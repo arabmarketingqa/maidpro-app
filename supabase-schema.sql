@@ -54,6 +54,17 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Settings table (single-row, stores admin settings as JSON)
+CREATE TABLE IF NOT EXISTS settings (
+  id    TEXT PRIMARY KEY DEFAULT 'main',
+  data  JSONB NOT NULL DEFAULT '{}'
+);
+
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all_settings" ON settings FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO settings (id, data) VALUES ('main', '{}') ON CONFLICT (id) DO NOTHING;
+
 -- Index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_bookings_date   ON bookings(date);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);

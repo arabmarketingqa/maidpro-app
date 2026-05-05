@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
-const fs   = require('fs');
 
 const app = express();
 app.use(express.json());
@@ -13,23 +12,35 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-// ── Settings file (persists across restarts) ──────────────────────────────────
-const SETTINGS_FILE = path.join(__dirname, 'settings.json');
+// ── Settings (stored in Supabase — works on Vercel serverless) ────────────────
 
-function readSettings() {
-  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')); }
-  catch { return {}; }
+async function readSettings() {
+  try {
+    const { data, error } = await supabase
+      .from('settings')
+      .select('data')
+      .eq('id', 'main')
+      .single();
+    if (error || !data) return {};
+    return data.data || {};
+  } catch { return {}; }
 }
-function writeSettings(patch) {
-  const cur = readSettings();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ ...cur, ...patch }, null, 2));
+
+async function writeSettings(patch) {
+  try {
+    const cur = await readSettings();
+    const updated = { ...cur, ...patch };
+    await supabase.from('settings').upsert({ id: 'main', data: updated });
+    return updated;
+  } catch { return patch; }
 }
 
-app.get('/api/settings', (req, res) => res.json(readSettings()));
+app.get('/api/settings', async (req, res) => {
+  res.json(await readSettings());
+});
 
-app.post('/api/settings', (req, res) => {
-  writeSettings(req.body);
-  res.json(readSettings());
+app.post('/api/settings', async (req, res) => {
+  res.json(await writeSettings(req.body));
 });
 
 // ── Scheduling utilities ──────────────────────────────────────────────────────
@@ -476,9 +487,16 @@ async function seedDefaultStaff() {
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-  console.log(`CleanPro server running at http://localhost:${PORT}`);
-  console.log(`Booking page: http://localhost:${PORT}/maid-booking.html`);
-  console.log(`Admin panel:  http://localhost:${PORT}/admin-panel.html`);
-  await seedDefaultStaff();
-});
+
+if (require.main === module) {
+  app.listen(PORT, async () => {
+    console.log(`CleanPro server running at http://localhost:${PORT}`);
+    console.log(`Booking page: http://localhost:${PORT}/index.html`);
+    console.log(`Admin panel:  http://localhost:${PORT}/admin-panel.html`);
+    await seedDefaultStaff();
+  });
+} else {
+  seedDefaultStaff().catch(() => {});
+}
+
+module.exports = app;
