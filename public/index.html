@@ -349,27 +349,8 @@ tr:hover td { background: #fafafa; }
       <div class="step-panel active" id="step1">
         <div class="step-title">Choose Service</div>
         <div class="step-sub">Select the type of cleaning you need</div>
-        <div class="service-cards">
-          <div class="service-card selected" onclick="selectService(this,'Regular Cleaning','15 QAR/hr')">
-            <div class="svc-icon">🧹</div>
-            <div class="svc-name">Regular Cleaning</div>
-            <div class="svc-price">15 QAR / hour</div>
-          </div>
-          <div class="service-card" onclick="selectService(this,'Deep Cleaning','15 QAR/hr')">
-            <div class="svc-icon">✨</div>
-            <div class="svc-name">Deep Cleaning</div>
-            <div class="svc-price">15 QAR / hour</div>
-          </div>
-          <div class="service-card" onclick="selectService(this,'Move-in / Move-out','15 QAR/hr')">
-            <div class="svc-icon">📦</div>
-            <div class="svc-name">Move-in / Out</div>
-            <div class="svc-price">15 QAR / hour</div>
-          </div>
-          <div class="service-card" onclick="selectService(this,'Post-Construction','15 QAR/hr')">
-            <div class="svc-icon">🏗️</div>
-            <div class="svc-name">Post-Construction</div>
-            <div class="svc-price">15 QAR / hour</div>
-          </div>
+        <div class="service-cards" id="service-cards-container">
+          <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:0.875rem">Loading services…</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
           <div class="form-group" style="margin-bottom:0">
@@ -634,7 +615,8 @@ const API = 'https://web-production-ca616.up.railway.app';
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let bookings = [];
-let booking = { service: 'Regular Cleaning', rate: 15, hours: 4, date: '', time: '', dateObj: null };
+let _services = [];
+let booking = { service: '', rate: 15, hours: 4, cleaners: 1, materials: false, date: '', time: '', dateObj: null };
 let calDate = new Date();
 let currentStep = 1;
 let BASE_RATE = 15;
@@ -647,8 +629,53 @@ async function loadSettings() {
     const s = await res.json();
     if (s.baseRate) BASE_RATE = parseFloat(s.baseRate);
     if (s.matRate)  MAT_RATE  = parseFloat(s.matRate);
-    booking.rate = BASE_RATE;
   } catch {}
+}
+
+async function loadServices() {
+  try {
+    const res = await fetch(API + '/api/services');
+    if (!res.ok) return;
+    const data = await res.json();
+    _services = Array.isArray(data) && data.length ? data : _defaultServices();
+  } catch {
+    _services = _defaultServices();
+  }
+  renderServiceCards();
+}
+
+function _defaultServices() {
+  return [
+    { id: 'svc1', name: 'Regular Cleaning',   icon: '🧹', baseRate: BASE_RATE, matRate: MAT_RATE },
+    { id: 'svc2', name: 'Deep Cleaning',      icon: '✨', baseRate: BASE_RATE, matRate: MAT_RATE },
+    { id: 'svc3', name: 'Move-in / Move-out', icon: '📦', baseRate: BASE_RATE, matRate: MAT_RATE },
+    { id: 'svc4', name: 'Post-Construction',  icon: '🏗️', baseRate: BASE_RATE, matRate: MAT_RATE },
+  ];
+}
+
+function renderServiceCards() {
+  const container = document.getElementById('service-cards-container');
+  if (!container) return;
+  if (!_services.length) {
+    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:0.875rem">No services available.</div>';
+    return;
+  }
+  container.innerHTML = _services.map((s, i) => `
+    <div class="service-card${i === 0 ? ' selected' : ''}"
+         onclick="selectService(this,'${s.name}',${s.baseRate},${s.matRate})">
+      <div class="svc-icon">${s.icon || '🧹'}</div>
+      <div class="svc-name">${s.name}</div>
+      <div class="svc-price">${s.baseRate} QAR / hour</div>
+    </div>`).join('');
+  // Select first service by default
+  if (_services.length) {
+    const first = _services[0];
+    booking.service = first.name;
+    booking.serviceBaseRate = first.baseRate;
+    booking.serviceMatRate  = first.matRate;
+    booking.rate = needsMaterials ? first.matRate : first.baseRate;
+    updateLiveTotal();
+  }
 }
 
 async function loadBookings() {
@@ -662,7 +689,10 @@ async function loadBookings() {
 }
 
 // Initial load then render admin
-Promise.all([loadSettings(), loadBookings()]).then(() => renderAdmin());
+Promise.all([loadSettings(), loadBookings()]).then(() => {
+  loadServices();
+  renderAdmin();
+});
 
 // ─── PAGE ─────────────────────────────────────────────────────────────────────
 function showPage(id) {
@@ -696,18 +726,23 @@ function updateProgress(n) {
 }
 
 // ─── SERVICE ─────────────────────────────────────────────────────────────────
-function selectService(el, name) {
+function selectService(el, name, svcBaseRate, svcMatRate) {
   document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   booking.service = name;
-  booking.rate = needsMaterials ? MAT_RATE : BASE_RATE;
+  booking.serviceBaseRate = svcBaseRate !== undefined ? svcBaseRate : BASE_RATE;
+  booking.serviceMatRate  = svcMatRate  !== undefined ? svcMatRate  : MAT_RATE;
+  booking.rate = needsMaterials ? booking.serviceMatRate : booking.serviceBaseRate;
+  updateLiveTotal();
 }
 
 let hours = 4, cleaners = 1, needsMaterials = false;
 let _blockedSlots = [];  // time slots where all maids are busy
 
 function updateLiveTotal() {
-  booking.rate = needsMaterials ? MAT_RATE : BASE_RATE;
+  const svcBase = booking.serviceBaseRate !== undefined ? booking.serviceBaseRate : BASE_RATE;
+  const svcMat  = booking.serviceMatRate  !== undefined ? booking.serviceMatRate  : MAT_RATE;
+  booking.rate = needsMaterials ? svcMat : svcBase;
   const total = booking.rate * hours * cleaners;
   const lt = document.getElementById('live-total');
   const sh = document.getElementById('summary-hrs');
@@ -885,7 +920,9 @@ function updateSummary() {
   booking.hours = hours;
   booking.cleaners = cleaners;
   booking.materials = needsMaterials;
-  booking.rate = needsMaterials ? MAT_RATE : BASE_RATE;
+  const svcBase = booking.serviceBaseRate !== undefined ? booking.serviceBaseRate : BASE_RATE;
+  const svcMat  = booking.serviceMatRate  !== undefined ? booking.serviceMatRate  : MAT_RATE;
+  booking.rate = needsMaterials ? svcMat : svcBase;
   const total = booking.rate * booking.hours * booking.cleaners;
   const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   safe('sum-service', booking.service);
@@ -942,7 +979,14 @@ async function submitBooking() {
 }
 
 function newBooking() {
-  booking = { service: 'Regular Cleaning', rate: BASE_RATE, hours: 4, cleaners: 1, materials: false, date: '', time: '', dateObj: null };
+  const firstSvc = _services[0];
+  booking = {
+    service: firstSvc ? firstSvc.name : '',
+    serviceBaseRate: firstSvc ? firstSvc.baseRate : BASE_RATE,
+    serviceMatRate:  firstSvc ? firstSvc.matRate  : MAT_RATE,
+    rate: firstSvc ? firstSvc.baseRate : BASE_RATE,
+    hours: 4, cleaners: 1, materials: false, date: '', time: '', dateObj: null,
+  };
   hours = 4; cleaners = 1; needsMaterials = false;
   const hoursEl = document.getElementById('hours-display');
   const cleanersEl = document.getElementById('cleaners-display');

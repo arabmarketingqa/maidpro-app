@@ -455,6 +455,74 @@ app.delete('/api/customers', async (req, res) => {
   res.json({ success: true });
 });
 
+// ── SERVICES ─────────────────────────────────────────────────────────────────
+
+function mapService(row) {
+  return {
+    id:        row.id,
+    name:      row.name,
+    icon:      row.icon       || '🧹',
+    baseRate:  parseFloat(row.base_rate)  || 15,
+    matRate:   parseFloat(row.mat_rate)   || 25,
+    sortOrder: parseInt(row.sort_order)   || 0,
+  };
+}
+
+app.get('/api/services', async (req, res) => {
+  const { data, error } = await supabase
+    .from('services')
+    .select('*')
+    .order('sort_order')
+    .order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data.map(mapService));
+});
+
+app.post('/api/services', async (req, res) => {
+  const s = req.body;
+  if (!s.name) return res.status(400).json({ error: 'name is required' });
+  const id = 'svc_' + Date.now();
+  const { data, error } = await supabase
+    .from('services')
+    .insert([{
+      id,
+      name:       s.name,
+      icon:       s.icon      || '🧹',
+      base_rate:  parseFloat(s.baseRate)  || 15,
+      mat_rate:   parseFloat(s.matRate)   || 25,
+      sort_order: parseInt(s.sortOrder)   || 0,
+    }])
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(mapService(data));
+});
+
+app.put('/api/services/:id', async (req, res) => {
+  const s = req.body;
+  if (!s.name) return res.status(400).json({ error: 'name is required' });
+  const { data, error } = await supabase
+    .from('services')
+    .update({
+      name:       s.name,
+      icon:       s.icon      || '🧹',
+      base_rate:  parseFloat(s.baseRate)  || 15,
+      mat_rate:   parseFloat(s.matRate)   || 25,
+      sort_order: parseInt(s.sortOrder)   || 0,
+    })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(mapService(data));
+});
+
+app.delete('/api/services/:id', async (req, res) => {
+  const { error } = await supabase.from('services').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // ── Health check ──────────────────────────────────────────────────────────────
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
@@ -490,15 +558,41 @@ async function seedDefaultStaff() {
 
 const PORT = process.env.PORT || 3000;
 
+async function seedDefaultServices() {
+  try {
+    const { count, error } = await supabase
+      .from('services')
+      .select('*', { count: 'exact', head: true });
+    if (error) {
+      console.log('ℹ️  Services table not ready — run add-services-table.sql in Supabase SQL Editor.');
+      return;
+    }
+    if (count === 0) {
+      const { error: insertErr } = await supabase.from('services').insert([
+        { id: 'svc1', name: 'Regular Cleaning',   icon: '🧹', base_rate: 15, mat_rate: 25, sort_order: 1 },
+        { id: 'svc2', name: 'Deep Cleaning',      icon: '✨', base_rate: 15, mat_rate: 25, sort_order: 2 },
+        { id: 'svc3', name: 'Move-in / Move-out', icon: '📦', base_rate: 15, mat_rate: 25, sort_order: 3 },
+        { id: 'svc4', name: 'Post-Construction',  icon: '🏗️', base_rate: 15, mat_rate: 25, sort_order: 4 },
+      ]);
+      if (insertErr) console.log('⚠️  Could not seed services:', insertErr.message);
+      else console.log('✅ Default services seeded');
+    }
+  } catch (e) {
+    console.log('ℹ️  Services seed skipped:', e.message);
+  }
+}
+
 if (require.main === module) {
   app.listen(PORT, async () => {
     console.log(`CleanPro server running at http://localhost:${PORT}`);
     console.log(`Booking page: http://localhost:${PORT}/index.html`);
     console.log(`Admin panel:  http://localhost:${PORT}/admin-panel.html`);
     await seedDefaultStaff();
+    await seedDefaultServices();
   });
 } else {
   seedDefaultStaff().catch(() => {});
+  seedDefaultServices().catch(() => {});
 }
 
 module.exports = app;

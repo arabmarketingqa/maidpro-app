@@ -917,7 +917,7 @@ body.dark .rep-range-btn.active { background:var(--teal); color:white; }
             <div class="tbl-wrap">
               <table class="tbl">
                 <thead><tr>
-                  <th>#</th><th>Service Name</th><th>Base Rate (QAR/hr)</th><th>With Materials (QAR/hr)</th><th>Actions</th>
+                  <th>#</th><th>Icon</th><th>Service Name</th><th>Base Rate (QAR/hr)</th><th>With Materials (QAR/hr)</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="svc-table"></tbody>
               </table>
@@ -1459,9 +1459,15 @@ body.dark .rep-range-btn.active { background:var(--teal); color:white; }
     </div>
     <div class="modal-body">
       <input type="hidden" id="svc-id">
-      <div class="login-group">
-        <label class="login-label">Service Name *</label>
-        <input class="login-input" id="svc-name" placeholder="e.g. Regular Cleaning">
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:14px;margin-bottom:16px">
+        <div class="login-group" style="margin-bottom:0">
+          <label class="login-label">Icon</label>
+          <input class="login-input" id="svc-icon" placeholder="🧹" value="🧹" style="font-size:1.4rem;text-align:center">
+        </div>
+        <div class="login-group" style="margin-bottom:0">
+          <label class="login-label">Service Name *</label>
+          <input class="login-input" id="svc-name" placeholder="e.g. Regular Cleaning">
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="login-group">
@@ -1602,7 +1608,7 @@ async function _loadCustomers() {
   } catch(e) { _customers = []; }
 }
 async function _loadAll() {
-  await Promise.all([_loadBookings(), _loadStaff(), _loadCustomers()]);
+  await Promise.all([_loadBookings(), _loadStaff(), _loadCustomers(), _loadServices()]);
 }
 
 function localToday() {
@@ -1758,7 +1764,7 @@ function renderTab(tab) {
   if (tab === 'staff') { _loadStaff().then(() => renderStaff()); }
   if (tab === 'customers') renderCustomers();
   if (tab === 'settings') renderSettings();
-  if (tab === 'services') renderServices();
+  if (tab === 'services') _loadServices().then(() => renderServices());
 }
 
 // ══ SETTINGS ══════════════════════════════════════════════════════════════════
@@ -3368,23 +3374,17 @@ document.getElementById('detail-modal').addEventListener('click', e => { if (e.t
 document.getElementById('confirm-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal('confirm-overlay'); });
 
 // ══ SERVICES ══════════════════════════════════════════════════════════════════
-const DEFAULT_SERVICES = [
-  { id: 'svc1', name: 'Regular Cleaning',   baseRate: 15, matRate: 25 },
-  { id: 'svc2', name: 'Deep Cleaning',      baseRate: 15, matRate: 25 },
-  { id: 'svc3', name: 'Move-in / Move-out', baseRate: 15, matRate: 25 },
-  { id: 'svc4', name: 'Post-Construction',  baseRate: 15, matRate: 25 },
-];
+let _services = [];
 
-function getServices() {
+async function _loadServices() {
   try {
-    const stored = JSON.parse(localStorage.getItem('cp_services') || 'null');
-    return Array.isArray(stored) && stored.length ? stored : [...DEFAULT_SERVICES];
-  } catch { return [...DEFAULT_SERVICES]; }
+    const res = await fetch(API + '/api/services');
+    const data = await res.json();
+    _services = Array.isArray(data) ? data : [];
+  } catch { _services = []; }
 }
 
-function _saveServicesStore(svcs) {
-  localStorage.setItem('cp_services', JSON.stringify(svcs));
-}
+function getServices() { return _services; }
 
 function renderServices() {
   const svcs = getServices();
@@ -3394,6 +3394,7 @@ function renderServices() {
   el('svc-table').innerHTML = svcs.length ? svcs.map((s, i) => `
     <tr>
       <td style="color:var(--muted);font-size:0.82rem">${i + 1}</td>
+      <td style="font-size:1.4rem;text-align:center">${s.icon || '🧹'}</td>
       <td><strong>${s.name}</strong></td>
       <td style="color:var(--teal);font-weight:600">${s.baseRate} QAR/hr</td>
       <td style="color:var(--amber);font-weight:600">${s.matRate} QAR/hr</td>
@@ -3404,19 +3405,28 @@ function renderServices() {
         </div>
       </td>
     </tr>`).join('') :
-    `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No services yet. Add one above.</td></tr>`;
+    `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No services yet. Add one above.</td></tr>`;
+  // Keep service filter dropdown in sync
+  const bkSvc = document.getElementById('bk-service');
+  if (bkSvc) {
+    const cur = bkSvc.value;
+    bkSvc.innerHTML = '<option value="">All Services</option>' +
+      svcs.map(s => `<option value="${s.name}"${s.name===cur?' selected':''}>${s.name}</option>`).join('');
+  }
 }
 
 function openServiceModal(id) {
   const el = e => document.getElementById(e);
   el('svc-modal-title').textContent = id ? 'Edit Service' : 'Add Service';
   el('svc-id').value = id || '';
+  el('svc-icon').value = '🧹';
   el('svc-name').value = '';
   el('svc-base-rate').value = 15;
   el('svc-mat-rate').value = 25;
   if (id) {
     const s = getServices().find(x => x.id === id);
     if (s) {
+      el('svc-icon').value      = s.icon || '🧹';
       el('svc-name').value      = s.name;
       el('svc-base-rate').value = s.baseRate;
       el('svc-mat-rate').value  = s.matRate;
@@ -3425,32 +3435,45 @@ function openServiceModal(id) {
   el('service-modal').classList.add('open');
 }
 
-function saveService() {
+async function saveService() {
   const el = e => document.getElementById(e);
   const name = el('svc-name').value.trim();
   if (!name) { showToast('⚠️ Service name is required'); return; }
-  const id       = el('svc-id').value || ('svc_' + Date.now());
-  const baseRate = parseFloat(el('svc-base-rate').value) || 15;
-  const matRate  = parseFloat(el('svc-mat-rate').value)  || 25;
-  const svcs = getServices();
-  const idx  = svcs.findIndex(s => s.id === id);
-  if (idx > -1) svcs[idx] = { id, name, baseRate, matRate };
-  else svcs.push({ id, name, baseRate, matRate });
-  _saveServicesStore(svcs);
-  closeModal('service-modal');
-  renderServices();
-  showToast(`✅ Service "${name}" saved`);
+  const id       = el('svc-id').value;
+  const icon     = el('svc-icon').value.trim()              || '🧹';
+  const baseRate = parseFloat(el('svc-base-rate').value)    || 15;
+  const matRate  = parseFloat(el('svc-mat-rate').value)     || 25;
+  const payload  = { name, icon, baseRate, matRate };
+  try {
+    const res = await fetch(API + '/api/services' + (id ? '/' + id : ''), {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+    closeModal('service-modal');
+    await _loadServices();
+    renderServices();
+    showToast(`✅ Service "${name}" saved`);
+  } catch (e) {
+    showToast('❌ ' + e.message);
+  }
 }
 
 function deleteService(id) {
   const s = getServices().find(x => x.id === id);
   if (!s) return;
-  confirmAction(`Delete "${s.name}"?`, 'This removes this service type.', () => {
-    const svcs = getServices().filter(x => x.id !== id);
-    _saveServicesStore(svcs);
-    renderServices();
-    closeModal('confirm-overlay');
-    showToast(`🗑 "${s.name}" deleted`);
+  confirmAction(`Delete "${s.name}"?`, 'This removes this service type.', async () => {
+    try {
+      const res = await fetch(API + '/api/services/' + id, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      await _loadServices();
+      renderServices();
+      closeModal('confirm-overlay');
+      showToast(`🗑 "${s.name}" deleted`);
+    } catch (e) {
+      showToast('❌ ' + e.message);
+    }
   });
 }
 
