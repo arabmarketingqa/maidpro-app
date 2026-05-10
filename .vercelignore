@@ -1,9 +1,10 @@
 node_modules
-server.js
-api/
-Procfile
 .env
+.env.example
 settings.json
 *.sql
-package.json
-package-lock.json
+Procfile
+server.js
+Mobile Preview.html
+uploads/
+.claude/
