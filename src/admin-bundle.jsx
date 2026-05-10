@@ -1556,11 +1556,21 @@ const StatusDot = ({ status }) => {
 const StaffSection = ({ store, set, bookings }) => {
   const update = (id, patch) => set({ staff: store.staff.map(s => s.id === id ? { ...s, ...patch } : s) });
   const remove = (id) => set({ staff: store.staff.filter(s => s.id !== id) });
-  const add = () => set({ staff: [...store.staff, { id: `s${Date.now()}`, name: "New Maid", nationality: store.nationalities[0]?.id || "philippines", status: "Available", color: "mint", skills: [] }] });
   const toggleSkill = (sid, sk) => {
     const s = store.staff.find(x => x.id === sid); if (!s) return;
     const has = s.skills.includes(sk);
     update(sid, { skills: has ? s.skills.filter(x => x !== sk) : [...s.skills, sk] });
+  };
+
+  const blankDraft = () => ({ name: "", nationality: store.nationalities[0]?.id || "philippines", status: "Available", color: "mint", skills: [] });
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(blankDraft);
+  const toggleDraftSkill = (sk) => setDraft(d => ({ ...d, skills: d.skills.includes(sk) ? d.skills.filter(x => x !== sk) : [...d.skills, sk] }));
+  const openModal = () => { setDraft(blankDraft()); setModalOpen(true); };
+  const saveNew = () => {
+    if (!draft.name.trim()) return;
+    set({ staff: [...store.staff, { id: `s${Date.now()}`, ...draft }] });
+    setModalOpen(false);
   };
   const activeMaids = store.staff.filter(s => s.status === "Available").length;
   const totalMaids = store.staff.length;
@@ -1599,7 +1609,7 @@ const StaffSection = ({ store, set, bookings }) => {
       </div>
 
       <Card title="Staff Directory" subtitle="Add, edit and manage every maid on the roster."
-        action={<PrimaryBtn size="sm" onClick={add}><AdminIcon name="plus" className="w-4 h-4"/>Add staff</PrimaryBtn>} padded={false}>
+        action={<PrimaryBtn size="sm" onClick={openModal}><AdminIcon name="plus" className="w-4 h-4"/>Add staff</PrimaryBtn>} padded={false}>
         <div className="hidden md:grid grid-cols-[56px_1.4fr_1.1fr_1.1fr_1.6fr_120px_60px] gap-3 px-6 py-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 border-b border-ink-200/70 bg-ink-50/50">
           <div></div><div>Name</div><div>Nationality</div><div>Status</div><div>Skills</div><div>Active jobs</div><div></div>
         </div>
