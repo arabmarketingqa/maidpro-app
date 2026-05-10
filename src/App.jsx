@@ -3,6 +3,7 @@ import { Icon, Pill, PrimaryButton, GhostButton } from './ui'
 import { computePrice, Money } from './pricing'
 import { StepService, StepDate, StepTime, StepLocation, StepConfirm, StepSuccess } from './steps'
 import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle } from './tweaks-panel'
+import { supabase } from './supabase'
 
 const STEPS = [
   { id: "service", label: "Service" },
@@ -132,6 +133,7 @@ function App() {
   const [idx, setIdx] = React.useState(initStep);
   const [maxReached, setMaxReached] = React.useState(initStep);
   const [bookingId, setBookingId] = React.useState(initStep === 5 ? "MP-X7K9PM" : null);
+  const [submitting, setSubmitting] = React.useState(false);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   React.useEffect(() => { applyAccent(tweaks.accent); }, [tweaks.accent]);
@@ -155,9 +157,29 @@ function App() {
     return false;
   })();
 
-  const goNext = () => {
+  const goNext = async () => {
     if (stepKey === "confirm") {
-      setBookingId(makeBookingId());
+      setSubmitting(true);
+      const id = makeBookingId();
+      await supabase.from('bookings').insert({
+        ref:       id,
+        name:      state.name,
+        phone:     state.phone,
+        service:   breakdown.serviceName,
+        date:      state.date ? state.date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        time:      state.time || '—',
+        area:      state.zone || '',
+        hours:     breakdown.hours,
+        cleaners:  breakdown.maids,
+        materials: state.materials || false,
+        rate:      breakdown.rate,
+        total:     breakdown.total,
+        address:   state.address || '',
+        notes:     state.notes  || '',
+        status:    'New',
+      });
+      setSubmitting(false);
+      setBookingId(id);
       setIdx(visibleSteps.length);
       return;
     }
@@ -245,9 +267,9 @@ function App() {
                 <Icon name="arrow-left" className="w-4 h-4" />
                 Back
               </GhostButton>
-              <PrimaryButton onClick={goNext} disabled={!canAdvance} className="px-6">
-                {labelMap[stepKey] || "Continue"}
-                <Icon name="arrow-right" className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting} className="px-6">
+                {submitting ? 'Saving…' : (labelMap[stepKey] || "Continue")}
+                {!submitting && <Icon name="arrow-right" className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />}
               </PrimaryButton>
             </div>
           )}

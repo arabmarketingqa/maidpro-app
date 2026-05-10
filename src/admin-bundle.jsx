@@ -1,4 +1,5 @@
 ﻿import React from 'react'
+import { supabase, fmtBooking } from './supabase'
 
 /* Admin UI primitives â€” exposed on window for cross-script access */
 
@@ -997,27 +998,9 @@ const NAV = [
   { id: "settings",     label: "Settings",     icon: "settings" },
 ];
 
-const SEED_BOOKINGS = [
-  { ref: "MP-2034", customer: "Aisha Al-Mansouri", phone: "+974 3344 1209", service: "Deep Cleaning",      mode: "Hourly",   date: "May 11", time: "09:00", maids: 2, hours: 5, total: 380, status: "Confirmed" },
-  { ref: "MP-2033", customer: "Rohan Mehta",       phone: "+974 5567 8821", service: "Standard Package",   mode: "Monthly",  date: "May 10", time: "08:00", maids: 1, hours: 4, total: 1200, status: "In Progress" },
-  { ref: "MP-2032", customer: "Sara Al-Thani",     phone: "+974 7712 5503", service: "Move-in / Out",      mode: "Hourly",   date: "May 12", time: "13:00", maids: 3, hours: 6, total: 720, status: "Pending" },
-  { ref: "MP-2031", customer: "Daniel Okafor",     phone: "+974 6088 4412", service: "3-Month Stay-In",    mode: "Stay-In",  date: "May 09", time: "â€”",     maids: 1, hours: 24, total: 15000, status: "Confirmed" },
-  { ref: "MP-2030", customer: "Priya Sharma",      phone: "+974 3001 7745", service: "Regular Cleaning",   mode: "Hourly",   date: "May 09", time: "10:00", maids: 1, hours: 4, total: 160, status: "Completed" },
-  { ref: "MP-2029", customer: "Mohammad Al-Kuwari", phone: "+974 5544 9012", service: "Premium Package",   mode: "Monthly",  date: "May 08", time: "07:00", maids: 2, hours: 4, total: 2400, status: "Confirmed" },
-  { ref: "MP-2028", customer: "Lisa Tan",          phone: "+974 7090 3344", service: "Post-Construction", mode: "Hourly",   date: "May 08", time: "14:00", maids: 4, hours: 8, total: 1280, status: "Cancelled" },
-  { ref: "MP-2027", customer: "Faisal Ibrahim",    phone: "+974 6612 0099", service: "Custom Monthly",    mode: "Monthly",  date: "May 07", time: "16:00", maids: 1, hours: 4, total: 1080, status: "Completed" },
-  { ref: "MP-2026", customer: "Hannah Reyes",      phone: "+974 3398 1126", service: "Regular Cleaning",  mode: "Hourly",   date: "May 07", time: "11:00", maids: 1, hours: 3, total: 120, status: "Completed" },
-  { ref: "MP-2025", customer: "Ahmed Saif",        phone: "+974 7740 8855", service: "Deep Cleaning",     mode: "Hourly",   date: "May 06", time: "09:00", maids: 2, hours: 6, total: 480, status: "Pending" },
-  { ref: "MP-2024", customer: "Veronica Cruz",     phone: "+974 5081 2233", service: "Basic Package",     mode: "Monthly",  date: "May 06", time: "08:00", maids: 1, hours: 4, total: 960, status: "Confirmed" },
-  { ref: "MP-2023", customer: "Jaspreet Kaur",     phone: "+974 3320 4477", service: "12-Month Stay-In",  mode: "Stay-In",  date: "May 05", time: "â€”",     maids: 1, hours: 24, total: 54000, status: "Confirmed" },
-];
+/* Bookings loaded live from Supabase */
 
-const KPIS = [
-  { label: "Bookings Today",    value: "47",     unit: "jobs",     delta: 12,  icon: "calendar", tone: "mint" },
-  { label: "Active Maids",      value: "128",    unit: "live",     delta: 4,   icon: "users",    tone: "ink" },
-  { label: "Revenue (MTD)",     value: "82,450", unit: "QAR",      delta: 18,  icon: "money",    tone: "mint" },
-  { label: "Completion Rate",   value: "96.2",   unit: "%",        delta: -1,  icon: "trend",    tone: "ink" },
-];
+/* KPIs calculated from real bookings */
 
 const initialStore = () => ({
   modes: [
@@ -1165,7 +1148,7 @@ const Sidebar = ({ active, onNav, onClose, mobile }) => (
 );
 
 /* â”€â”€â”€ Top bar â”€â”€â”€ */
-const TopBar = ({ section, onMenu, store }) => {
+const TopBar = ({ section, onMenu, store, onClear }) => {
   const titles = {
     overview: "Overview",
     bookings: "Bookings",
@@ -1220,6 +1203,14 @@ const TopBar = ({ section, onMenu, store }) => {
         <div className="hidden sm:block w-64">
           <TextField icon="search" value="" onChange={() => {}} placeholder="Search bookings, customersâ€¦"/>
         </div>
+
+        <button
+          onClick={() => { if (window.confirm('Clear all admin data and reset to defaults?')) onClear(); }}
+          className="h-9 px-3.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[13px] font-semibold transition-colors flex items-center gap-1.5"
+        >
+          <AdminIcon name="trash" className="w-4 h-4"/>
+          Clear
+        </button>
 
         <button className="relative w-10 h-10 rounded-lg grid place-items-center text-ink-700 hover:bg-ink-100">
           <AdminIcon name="bell" className="w-5 h-5"/>
@@ -1854,18 +1845,49 @@ const App = () => {
   const [store, setStore] = React.useState(initialStore());
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const set = (patch) => setStore(prev => ({ ...prev, ...patch }));
+  const clearStore = () => setStore(initialStore());
 
+  /* Live bookings from Supabase */
+  const [bookings, setBookings] = React.useState([]);
+  const [bLoading, setBLoading] = React.useState(true);
+
+  const fetchBookings = React.useCallback(async () => {
+    const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false }).limit(500);
+    if (!error && data) setBookings(data.map(fmtBooking));
+    setBLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    fetchBookings();
+    const ch = supabase.channel('admin-bookings-live').on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings).subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [fetchBookings]);
+
+  const todayISO  = new Date().toISOString().split('T')[0];
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO);
+  const mtdRev    = bookings.filter(b => ['Confirmed','Completed'].includes(b.status) && (b._raw && b._raw.created_at || '').startsWith(thisMonth)).reduce((s, b) => s + b.total, 0);
+  const activeMaids = todayBks.filter(b => b.status === 'Confirmed').reduce((s, b) => s + b.maids, 0);
+  const doneCount = bookings.filter(b => b.status === 'Completed').length;
+  const doneOf    = bookings.filter(b => ['Confirmed','Completed','Cancelled'].includes(b.status)).length;
+  const compRate  = doneOf > 0 ? ((doneCount / doneOf) * 100).toFixed(1) : "0";
+  const dynamicKpis = [
+    { label: "Bookings Today",  value: String(todayBks.length),  unit: "jobs", delta: 0, icon: "calendar", tone: "mint" },
+    { label: "Active Maids",    value: String(activeMaids || 0), unit: "live", delta: 0, icon: "users",    tone: "ink"  },
+    { label: "Revenue (MTD)",   value: mtdRev.toLocaleString(),  unit: "QAR",  delta: 0, icon: "money",    tone: "mint" },
+    { label: "Completion Rate", value: compRate,                 unit: "%",    delta: 0, icon: "trend",    tone: "ink"  },
+  ];
   const sections = {
-    overview:      <OverviewSection store={store} kpis={KPIS} bookings={SEED_BOOKINGS}/>,
-    bookings:      <BookingsSection bookings={SEED_BOOKINGS} store={store} set={set}/>,
+    overview:      <OverviewSection store={store} kpis={dynamicKpis} bookings={bookings}/>,
+    bookings:      <BookingsSection bookings={bookings} store={store} set={set} loading={bLoading}/>,
     hourly:        <HourlySection store={store} set={set}/>,
     monthly:       <MonthlySection store={store} set={set}/>,
     stayin:        <StayInSection store={store} set={set}/>,
     nationalities: <NationalitiesSection store={store} set={set}/>,
     materials:     <MaterialsSection store={store} set={set}/>,
-    calendar:      <CalendarSection store={store} set={set} bookings={SEED_BOOKINGS}/>,
-    staff:         <StaffSection store={store} set={set} bookings={SEED_BOOKINGS}/>,
-    settings:      <SettingsSection store={store} set={set}/>,
+    calendar:      <CalendarSection store={store} set={set} bookings={bookings}/>,
+    staff:         <StaffSection store={store} set={set} bookings={bookings}/>,
+    settings:      <SettingsSection store={store} set={set}/>
   };
 
   return (
@@ -1887,7 +1909,7 @@ const App = () => {
 
       {/* main */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <TopBar section={section} onMenu={() => setDrawerOpen(true)} store={store}/>
+        <TopBar section={section} onMenu={() => setDrawerOpen(true)} store={store} onClear={clearStore}/>
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1480px] w-full mx-auto">
           {sections[section]}
         </main>
@@ -1901,3 +1923,4 @@ const App = () => {
 };
 
 export default App;
+
