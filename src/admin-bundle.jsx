@@ -547,14 +547,21 @@ const ServicesSection = ({ store, set }) => {
 
 /* â”€â”€â”€â”€â”€â”€â”€ Nationalities â”€â”€â”€â”€â”€â”€â”€ */
 const NationalitiesSection = ({ store, set }) => {
-  const update = (id, patch) => set({ nationalities: store.nationalities.map(n => n.id === id ? { ...n, ...patch } : n) });
-  const remove = (id) => set({ nationalities: store.nationalities.filter(n => n.id !== id) });
-  const add = () => set({
-    nationalities: [
-      ...store.nationalities,
-      { id: `new${Date.now()}`, name: "New nationality", flag: "ðŸŒ", rate: 20, on: true }
-    ]
-  });
+  const update = (id, patch) => {
+    set({ nationalities: store.nationalities.map(n => n.id === id ? { ...n, ...patch } : n) });
+    const dbPatch = { ...patch };
+    if ('on' in dbPatch) { dbPatch.enabled = dbPatch.on; delete dbPatch.on; }
+    supabase.from('nationalities').update(dbPatch).eq('id', id);
+  };
+  const remove = (id) => {
+    set({ nationalities: store.nationalities.filter(n => n.id !== id) });
+    supabase.from('nationalities').delete().eq('id', id);
+  };
+  const add = () => {
+    const n = { id: 'nat_' + Date.now(), name: 'New Nationality', flag: '🌍', rate: 20, on: true };
+    set({ nationalities: [...store.nationalities, n] });
+    supabase.from('nationalities').insert({ id: n.id, name: n.name, flag: n.flag, rate: n.rate, enabled: true });
+  };
 
   return (
     <div className="space-y-5 fade-up">
@@ -1554,22 +1561,30 @@ const StatusDot = ({ status }) => {
 };
 
 const StaffSection = ({ store, set, bookings }) => {
-  const update = (id, patch) => set({ staff: store.staff.map(s => s.id === id ? { ...s, ...patch } : s) });
-  const remove = (id) => set({ staff: store.staff.filter(s => s.id !== id) });
+  const update = (id, patch) => {
+    set({ staff: store.staff.map(s => s.id === id ? { ...s, ...patch } : s) });
+    supabase.from('staff').update(patch).eq('id', id);
+  };
+  const remove = (id) => {
+    set({ staff: store.staff.filter(s => s.id !== id) });
+    supabase.from('staff').delete().eq('id', id);
+  };
   const toggleSkill = (sid, sk) => {
     const s = store.staff.find(x => x.id === sid); if (!s) return;
     const has = s.skills.includes(sk);
     update(sid, { skills: has ? s.skills.filter(x => x !== sk) : [...s.skills, sk] });
   };
 
-  const blankDraft = () => ({ name: "", nationality: store.nationalities[0]?.id || "philippines", status: "Available", color: "mint", skills: [] });
+  const blankDraft = () => ({ name: '', nationality: store.nationalities[0]?.id || 'philippines', status: 'Available', color: 'mint', skills: [] });
   const [modalOpen, setModalOpen] = React.useState(false);
   const [draft, setDraft] = React.useState(blankDraft);
   const toggleDraftSkill = (sk) => setDraft(d => ({ ...d, skills: d.skills.includes(sk) ? d.skills.filter(x => x !== sk) : [...d.skills, sk] }));
   const openModal = () => { setDraft(blankDraft()); setModalOpen(true); };
   const saveNew = () => {
     if (!draft.name.trim()) return;
-    set({ staff: [...store.staff, { id: `s${Date.now()}`, ...draft }] });
+    const newStaff = { id: 's_' + Date.now(), ...draft };
+    set({ staff: [...store.staff, newStaff] });
+    supabase.from('staff').insert(newStaff);
     setModalOpen(false);
   };
   const activeMaids = store.staff.filter(s => s.status === "Available").length;
@@ -1872,6 +1887,44 @@ const App = () => {
     const ch = supabase.channel('admin-bookings-live').on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBookings).subscribe();
     return () => supabase.removeChannel(ch);
   }, [fetchBookings]);
+
+  /* ── Live nationalities from Supabase ── */
+  const fetchNationalities = React.useCallback(async () => {
+    const { data, error } = await supabase.from('nationalities').select('*').order('name');
+    if (!error && data && data.length > 0) {
+      setStore(prev => ({ ...prev, nationalities: data.map(n => ({
+        id: n.id, name: n.name, flag: n.flag || '🌍',
+        rate: Number(n.rate) || 15, on: n.enabled !== false,
+      })) }));
+    }
+  }, []);
+
+  /* ── Live staff from Supabase ── */
+  const fetchStaff = React.useCallback(async () => {
+    const { data, error } = await supabase.from('staff').select('*').order('name');
+    if (!error && data && data.length > 0) {
+      setStore(prev => ({ ...prev, staff: data.map(s => ({
+        id: s.id, name: s.name || '',
+        nationality: s.nationality || 'philippines',
+        status: s.status || 'Available',
+        color: s.color || 'mint',
+        skills: Array.isArray(s.skills) ? s.skills : [],
+        phone: s.phone || '',
+        notes: s.notes || '',
+      })) }));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchNationalities();
+    fetchStaff();
+    const ch2 = supabase
+      .channel('admin-nat-staff-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nationalities' }, fetchNationalities)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, fetchStaff)
+      .subscribe();
+    return () => supabase.removeChannel(ch2);
+  }, [fetchNationalities, fetchStaff]);
 
   const todayISO  = new Date().toISOString().split('T')[0];
   const thisMonth = new Date().toISOString().slice(0, 7);
