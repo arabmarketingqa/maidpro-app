@@ -1,0 +1,11 @@
+{
+  "theme": "light",
+  "bizName": "Al zahour",
+  "adminName": "",
+  "baseRate": 10,
+  "matRate": 25,
+  "minHours": 4,
+  "startHr": 8,
+  "endHr": 20,
+  "assignMethod": "least-busy"
+}

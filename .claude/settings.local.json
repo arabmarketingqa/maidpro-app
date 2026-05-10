@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Depth 2 | Where-Object { $_.PSIsContainer -and $_.Name -ne 'node_modules' -and $_.Name -ne '.git' } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Recurse -File | Where-Object { $_.Name -notmatch \"node_modules\" } | Select-Object Name, FullName | Format-Table -AutoSize)",
+      "PowerShell(notepad *)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/bookings\" | ConvertTo-Json -Depth 5)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/staff\" | ConvertTo-Json -Depth 5)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(try { Invoke-RestMethod -Uri \"http://localhost:3000/api/staff\" | ConvertTo-Json } catch { $_.Exception.Response.StatusCode.value__; $_.ErrorDetails.Message })",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/settings\" | ConvertTo-Json)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/availability?date=2026-05-06&hours=4\")",
+      "PowerShell(Start-Sleep -Seconds 3; Invoke-RestMethod \"http://localhost:3000/api/health\" | ConvertTo-Json)",
+      "PowerShell(Invoke-RestMethod -Uri \"http://localhost:3000/api/bookings\" -Method DELETE | ConvertTo-Json)",
+      "PowerShell(Start-Sleep -Seconds 3; Invoke-RestMethod -Uri \"http://localhost:3000/api/bookings\" -Method DELETE | ConvertTo-Json)",
+      "PowerShell(Invoke-RestMethod \"http://localhost:3000/api/bookings\" | ConvertTo-Json)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Recurse -File | Select-Object FullName | Sort-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\\\\\", \"\"\\) })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Depth 2 | Where-Object { $_.PSIsContainer } | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Force | Where-Object { -not $_.PSIsContainer } | Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Force | Where-Object { $_.Name -ne \"node_modules\" -and $_.Name -ne \".claude\" } | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\\\\public\" -Force | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(netstat *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\islam\\\\Downloads\\\\maid-booking-system\" -Depth 2 -Exclude node_modules | Where-Object { $_.Name -notmatch '^node_modules' })"
+    ]
+  }
+}

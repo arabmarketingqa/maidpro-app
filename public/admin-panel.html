@@ -1,0 +1,3527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CleanPro — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --teal: #0d9488; --teal-light: #14b8a6; --teal-dark: #0f766e;
+  --teal-faint: #f0fdfa; --teal-faint2: #ccfbf1;
+  --text: #0f172a; --text2: #475569; --muted: #94a3b8;
+  --border: #e2e8f0; --bg: #f1f5f9;
+  --red: #ef4444; --green: #10b981; --amber: #f59e0b; --blue: #3b82f6;
+  --sidebar-w: 240px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); }
+
+/* ── LOGIN ── */
+#login-screen {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#0f766e,#0d9488,#134e4a);
+  position:relative; overflow:hidden;
+}
+#login-screen::before {
+  content:''; position:absolute; inset:0; opacity:0.04;
+  background-image:repeating-linear-gradient(45deg,white 0,white 1px,transparent 0,transparent 50%);
+  background-size:24px 24px;
+}
+.login-card {
+  background:white; border-radius:20px; padding:44px 40px; width:400px; max-width:95vw;
+  box-shadow:0 32px 80px rgba(0,0,0,0.25); position:relative; z-index:1;
+}
+.login-logo { text-align:center; margin-bottom:28px; }
+.login-logo .icon { width:60px; height:60px; background:linear-gradient(135deg,var(--teal),var(--teal-dark)); border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 12px; box-shadow:0 8px 24px rgba(13,148,136,0.35); }
+.login-logo h1 { font-family:'Cormorant Garamond',serif; font-size:1.6rem; color:var(--text); }
+.login-logo p { font-size:0.78rem; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-top:3px; }
+.login-group { margin-bottom:16px; }
+.login-label { display:block; font-size:0.75rem; font-weight:600; color:var(--text2); letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px; }
+.login-input {
+  width:100%; padding:12px 16px; border:1.5px solid var(--border); border-radius:10px;
+  font-family:'Outfit',sans-serif; font-size:0.9rem; color:var(--text); outline:none; transition:border-color 0.2s;
+}
+.login-input:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(13,148,136,0.08); }
+.login-btn {
+  width:100%; padding:14px; background:linear-gradient(135deg,var(--teal),var(--teal-dark));
+  color:white; border:none; border-radius:10px; font-family:'Outfit',sans-serif;
+  font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.2s; margin-top:8px;
+  box-shadow:0 4px 20px rgba(13,148,136,0.35);
+}
+.login-btn:hover { transform:translateY(-1px); box-shadow:0 6px 28px rgba(13,148,136,0.45); }
+.login-error { background:#fef2f2; border:1px solid #fca5a5; color:var(--red); border-radius:8px; padding:10px 14px; font-size:0.82rem; margin-top:12px; display:none; text-align:center; }
+
+/* ── ADMIN LAYOUT ── */
+#admin-screen { display:none; min-height:100vh; }
+
+.sidebar {
+  position:fixed; left:0; top:0; bottom:0; width:var(--sidebar-w);
+  background:#0f172a; display:flex; flex-direction:column; z-index:100;
+  transition:width 0.25s ease, transform 0.3s; overflow:hidden;
+}
+.sidebar.collapsed { width:64px; }
+.sidebar.collapsed .sidebar-logo p,
+.sidebar.collapsed .nav-section-label,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .logout-label { display:none; }
+.sidebar.collapsed .nav-item { justify-content:center; padding:10px 0; gap:0; }
+.sidebar.collapsed .sidebar-bottom .nav-item { justify-content:center; padding:10px 0; gap:0; }
+.sidebar.collapsed .logout-btn { justify-content:center; padding:10px 0; gap:0; }
+.sidebar.collapsed .sidebar-logo { padding:18px 0; justify-content:center; }
+.sidebar.collapsed .sidebar-logo h2 { font-size:1.4rem; }
+.sidebar-toggle { background:none; border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.6); border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0; }
+.sidebar-toggle:hover { background:rgba(255,255,255,0.1); color:white; }
+.sidebar.collapsed .sidebar-toggle { transform:rotate(180deg); }
+.sidebar-logo { padding:24px 20px 20px; border-bottom:1px solid rgba(255,255,255,0.08); }
+.sidebar-logo h2 { font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:white; }
+.sidebar-logo p { font-size:0.68rem; color:rgba(255,255,255,0.4); letter-spacing:2px; text-transform:uppercase; margin-top:2px; }
+.sidebar-nav { padding:16px 12px; flex:1; overflow-y:auto; }
+.nav-section-label { font-size:0.62rem; color:rgba(255,255,255,0.35); letter-spacing:2px; text-transform:uppercase; padding:12px 12px 6px; }
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px;
+  cursor:pointer; transition:all 0.2s; color:rgba(255,255,255,0.6); font-size:0.875rem; margin-bottom:3px;
+}
+.nav-item:hover { background:rgba(255,255,255,0.08); color:white; }
+.nav-item.active { background:rgba(13,148,136,0.25); color:var(--teal-light); border:1px solid rgba(13,148,136,0.3); }
+.nav-item .ni { font-size:1rem; width:20px; text-align:center; }
+.nav-badge { background:var(--red); color:white; font-size:0.62rem; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:auto; }
+.sidebar-bottom { padding:16px 12px; border-top:1px solid rgba(255,255,255,0.08); }
+.logout-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; color:rgba(255,255,255,0.5); font-size:0.82rem; transition:all 0.2s; }
+.logout-btn:hover { color:var(--red); background:rgba(239,68,68,0.1); }
+
+.main { margin-left:var(--sidebar-w); min-height:100vh; }
+
+/* ── TOPBAR ── */
+.topbar { background:white; border-bottom:1px solid var(--border); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50; }
+.topbar-left h2 { font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:var(--text); }
+.topbar-left p { font-size:0.78rem; color:var(--muted); margin-top:1px; }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.refresh-btn { padding:8px 16px; background:var(--teal); color:white; border:none; border-radius:8px; font-family:'Outfit',sans-serif; font-size:0.82rem; cursor:pointer; transition:all 0.2s; }
+.refresh-btn:hover { background:var(--teal-dark); }
+.admin-avatar { width:36px; height:36px; background:linear-gradient(135deg,var(--teal),var(--teal-dark)); border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:0.875rem; }
+
+/* ── PAGE CONTENT ── */
+.content { padding:28px; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* ── STATS ── */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; margin-bottom:24px; }
+.stat-card { background:white; border-radius:14px; padding:20px 22px; border:1px solid var(--border); position:relative; overflow:hidden; }
+.stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; }
+.stat-card.teal::after { background:linear-gradient(90deg,var(--teal),var(--teal-light)); }
+.stat-card.amber::after { background:linear-gradient(90deg,var(--amber),#fcd34d); }
+.stat-card.green::after { background:linear-gradient(90deg,var(--green),#34d399); }
+.stat-card.blue::after  { background:linear-gradient(90deg,var(--blue),#60a5fa); }
+.stat-card.red::after   { background:linear-gradient(90deg,var(--red),#f87171); }
+.stat-label { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+.stat-val { font-family:'Cormorant Garamond',serif; font-size:2.2rem; color:var(--text); font-weight:700; margin:4px 0 2px; line-height:1; }
+.stat-sub { font-size:0.75rem; color:var(--muted); }
+.stat-icon { position:absolute; right:18px; top:18px; font-size:1.8rem; opacity:0.15; }
+
+/* ── TODAY STRIP ── */
+.today-strip { background:linear-gradient(135deg,var(--teal-dark),var(--teal)); border-radius:12px; padding:16px 22px; margin-bottom:24px; display:flex; align-items:center; gap:16px; color:white; }
+.today-strip .ts-icon { font-size:1.8rem; }
+.today-strip h3 { font-size:1rem; font-weight:600; }
+.today-strip p { font-size:0.82rem; opacity:0.8; margin-top:2px; }
+.today-jobs { margin-left:auto; display:flex; gap:12px; flex-wrap:wrap; }
+.today-job-pill { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.2); border-radius:20px; padding:5px 14px; font-size:0.78rem; white-space:nowrap; }
+
+/* ── FILTER BAR ── */
+.filter-bar { background:white; border-radius:12px; padding:14px 18px; margin-bottom:16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border:1px solid var(--border); }
+.search-box { flex:1; min-width:180px; padding:9px 14px 9px 36px; border:1.5px solid var(--border); border-radius:8px; font-family:'Outfit',sans-serif; font-size:0.875rem; outline:none; transition:border-color 0.2s; background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 12px center; }
+.search-box:focus { border-color:var(--teal); }
+.filter-sel { padding:9px 14px; border:1.5px solid var(--border); border-radius:8px; font-family:'Outfit',sans-serif; font-size:0.82rem; outline:none; cursor:pointer; background:white; color:var(--text); }
+.filter-sel:focus { border-color:var(--teal); }
+
+/* ── TABLE ── */
+.table-card { background:white; border-radius:14px; border:1px solid var(--border); overflow:hidden; }
+.table-head { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.table-head h3 { font-weight:600; font-size:0.95rem; }
+.table-count { font-size:0.78rem; color:var(--muted); background:var(--bg); padding:3px 10px; border-radius:20px; }
+.tbl { width:100%; border-collapse:collapse; }
+.tbl thead { background:#f8fafc; }
+.tbl th { padding:11px 16px; text-align:left; font-size:0.68rem; color:var(--muted); letter-spacing:1px; text-transform:uppercase; font-weight:600; border-bottom:1px solid var(--border); white-space:nowrap; }
+.tbl td { padding:13px 16px; font-size:0.85rem; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.tbl tr:last-child td { border-bottom:none; }
+.tbl tr:hover td { background:#fafafa; }
+.tbl-wrap { overflow-x:auto; }
+
+.badge { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:20px; font-size:0.7rem; font-weight:600; white-space:nowrap; }
+.badge-new { background:#eff6ff; color:var(--blue); }
+.badge-confirmed { background:#f0fdf4; color:var(--green); }
+.badge-completed { background:var(--teal-faint); color:var(--teal-dark); }
+.badge-cancelled { background:#fef2f2; color:var(--red); }
+
+.act-row { display:flex; gap:5px; flex-wrap:wrap; }
+.act-btn { padding:5px 11px; border-radius:6px; border:1px solid var(--border); background:white; font-size:0.72rem; font-weight:500; cursor:pointer; font-family:'Outfit',sans-serif; transition:all 0.2s; white-space:nowrap; }
+.act-btn:hover { border-color:var(--teal); color:var(--teal); }
+.act-btn.green { background:var(--green); color:white; border-color:var(--green); }
+.act-btn.green:hover { background:#059669; }
+.act-btn.amber { background:var(--amber); color:white; border-color:var(--amber); }
+.act-btn.red { color:var(--red); border-color:#fca5a5; }
+.act-btn.red:hover { background:#fef2f2; }
+
+/* ── TODAY'S SCHEDULE ── */
+.schedule-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.schedule-card { background:white; border-radius:12px; border:1px solid var(--border); padding:18px 20px; position:relative; overflow:hidden; }
+.schedule-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; }
+.schedule-card.status-new::before { background:var(--blue); }
+.schedule-card.status-confirmed::before { background:var(--green); }
+.schedule-card.status-completed::before { background:var(--teal); }
+.schedule-card.status-cancelled::before { background:var(--red); opacity:0.4; }
+.sc-time { font-size:1.1rem; font-weight:700; color:var(--text); font-family:'Cormorant Garamond',serif; }
+.sc-name { font-weight:600; font-size:0.9rem; margin:4px 0 2px; }
+.sc-detail { font-size:0.78rem; color:var(--muted); }
+.sc-badges { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+.sc-pill { background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:0.72rem; color:var(--text2); }
+.sc-actions { display:flex; gap:6px; margin-top:12px; }
+
+/* ── REPORTS ── */
+.reports-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.report-card { background:white; border-radius:14px; border:1px solid var(--border); padding:24px; }
+.report-card h4 { font-weight:600; font-size:0.95rem; margin-bottom:18px; color:var(--text); }
+.bar-chart { display:flex; flex-direction:column; gap:10px; }
+.bar-row { display:flex; align-items:center; gap:10px; }
+.bar-lbl { font-size:0.75rem; color:var(--text2); width:110px; text-align:right; flex-shrink:0; }
+.bar-track { flex:1; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; transition:width 0.8s ease; }
+.bar-v { font-size:0.75rem; color:var(--text2); width:50px; }
+.revenue-boxes { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.rev-box { background:var(--bg); border-radius:10px; padding:14px; text-align:center; }
+.rev-box-label { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+.rev-box-val { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:700; margin-top:4px; }
+
+/* ── MODAL ── */
+.modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:200; display:none; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:white; border-radius:18px; width:520px; max-width:96vw; max-height:92vh; overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,0.2); }
+.modal-hdr { padding:22px 26px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.modal-hdr h3 { font-family:'Cormorant Garamond',serif; font-size:1.4rem; }
+.modal-close { background:none; border:none; font-size:1.2rem; color:var(--muted); cursor:pointer; padding:4px 8px; border-radius:6px; }
+.modal-close:hover { background:var(--bg); color:var(--text); }
+.modal-body { padding:22px 26px; }
+.detail-row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 0; border-bottom:1px solid #f1f5f9; }
+.detail-row:last-child { border-bottom:none; }
+.detail-key { font-size:0.78rem; color:var(--text2); flex-shrink:0; }
+.detail-val { font-size:0.85rem; font-weight:600; color:var(--text); text-align:right; max-width:65%; word-break:break-word; }
+.modal-ftr { padding:16px 26px 22px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid var(--border); flex-wrap:wrap; }
+
+/* ── CONFIRM DIALOG ── */
+.confirm-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:300; display:none; align-items:center; justify-content:center; }
+.confirm-overlay.open { display:flex; }
+.confirm-box { background:white; border-radius:16px; padding:28px; width:360px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,0.2); text-align:center; }
+.confirm-box h3 { font-size:1.1rem; font-weight:600; margin-bottom:8px; }
+.confirm-box p { font-size:0.85rem; color:var(--text2); margin-bottom:20px; }
+.confirm-btns { display:flex; gap:10px; justify-content:center; }
+
+/* ── REVENUE STRIP ── */
+.rev-strip { background:white; border-radius:14px; border:1px solid var(--border); padding:20px 24px; margin-bottom:20px; display:flex; align-items:center; gap:0; flex-wrap:wrap; }
+.rev-pill { display:flex; align-items:center; gap:14px; flex:1; min-width:160px; padding:4px 0; }
+.rev-pill-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; flex-shrink:0; }
+.rev-pill-label { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+.rev-pill-val { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; color:var(--text); margin-top:2px; }
+.rev-divider { width:1px; height:48px; background:var(--border); margin:0 20px; flex-shrink:0; }
+
+/* ── SCHEDULE LIST ── */
+.sched-item { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f5f9; transition:background 0.15s; }
+.sched-item:last-child { border-bottom:none; }
+.sched-item:hover { background:#fafafa; }
+.sched-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.sched-time { font-weight:700; font-size:0.88rem; color:var(--text); min-width:64px; }
+.sched-info { flex:1; }
+.sched-name { font-weight:600; font-size:0.85rem; }
+.sched-detail { font-size:0.72rem; color:var(--muted); margin-top:1px; }
+.sched-right { text-align:right; }
+.sched-amount { font-size:0.82rem; font-weight:700; color:var(--teal); }
+.sched-status { font-size:0.7rem; color:var(--muted); margin-top:1px; }
+
+/* ── LEAD ITEM ── */
+.lead-item { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid #f1f5f9; }
+.lead-item:last-child { border-bottom:none; }
+.lead-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--teal-faint),var(--teal-faint2)); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.9rem; color:var(--teal-dark); flex-shrink:0; }
+.lead-info { flex:1; }
+.lead-name { font-weight:600; font-size:0.85rem; }
+.lead-detail { font-size:0.72rem; color:var(--muted); margin-top:1px; }
+.lead-actions { display:flex; gap:5px; }
+.lead-confirm { padding:5px 12px; background:var(--green); color:white; border:none; border-radius:6px; font-size:0.72rem; font-weight:600; cursor:pointer; font-family:'Outfit',sans-serif; transition:all 0.2s; }
+.lead-confirm:hover { background:#059669; }
+.lead-view { padding:5px 10px; background:white; color:var(--text2); border:1px solid var(--border); border-radius:6px; font-size:0.72rem; cursor:pointer; font-family:'Outfit',sans-serif; transition:all 0.2s; }
+.lead-view:hover { border-color:var(--teal); color:var(--teal); }
+.empty-state-sm { text-align:center; padding:32px 20px; color:var(--muted); font-size:0.85rem; }
+.empty-state-sm .esi { font-size:2rem; margin-bottom:8px; }
+
+@media(max-width:900px) {
+  .rev-strip { gap:12px; }
+  .rev-divider { display:none; }
+  #dash-two-col { grid-template-columns:1fr !important; }
+}
+/* ── CALENDAR VIEW ── */
+.cal-toolbar { background:white; border-radius:12px; border:1px solid var(--border); padding:14px 18px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.cal-nav-btn { padding:7px 14px; border:1.5px solid var(--border); border-radius:8px; background:white; font-family:Outfit,sans-serif; font-size:0.85rem; cursor:pointer; transition:all 0.2s; color:var(--text); }
+.cal-nav-btn:hover { border-color:var(--teal); color:var(--teal); }
+.cal-today-btn { padding:7px 16px; border:none; border-radius:8px; background:var(--teal); color:white; font-family:Outfit,sans-serif; font-size:0.85rem; cursor:pointer; font-weight:600; }
+.cal-date-label { font-family:Cormorant Garamond,serif; font-size:1.2rem; font-weight:700; color:var(--text); min-width:160px; }
+.cal-view-toggle { display:flex; border:1.5px solid var(--border); border-radius:8px; overflow:hidden; margin-left:auto; }
+.cal-vbtn { padding:6px 14px; border:none; background:white; font-family:Outfit,sans-serif; font-size:0.8rem; cursor:pointer; color:var(--text2); transition:all 0.2s; }
+.cal-vbtn.active { background:var(--teal); color:white; }
+.cal-wrap { background:white; border-radius:14px; border:1px solid var(--border); overflow:auto; max-height:75vh; }
+.cal-grid-header { display:flex; border-bottom:2px solid var(--border); position:sticky; top:0; background:white; z-index:10; min-width:max-content; }
+.cal-time-gutter { width:64px; flex-shrink:0; border-right:1px solid var(--border); }
+.cal-maid-header { flex:1; min-width:180px; padding:14px 12px; border-right:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.cal-maid-header:last-child { border-right:none; }
+.cal-maid-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.95rem; color:white; flex-shrink:0; }
+.cal-maid-name { font-weight:600; font-size:0.85rem; }
+.cal-maid-status-txt { font-size:0.68rem; margin-top:2px; font-weight:500; }
+.cal-body { display:flex; min-width:max-content; }
+.cal-times { width:64px; flex-shrink:0; border-right:1px solid var(--border); }
+.cal-time-cell { height:var(--hour-h,72px); box-sizing:border-box; display:flex; align-items:flex-start; justify-content:flex-end; padding:4px 8px 0; font-size:0.68rem; color:var(--muted); border-bottom:1px solid #cbd5e1; white-space:nowrap; }
+.cal-columns { flex:1; display:flex; }
+.cal-col { flex:1; min-width:180px; border-right:1.5px solid #cbd5e1; position:relative; }
+.cal-col:last-child { border-right:none; }
+.cal-cell { height:var(--hour-h,72px); box-sizing:border-box; border-bottom:1px solid #cbd5e1; position:relative; }
+.cal-cell:hover { background:rgba(13,148,136,0.02); }
+.cal-booking-card { position:absolute; left:4px; right:4px; border-radius:8px; padding:6px 8px; font-size:0.75rem; cursor:pointer; overflow:hidden; z-index:5; border-left:3px solid; box-shadow:0 1px 4px rgba(0,0,0,0.08); transition:all 0.15s; }
+.cal-booking-card:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:10; }
+.cbc-time { font-weight:700; font-size:0.68rem; margin-bottom:1px; }
+.cbc-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cbc-svc { opacity:0.75; font-size:0.67rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cbc-new { background:#eff6ff; border-color:#3b82f6; color:#1e40af; }
+.cbc-confirmed { background:#fefce8; border-color:#ca8a04; color:#713f12; }
+.cbc-completed { background:#f0fdf4; border-color:#16a34a; color:#14532d; }
+.cbc-cancelled { background:#fef2f2; border-color:#ef4444; color:#991b1b; opacity:0.55; }
+.cal-now-line { position:absolute; left:0; right:0; height:2px; background:var(--red); z-index:20; pointer-events:none; }
+.cal-now-dot { position:absolute; left:-3px; top:-4px; width:8px; height:8px; border-radius:50%; background:var(--red); }
+.cal-unassigned { background:white; border-radius:14px; border:1px solid var(--border); margin-top:16px; }
+.cal-unassigned-hdr { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; font-weight:600; font-size:0.9rem; }
+.cal-unassigned-grid { display:flex; flex-wrap:wrap; gap:10px; padding:14px 18px; }
+.unassigned-pill { background:var(--bg); border:1.5px solid var(--border); border-radius:10px; padding:10px 14px; font-size:0.8rem; cursor:pointer; transition:all 0.2s; }
+.unassigned-pill:hover { border-color:var(--teal); color:var(--teal); }
+/* ── CUSTOMERS ── */
+.cust-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
+.cust-stat { background:white; border-radius:12px; border:1px solid var(--border); padding:16px 20px; display:flex; align-items:center; gap:14px; }
+.cust-stat-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; }
+.cust-stat-val { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:700; color:var(--text); line-height:1; }
+.cust-stat-lbl { font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+
+.cust-tag { display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.68rem; font-weight:600; }
+.tag-loyal    { background:#fef3c7; color:#92400e; }
+.tag-new      { background:#eff6ff; color:#1e40af; }
+.tag-vip      { background:#fdf4ff; color:#7e22ce; }
+.tag-regular  { background:#f0fdf4; color:#166534; }
+.tag-inactive { background:#f1f5f9; color:var(--muted); }
+
+/* ── SETTINGS ── */
+.settings-section { margin-bottom:24px; }
+.settings-section-title { font-weight:700; font-size:0.85rem; color:var(--text2); letter-spacing:0.5px; text-transform:uppercase; margin-bottom:10px; padding-left:2px; }
+.settings-card { background:white; border-radius:14px; border:1px solid var(--border); overflow:hidden; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); gap:16px; }
+.settings-row-info { flex:1; }
+.settings-row-label { font-weight:600; font-size:0.875rem; }
+.settings-row-sub { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+.settings-input { padding:8px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:'Outfit',sans-serif; font-size:0.85rem; color:var(--text); outline:none; background:white; transition:border-color 0.2s; }
+.settings-input:focus { border-color:var(--teal); }
+/* Toggle */
+.toggle-wrap { width:48px; height:26px; border-radius:13px; background:#e2e8f0; cursor:pointer; position:relative; transition:background 0.25s; flex-shrink:0; }
+.toggle-wrap.active { background:var(--teal); }
+.toggle-knob { width:20px; height:20px; border-radius:50%; background:white; position:absolute; top:3px; left:3px; transition:left 0.25s; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
+.toggle-wrap.active .toggle-knob { left:25px; }
+/* Theme toggle */
+.theme-toggle-wrap { display:flex; border:1.5px solid var(--border); border-radius:8px; overflow:hidden; }
+.theme-btn { padding:7px 16px; border:none; background:white; font-family:'Outfit',sans-serif; font-size:0.82rem; cursor:pointer; color:var(--text2); transition:all 0.2s; }
+.theme-btn.active { background:var(--text); color:white; }
+
+/* ── NEW SHIFT STEPS ── */
+.ns-step { flex:1; text-align:center; padding:8px 4px; font-size:0.72rem; font-weight:600; color:var(--muted); border-bottom:2px solid var(--border); transition:all 0.2s; }
+.ns-step.active { color:var(--teal); border-color:var(--teal); }
+.ns-cust-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; transition:all 0.15s; border:1.5px solid transparent; margin-bottom:6px; }
+.ns-cust-item:hover { background:var(--teal-faint); border-color:var(--teal-faint2); }
+.ns-cust-item.selected { background:var(--teal-faint); border-color:var(--teal); }
+.ns-cust-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--teal),var(--teal-dark)); display:flex; align-items:center; justify-content:center; color:white; font-weight:700; font-size:0.8rem; flex-shrink:0; }
+
+/* ── DARK THEME ── */
+body.dark { --bg:#0f172a; --text:#f1f5f9; --text2:#94a3b8; --muted:#64748b; --border:#1e293b; }
+body.dark .main { background:var(--bg); }
+body.dark .table-card, body.dark .stat-card, body.dark .report-card, body.dark .settings-card, body.dark .filter-bar, body.dark .rev-strip, body.dark .staff-card, body.dark .cal-wrap, body.dark .cal-toolbar, body.dark .cust-stat { background:#1e293b; border-color:#334155; }
+body.dark .tbl thead { background:#0f172a; }
+body.dark .tbl tr:hover td { background:#1e293b; }
+body.dark .tbl td, body.dark .tbl th { border-color:#1e293b; }
+body.dark .search-box, body.dark .filter-sel, body.dark .settings-input, body.dark .act-btn { background:#0f172a; border-color:#334155; color:var(--text); }
+body.dark .staff-stat-item { background:#0f172a; }
+body.dark .nav-section-label { color:rgba(255,255,255,0.3); }
+body.dark .topbar { background:#1e293b; border-color:#334155; }
+body.dark .topbar-left h2 { color:#f1f5f9; }
+body.dark .topbar-left p { color:#94a3b8; }
+body.dark .modal-box { background:#1e293b; border-color:#334155; }
+body.dark .modal-hdr, body.dark .modal-ftr, body.dark .detail-row { border-color:#334155; }
+body.dark .theme-btn { background:#1e293b; color:var(--text2); }
+body.dark .theme-btn.active { background:white; color:#0f172a; }
+body.dark #theme-light-btn.active { background:white; color:#0f172a; }
+body.dark #theme-dark-btn.active { background:#334155; color:white; }
+body.dark .cal-grid-header, body.dark .cal-maid-header { background:#1e293b; }
+body.dark .cal-cell { border-color:#1e293b; }
+body.dark .cal-col { border-color:#1e293b; }
+body.dark .cal-time-cell { border-color:#1e293b; }
+
+/* ── NOTIFICATION BELL ── */
+.notif-bell-wrap { position:relative; cursor:pointer; padding:6px; border-radius:8px; transition:background 0.2s; }
+.notif-bell-wrap:hover { background:var(--bg); }
+.notif-bell { font-size:1.3rem; }
+.notif-dot { position:absolute; top:4px; right:4px; width:10px; height:10px; border-radius:50%; background:var(--red); border:2px solid white; }
+.notif-panel { position:absolute; top:52px; right:16px; width:340px; background:white; border:1px solid var(--border); border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,0.15); z-index:200; max-height:420px; overflow:hidden; display:flex; flex-direction:column; }
+.notif-panel-hdr { padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:0.875rem; }
+#notif-list { overflow-y:auto; flex:1; }
+.notif-item { padding:12px 16px; border-bottom:1px solid #f1f5f9; display:flex; gap:10px; align-items:flex-start; cursor:pointer; transition:background 0.15s; }
+.notif-item:hover { background:var(--bg); }
+.notif-item.unread { background:#fffbeb; }
+.notif-icon { font-size:1.2rem; flex-shrink:0; margin-top:1px; }
+.notif-text { font-size:0.82rem; color:var(--text); line-height:1.4; }
+.notif-time { font-size:0.7rem; color:var(--muted); margin-top:2px; }
+.notif-empty { text-align:center; padding:32px; color:var(--muted); font-size:0.85rem; }
+body.dark .notif-panel { background:#1e293b; border-color:#334155; }
+body.dark .notif-item { border-color:#1e293b; }
+body.dark .notif-item.unread { background:#1c2a1c; }
+
+/* ── REPORTS DATE RANGE ── */
+.rep-range-btns { display:flex; gap:4px; flex-wrap:wrap; }
+.rep-range-btn { padding:6px 12px; border:1.5px solid var(--border); border-radius:6px; background:white; font-family:'Outfit',sans-serif; font-size:0.78rem; cursor:pointer; transition:all 0.2s; color:var(--text2); }
+.rep-range-btn:hover { border-color:var(--teal); color:var(--teal); }
+.rep-range-btn.active { background:var(--teal); color:white; border-color:var(--teal); }
+body.dark .rep-range-btn { background:#1e293b; color:var(--text2); border-color:#334155; }
+body.dark .rep-range-btn.active { background:var(--teal); color:white; }
+
+/* ── SHIFT MODAL ── */
+.shift-booking-card { border:1.5px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer; transition:all 0.2s; margin-bottom:8px; display:flex; align-items:center; gap:12px; }
+.shift-booking-card:hover { border-color:var(--teal); background:var(--teal-faint); }
+.shift-booking-card.selected { border-color:var(--teal); background:var(--teal-faint); box-shadow:0 0 0 2px rgba(13,148,136,0.2); }
+.shift-booking-card .sbc-ref { font-weight:700; color:var(--teal); font-size:0.8rem; }
+.shift-booking-card .sbc-name { font-weight:600; font-size:0.9rem; }
+.shift-booking-card .sbc-detail { font-size:0.75rem; color:var(--muted); }
+.maid-select-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-top:8px; }
+.maid-option { border:2px solid var(--border); border-radius:10px; padding:12px 8px; cursor:pointer; text-align:center; transition:all 0.2s; }
+.maid-option:hover { border-color:var(--teal); }
+.maid-option.selected { border-color:var(--teal); background:var(--teal-faint); }
+.maid-option .mo-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:white; margin:0 auto 6px; font-size:0.9rem; }
+.maid-option .mo-name { font-size:0.78rem; font-weight:600; }
+.maid-option .mo-jobs { font-size:0.68rem; color:var(--muted); margin-top:2px; }
+
+/* ── STAFF MANAGEMENT ── */
+.staff-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; margin-bottom:24px; }
+.staff-card { background:white; border-radius:16px; border:1px solid var(--border); padding:24px; position:relative; transition:all 0.2s; }
+.staff-card:hover { box-shadow:0 4px 20px rgba(0,0,0,0.08); transform:translateY(-2px); }
+.staff-card-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+.staff-avatar-lg { width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1.3rem; color:white; flex-shrink:0; position:relative; }
+.staff-status-dot { position:absolute; bottom:2px; right:2px; width:12px; height:12px; border-radius:50%; border:2px solid white; }
+.staff-status-dot.available { background:var(--green); }
+.staff-status-dot.on-duty { background:var(--amber); }
+.staff-status-dot.leave { background:var(--red); }
+.staff-name { font-weight:700; font-size:1rem; }
+.staff-role { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+.staff-status-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:0.7rem; font-weight:600; margin-top:8px; }
+.ssb-available { background:#f0fdf4; color:var(--green); }
+.ssb-on-duty { background:#fffbeb; color:var(--amber); }
+.ssb-leave { background:#fef2f2; color:var(--red); }
+.staff-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:14px 0; }
+.staff-stat-item { background:var(--bg); border-radius:8px; padding:8px; text-align:center; }
+.staff-stat-val { font-weight:700; font-size:1rem; color:var(--text); }
+.staff-stat-lbl { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
+.staff-card-actions { display:flex; gap:8px; margin-top:14px; }
+.staff-add-card { background:var(--bg); border:2px dashed var(--border); border-radius:16px; padding:24px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; cursor:pointer; transition:all 0.2s; min-height:220px; }
+.staff-add-card:hover { border-color:var(--teal); background:var(--teal-faint); }
+.staff-add-icon { width:48px; height:48px; border-radius:50%; background:var(--teal-faint2); display:flex; align-items:center; justify-content:center; font-size:1.4rem; }
+.staff-add-text { font-weight:600; color:var(--teal); font-size:0.9rem; }
+.staff-color-picker { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.color-swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:all 0.15s; }
+.color-swatch.selected { border-color:var(--text); transform:scale(1.15); }
+@keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+
+/* ── PAYMENT MODAL ── */
+.pay-method-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:4px 0 16px; }
+.pay-method-opt { border:2px solid var(--border); border-radius:10px; padding:14px 12px; cursor:pointer; text-align:center; transition:all 0.2s; }
+.pay-method-opt:hover { border-color:var(--teal); }
+.pay-method-opt.selected { border-color:var(--teal); background:var(--teal-faint); }
+.pay-method-opt .pmo-icon { font-size:1.6rem; margin-bottom:4px; }
+.pay-method-opt .pmo-label { font-size:0.8rem; font-weight:600; }
+.pay-due-amount-box { border-radius:10px; padding:14px 18px; text-align:center; margin-top:12px; transition:background 0.2s; }
+.pay-due-amount-box.paid { background:#f0fdf4; border:1.5px solid #16a34a; }
+.pay-due-amount-box.owed { background:#fef2f2; border:1.5px solid var(--red); }
+.pay-due-amount-box.change { background:#fffbeb; border:1.5px solid var(--amber); }
+.pay-due-amount-val { font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:700; }
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px) {
+  .sidebar { transform:translateX(-100%); }
+  .sidebar.open { transform:translateX(0); }
+  .main { margin-left:0; }
+  .stats-grid { grid-template-columns:1fr 1fr; }
+  .reports-grid { grid-template-columns:1fr; }
+  .content { padding:16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">🧹</div>
+      <h1>CleanPro Admin</h1>
+      <p>Management Portal</p>
+    </div>
+    <div class="login-group">
+      <label class="login-label">Username</label>
+      <input class="login-input" id="l-user" type="text" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="login-group">
+      <label class="login-label">Password</label>
+      <input class="login-input" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Login to Admin Panel</button>
+    <div class="login-error" id="login-error">❌ Incorrect username or password</div>
+    <div style="text-align:center;margin-top:16px;font-size:0.75rem;color:var(--muted)">Default: admin / admin</div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ══ -->
+<div id="admin-screen">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo" style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <h2>🧹 CleanPro</h2>
+        <p>Admin Panel</p>
+      </div>
+      <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item active" onclick="switchTab('dashboard',this)">
+        <span class="ni">📊</span><span class="nav-label"> Dashboard</span>
+        <span class="nav-badge" id="nb-new">0</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('bookings',this)">
+        <span class="ni">📋</span><span class="nav-label"> All Bookings</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('today',this)">
+        <span class="ni">📅</span><span class="nav-label"> Today's Schedule</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('calendar',this)">
+        <span class="ni">🗓️</span><span class="nav-label"> Calendar View</span>
+      </div>
+      <div class="nav-section-label">Analytics</div>
+      <div class="nav-item" onclick="switchTab('customers',this)">
+        <span class="ni">👤</span><span class="nav-label"> Customers</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('staff',this)">
+        <span class="ni">👥</span><span class="nav-label"> Staff Management</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('services',this)">
+        <span class="ni">🛠️</span><span class="nav-label"> Services</span>
+      </div>
+      <div class="nav-item" onclick="switchTab('reports',this)">
+        <span class="ni">📈</span><span class="nav-label"> Reports</span>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="nav-item" onclick="switchTab('settings',this)" style="color:rgba(255,255,255,0.5)">
+        <span class="ni">⚙️</span><span class="nav-label"> Settings</span>
+      </div>
+      <div class="logout-btn" onclick="doLogout()">
+        <span class="ni">🚪</span><span class="logout-label"> Logout</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-left" style="display:flex;align-items:center;gap:12px">
+        <button onclick="toggleSidebar()" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 9px;cursor:pointer;font-size:1rem;color:var(--text2);transition:all 0.2s;line-height:1" title="Toggle sidebar">☰</button>
+        <div>
+          <h2 id="tab-title">Dashboard</h2>
+          <p id="tab-date">—</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <!-- Clear All Data -->
+        <button onclick="clearAllData()" title="Clear all bookings, customers & payments" style="display:flex;align-items:center;gap:6px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:0.78rem;font-weight:700;color:#dc2626;transition:all 0.2s" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">🗑 Clear Data</button>
+        <!-- Notification Bell -->
+        <div class="notif-bell-wrap" onclick="toggleNotifPanel()">
+          <span class="notif-bell">🔔</span>
+          <span class="notif-dot" id="notif-dot" style="display:none"></span>
+        </div>
+        <!-- Notification Panel -->
+        <div class="notif-panel" id="notif-panel" style="display:none">
+          <div class="notif-panel-hdr">
+            <span style="font-weight:700">Notifications</span>
+            <button onclick="clearNotifs()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.75rem">Clear all</button>
+          </div>
+          <div id="notif-list"><div class="notif-empty">No notifications</div></div>
+        </div>
+        <div class="admin-avatar" id="admin-avatar-initials">A</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- DASHBOARD TAB -->
+      <div class="tab-content active" id="tab-dashboard">
+
+        <!-- Revenue Stats Row -->
+        <div class="rev-strip">
+          <div class="rev-pill">
+            <div class="rev-pill-icon" style="background:linear-gradient(135deg,#0d9488,#0f766e)">💰</div>
+            <div>
+              <div class="rev-pill-label">Today's Revenue</div>
+              <div class="rev-pill-val" id="rev-today">0 QAR</div>
+            </div>
+          </div>
+          <div class="rev-divider"></div>
+          <div class="rev-pill">
+            <div class="rev-pill-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">📅</div>
+            <div>
+              <div class="rev-pill-label">This Week</div>
+              <div class="rev-pill-val" id="rev-week">0 QAR</div>
+            </div>
+          </div>
+          <div class="rev-divider"></div>
+          <div class="rev-pill">
+            <div class="rev-pill-icon" style="background:linear-gradient(135deg,#10b981,#059669)">📆</div>
+            <div>
+              <div class="rev-pill-label">This Month</div>
+              <div class="rev-pill-val" id="rev-month">0 QAR</div>
+            </div>
+          </div>
+          <div class="rev-divider"></div>
+          <div class="rev-pill">
+            <div class="rev-pill-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📊</div>
+            <div>
+              <div class="rev-pill-label">All Time</div>
+              <div class="rev-pill-val" id="rev-all">0 QAR</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-grid">
+          <div class="stat-card teal">
+            <div class="stat-icon">📅</div>
+            <div class="stat-label">Today's Jobs</div>
+            <div class="stat-val" id="s-today">0</div>
+            <div class="stat-sub" id="s-today-sub">No jobs today</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon">⏳</div>
+            <div class="stat-label">Active Leads</div>
+            <div class="stat-val" id="s-pending">0</div>
+            <div class="stat-sub">Awaiting confirmation</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">✅</div>
+            <div class="stat-label">Confirmed Today</div>
+            <div class="stat-val" id="s-confirmed">0</div>
+            <div class="stat-sub">Ready to go</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-icon">📋</div>
+            <div class="stat-label">Total Bookings</div>
+            <div class="stat-val" id="s-total">0</div>
+            <div class="stat-sub">All time</div>
+          </div>
+          <div class="stat-card red">
+            <div class="stat-icon">💳</div>
+            <div class="stat-label">Total Due Amount</div>
+            <div class="stat-val" id="s-pending-bal">0</div>
+            <div class="stat-sub">QAR unpaid across all bookings</div>
+          </div>
+        </div>
+
+        <!-- Two column layout -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px" id="dash-two-col">
+
+          <!-- Today's Schedule -->
+          <div class="table-card">
+            <div class="table-head">
+              <h3>📅 Today's Schedule</h3>
+              <span class="table-count" id="today-badge">0 jobs</span>
+            </div>
+            <div id="today-schedule-list" style="padding:0 0 8px"></div>
+          </div>
+
+          <!-- Active Leads -->
+          <div class="table-card">
+            <div class="table-head">
+              <h3>⏳ Active Leads</h3>
+              <span class="table-count" id="leads-badge">0 pending</span>
+            </div>
+            <div id="active-leads-list" style="padding:0 0 8px"></div>
+          </div>
+
+        </div>
+
+        <!-- Recent bookings full table -->
+        <div class="table-card">
+          <div class="table-head">
+            <h3>🕐 Recent Bookings</h3>
+            <span class="table-count" id="recent-count">—</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr>
+                <th>Ref</th><th>Customer</th><th>Service</th><th>Date & Time</th>
+                <th>Total</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="recent-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOOKINGS TAB -->
+      <div class="tab-content" id="tab-bookings">
+        <div class="filter-bar">
+          <input class="search-box" id="bk-search" placeholder="Search name, phone, ref..." oninput="renderBookings()">
+          <select class="filter-sel" id="bk-status" onchange="renderBookings()">
+            <option value="">All Status</option>
+            <option>New</option><option>Confirmed</option>
+            <option>Completed</option><option>Cancelled</option>
+          </select>
+          <select class="filter-sel" id="bk-service" onchange="renderBookings()">
+            <option value="">All Services</option>
+            <option>Regular Cleaning</option><option>Deep Cleaning</option>
+            <option>Move-in / Move-out</option><option>Post-Construction</option>
+          </select>
+          <select class="filter-sel" id="bk-sort" onchange="renderBookings()">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="date">By Date</option>
+          </select>
+        </div>
+        <div class="table-card">
+          <div class="table-head">
+            <h3>All Bookings</h3>
+            <span class="table-count" id="bk-count">—</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr>
+                <th>Ref #</th><th>Customer</th><th>Phone</th><th>Service</th>
+                <th>Date & Time</th><th>Area</th><th>Hrs</th><th>Cleaners</th>
+                <th>Materials</th><th>Total</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="bk-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TODAY TAB -->
+      <div class="tab-content" id="tab-today">
+        <div class="today-strip" id="today-strip">
+          <div class="ts-icon">☀️</div>
+          <div>
+            <h3 id="today-heading">Today's Schedule</h3>
+            <p id="today-sub">Loading...</p>
+          </div>
+          <div class="today-jobs" id="today-pills"></div>
+        </div>
+        <div class="schedule-grid" id="schedule-grid"></div>
+      </div>
+
+      <!-- CALENDAR TAB -->
+      <div class="tab-content" id="tab-calendar">
+        <div class="cal-toolbar">
+          <button class="cal-today-btn" onclick="calGoToday()">Today</button>
+          <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+          <div class="cal-date-label" id="cal-date-label">—</div>
+          <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+          <div class="cal-view-toggle">
+            <button class="cal-vbtn active" id="cvbtn-day" onclick="calSetView('day',this)">Day</button>
+            <button class="cal-vbtn" id="cvbtn-week" onclick="calSetView('week',this)">Week</button>
+          </div>
+          <div style="display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto">
+            <button onclick="calZoom(-12)" class="cal-nav-btn" style="border:none;border-radius:0;padding:6px 10px" title="Zoom Out">🔍−</button>
+            <button onclick="calZoom(12)"  class="cal-nav-btn" style="border:none;border-radius:0;padding:6px 10px;border-left:1px solid var(--border)" title="Zoom In">🔍+</button>
+          </div>
+          <button onclick="openShiftModal()" style="padding:8px 18px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:white;border:none;border-radius:8px;font-family:Outfit,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(13,148,136,0.3)">
+            ➕ Assign Shift
+          </button>
+          <button onclick="openNewShiftModal()" style="padding:8px 18px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;border:none;border-radius:8px;font-family:Outfit,sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(59,130,246,0.3)">
+            📞 New Shift
+          </button>
+        </div>
+        <div class="cal-wrap" id="cal-wrap"></div>
+        <div class="cal-unassigned" id="cal-unassigned">
+          <div class="cal-unassigned-hdr">📋 All Bookings <span class="table-count" id="unassigned-count">0</span></div>
+          <div class="cal-unassigned-grid" id="unassigned-grid"><div style="padding:12px;color:var(--muted);font-size:0.85rem">No bookings for this day</div></div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS TAB -->
+      <div class="tab-content" id="tab-customers">
+
+        <!-- Summary stats -->
+        <div class="cust-summary">
+          <div class="cust-stat">
+            <div class="cust-stat-icon" style="background:#eff6ff">👤</div>
+            <div><div class="cust-stat-val" id="cs-total">0</div><div class="cust-stat-lbl">Total Customers</div></div>
+          </div>
+          <div class="cust-stat">
+            <div class="cust-stat-icon" style="background:#fdf4ff">⭐</div>
+            <div><div class="cust-stat-val" id="cs-loyal">0</div><div class="cust-stat-lbl">Loyal (3+ bookings)</div></div>
+          </div>
+          <div class="cust-stat">
+            <div class="cust-stat-icon" style="background:#f0fdf4">🆕</div>
+            <div><div class="cust-stat-val" id="cs-new">0</div><div class="cust-stat-lbl">New This Month</div></div>
+          </div>
+          <div class="cust-stat">
+            <div class="cust-stat-icon" style="background:#fffbeb">💰</div>
+            <div><div class="cust-stat-val" id="cs-rev">0</div><div class="cust-stat-lbl">Total Revenue (QAR)</div></div>
+          </div>
+        </div>
+
+        <!-- Filter + table -->
+        <div class="filter-bar">
+          <input class="search-box" id="cust-search" placeholder="Search name, phone, area..." oninput="renderCustomers()">
+          <select class="filter-sel" id="cust-tag-filter" onchange="renderCustomers()">
+            <option value="">All Customers</option>
+            <option value="vip">⭐ VIP</option>
+            <option value="loyal">🏅 Loyal</option>
+            <option value="new">🆕 New</option>
+            <option value="regular">✅ Regular</option>
+            <option value="inactive">💤 Inactive</option>
+          </select>
+          <select class="filter-sel" id="cust-due-amount-filter" onchange="renderCustomers()">
+            <option value="">All Due Amounts</option>
+            <option value="outstanding">💳 Has Due Amount</option>
+            <option value="clear">✅ Fully Paid</option>
+          </select>
+          <select class="filter-sel" id="cust-sort" onchange="renderCustomers()">
+            <option value="recent">Most Recent</option>
+            <option value="bookings">Most Bookings</option>
+            <option value="revenue">Highest Revenue</option>
+            <option value="name">Name A-Z</option>
+          </select>
+          <button class="refresh-btn" onclick="openCustModal()">+ Add Customer</button>
+          <button class="refresh-btn" style="background:#10b981" onclick="exportCustomersExcel()">📊 Excel</button>
+          <button class="refresh-btn" style="background:#ef4444" onclick="exportCustomersPDF()">📄 PDF</button>
+        </div>
+
+        <div class="table-card">
+          <div class="table-head">
+            <h3>All Customers</h3>
+            <span class="table-count" id="cust-count">—</span>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr>
+                <th>ID</th><th>Customer</th><th>Phone</th><th>Area</th>
+                <th>Bookings</th><th>Last Visit</th><th>Total Spent</th><th>Due Amount</th><th>Tag</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="cust-table"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- STAFF TAB -->
+      <div class="tab-content" id="tab-staff">
+        <div class="filter-bar" style="margin-bottom:16px">
+          <span style="font-weight:600;font-size:0.875rem;color:var(--text2);flex-shrink:0">📅 Period:</span>
+          <div class="rep-range-btns">
+            <button class="rep-range-btn active" id="srf-all"   onclick="setStaffRange('all',this)">All Time</button>
+            <button class="rep-range-btn"         id="srf-month" onclick="setStaffRange('month',this)">This Month</button>
+            <button class="rep-range-btn"         id="srf-week"  onclick="setStaffRange('week',this)">This Week</button>
+            <button class="rep-range-btn"         id="srf-today" onclick="setStaffRange('today',this)">Today</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <span style="font-size:0.8rem;color:var(--muted)">Custom:</span>
+            <input type="date" class="filter-sel" id="staff-from" onchange="setStaffRange('custom',null)">
+            <span style="color:var(--muted)">→</span>
+            <input type="date" class="filter-sel" id="staff-to"   onchange="setStaffRange('custom',null)">
+          </div>
+        </div>
+        <div class="staff-grid" id="staff-grid"></div>
+      </div>
+
+      <!-- REPORTS TAB -->
+      <div class="tab-content" id="tab-reports">
+
+        <!-- Date Range Filter -->
+        <div class="filter-bar" style="margin-bottom:20px">
+          <span style="font-weight:600;font-size:0.875rem;color:var(--text2)">📅 Date Range:</span>
+          <div class="rep-range-btns">
+            <button class="rep-range-btn active" onclick="setRepRange('today',this)">Today</button>
+            <button class="rep-range-btn" onclick="setRepRange('week',this)">This Week</button>
+            <button class="rep-range-btn" onclick="setRepRange('month',this)">This Month</button>
+            <button class="rep-range-btn" onclick="setRepRange('3month',this)">3 Months</button>
+            <button class="rep-range-btn" onclick="setRepRange('year',this)">This Year</button>
+            <button class="rep-range-btn" onclick="setRepRange('all',this)">All Time</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <span style="font-size:0.8rem;color:var(--muted)">Custom:</span>
+            <input type="date" class="filter-sel" id="rep-from" onchange="setRepRange('custom',null)">
+            <span style="color:var(--muted)">→</span>
+            <input type="date" class="filter-sel" id="rep-to" onchange="setRepRange('custom',null)">
+          </div>
+          <button class="refresh-btn" onclick="exportReport()">⬇️ Export PDF</button>
+        </div>
+
+        <!-- Range label -->
+        <div id="rep-range-label" style="font-size:0.82rem;color:var(--muted);margin-bottom:16px;padding-left:2px"></div>
+
+        <div class="reports-grid">
+          <div class="report-card">
+            <h4>📊 Bookings by Status</h4>
+            <div class="bar-chart" id="rep-status"></div>
+          </div>
+          <div class="report-card">
+            <h4>💰 Revenue Summary</h4>
+            <div class="revenue-boxes" id="rep-revenue"></div>
+          </div>
+          <div class="report-card">
+            <h4>🧹 Popular Services</h4>
+            <div class="bar-chart" id="rep-services"></div>
+          </div>
+          <div class="report-card">
+            <h4>📍 Top Areas</h4>
+            <div class="bar-chart" id="rep-areas"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SERVICES TAB -->
+      <div class="tab-content" id="tab-services">
+        <div style="max-width:800px">
+          <div class="filter-bar" style="margin-bottom:20px">
+            <span style="font-weight:600;font-size:0.875rem;flex:1;color:var(--text2)">🛠️ Manage Service Types</span>
+            <button class="refresh-btn" onclick="openServiceModal()">+ Add Service</button>
+          </div>
+          <div class="table-card">
+            <div class="table-head">
+              <h3>Service Catalogue</h3>
+              <span class="table-count" id="svc-count">—</span>
+            </div>
+            <div class="tbl-wrap">
+              <table class="tbl">
+                <thead><tr>
+                  <th>#</th><th>Icon</th><th>Service Name</th><th>Base Rate (QAR/hr)</th><th>With Materials (QAR/hr)</th><th>Actions</th>
+                </tr></thead>
+                <tbody id="svc-table"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div class="tab-content" id="tab-settings">
+        <div style="max-width:720px">
+
+          <!-- Appearance -->
+          <div class="settings-section">
+            <div class="settings-section-title">🎨 Appearance</div>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Theme</div>
+                  <div class="settings-row-sub">Switch between light and dark mode</div>
+                </div>
+                <div class="theme-toggle-wrap">
+                  <button class="theme-btn" id="theme-light-btn" onclick="setTheme('light')">☀️ Light</button>
+                  <button class="theme-btn active" id="theme-dark-btn" onclick="setTheme('dark')">🌙 Dark</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Business Name</div>
+                  <div class="settings-row-sub">Shown on admin panel header</div>
+                </div>
+                <input class="settings-input" id="set-biz-name" placeholder="CleanPro Services" value="CleanPro">
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Admin Name</div>
+                  <div class="settings-row-sub">Your name shown in topbar</div>
+                </div>
+                <input class="settings-input" id="set-admin-name" placeholder="Admin">
+              </div>
+            </div>
+          </div>
+
+          <!-- Booking Settings -->
+          <div class="settings-section">
+            <div class="settings-section-title">📋 Booking Settings</div>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Base Rate (QAR/hr)</div>
+                  <div class="settings-row-sub">Default hourly rate without materials</div>
+                </div>
+                <input class="settings-input" id="set-base-rate" type="number" value="15" style="width:80px">
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Materials Rate (QAR/hr)</div>
+                  <div class="settings-row-sub">Rate when cleaning materials included</div>
+                </div>
+                <input class="settings-input" id="set-mat-rate" type="number" value="25" style="width:80px">
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Minimum Hours</div>
+                  <div class="settings-row-sub">Minimum booking duration</div>
+                </div>
+                <input class="settings-input" id="set-min-hours" type="number" value="4" style="width:80px">
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Working Hours</div>
+                  <div class="settings-row-sub">Slots shown to customers</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input class="settings-input" id="set-start-hr" type="number" value="8" style="width:60px"> <span style="color:var(--muted)">to</span>
+                  <input class="settings-input" id="set-end-hr" type="number" value="20" style="width:60px">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Maid Auto-Assignment -->
+          <div class="settings-section">
+            <div class="settings-section-title">🤖 Auto Maid Assignment</div>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Auto-Assign Maids</div>
+                  <div class="settings-row-sub">System automatically assigns available maids to new bookings</div>
+                </div>
+                <div class="toggle-wrap" onclick="toggleSetting('auto-assign')" id="toggle-auto-assign">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Auto-Assignment Method</div>
+                  <div class="settings-row-sub">How the system picks a maid</div>
+                </div>
+                <select class="settings-input" id="set-assign-method">
+                  <option value="least-busy">Least Busy (fewest jobs today)</option>
+                  <option value="round-robin">Round Robin (rotate evenly)</option>
+                  <option value="area">By Area (closest location)</option>
+                </select>
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Notify on Auto-Assign</div>
+                  <div class="settings-row-sub">Show toast when maid is auto-assigned</div>
+                </div>
+                <div class="toggle-wrap active" onclick="toggleSetting('notify-assign')" id="toggle-notify-assign">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications -->
+          <div class="settings-section">
+            <div class="settings-section-title">🔔 Notifications</div>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">New Booking Alert</div>
+                  <div class="settings-row-sub">Show alert badge when new booking arrives</div>
+                </div>
+                <div class="toggle-wrap active" onclick="toggleSetting('notif-new')" id="toggle-notif-new">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Auto Refresh</div>
+                  <div class="settings-row-sub">Refresh dashboard data every 30 seconds</div>
+                </div>
+                <div class="toggle-wrap active" onclick="toggleSetting('auto-refresh')" id="toggle-auto-refresh">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="settings-section">
+            <div class="settings-section-title">🔐 Security</div>
+            <div class="settings-card">
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Admin Username</div>
+                  <div class="settings-row-sub">Login username</div>
+                </div>
+                <input class="settings-input" id="set-username" placeholder="admin">
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">New Password</div>
+                  <div class="settings-row-sub">Leave blank to keep current</div>
+                </div>
+                <input class="settings-input" id="set-password" type="password" placeholder="••••••••">
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-info">
+                  <div class="settings-row-label">Data Management</div>
+                  <div class="settings-row-sub">Clear all bookings data (irreversible!)</div>
+                </div>
+                <button class="act-btn red" onclick="confirmAction('Clear ALL booking data?','This cannot be undone. All bookings will be lost.',async()=>{const r=await fetch(API+\'/api/bookings\',{method:\'DELETE\'});if(r.ok){_bookings=[];renderDashboard();closeModal(\'confirm-overlay\');showToast(\'🗑 All bookings cleared\')}else{alert(\'Delete failed\')}})">Clear Data</button>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="saveSettings()" style="padding:12px 32px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:white;border:none;border-radius:10px;font-family:Outfit,sans-serif;font-size:0.95rem;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(13,148,136,0.3);margin-bottom:32px">
+            💾 Save Settings
+          </button>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /admin -->
+
+<!-- New Shift Modal (manual booking from call) -->
+<div class="modal-overlay" id="new-shift-modal">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-hdr">
+      <h3>📞 New Shift — Manual Booking</h3>
+      <button class="modal-close" onclick="closeModal('new-shift-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Step indicator -->
+      <div style="display:flex;gap:0;margin-bottom:20px">
+        <div class="ns-step active" id="nss1">1. Customer</div>
+        <div class="ns-step" id="nss2">2. Service</div>
+        <div class="ns-step" id="nss3">3. Date & Time</div>
+        <div class="ns-step" id="nss4">4. Confirm</div>
+      </div>
+
+      <!-- Step 1: Customer -->
+      <div id="ns-panel1">
+        <input class="search-box" id="ns-cust-search" placeholder="Search customer by name or phone..." oninput="renderNsCustList()" style="width:100%;margin-bottom:10px">
+        <div style="max-height:300px;overflow-y:auto" id="ns-cust-list"></div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">Or enter new customer details:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <input class="settings-input" id="ns-new-name" placeholder="Full Name">
+            <input class="settings-input" id="ns-new-phone" placeholder="Phone / WhatsApp">
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Service -->
+      <div id="ns-panel2" style="display:none">
+        <div id="ns-cust-confirm" style="padding:12px 14px;background:var(--teal-faint);border-radius:10px;border:1.5px solid var(--teal-faint2);margin-bottom:16px;font-weight:600"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Service Type</div>
+            <select class="settings-input" id="ns-service" style="width:100%">
+              <option>Regular Cleaning</option>
+              <option>Deep Cleaning</option>
+              <option>Move-in / Move-out</option>
+              <option>Post-Construction</option>
+            </select>
+          </div>
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Area</div>
+            <input class="settings-input" id="ns-area" placeholder="e.g. Al Waab" style="width:100%">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Hours (min 4)</div>
+            <input class="settings-input" id="ns-hours" type="number" value="4" min="4" max="12" style="width:100%">
+          </div>
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Cleaners</div>
+            <input class="settings-input" id="ns-cleaners" type="number" value="1" min="1" max="10" style="width:100%">
+          </div>
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Materials</div>
+            <select class="settings-input" id="ns-materials" style="width:100%">
+              <option value="0">No (15 QAR/hr)</option>
+              <option value="1">Yes (25 QAR/hr)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Date & Time -->
+      <div id="ns-panel3" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Date</div>
+            <input class="settings-input" id="ns-date" type="date" style="width:100%">
+          </div>
+          <div>
+            <div class="settings-row-sub" style="margin-bottom:6px">Time Slot</div>
+            <select class="settings-input" id="ns-time" style="width:100%">
+              <option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option>
+              <option>11:00 AM</option><option>12:00 PM</option><option>1:00 PM</option>
+              <option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option>
+              <option>5:00 PM</option><option>6:00 PM</option><option>7:00 PM</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="settings-row-sub" style="margin-bottom:6px">Assign Maid (optional)</div>
+          <select class="settings-input" id="ns-maid" style="width:100%">
+            <option value="">Auto-assign</option>
+          </select>
+        </div>
+        <div style="margin-top:12px">
+          <div class="settings-row-sub" style="margin-bottom:6px">Notes</div>
+          <textarea class="settings-input" id="ns-notes" rows="2" placeholder="Any special instructions..." style="width:100%;resize:none"></textarea>
+        </div>
+      </div>
+
+      <!-- Step 4: Confirm -->
+      <div id="ns-panel4" style="display:none">
+        <div id="ns-summary" style="background:var(--teal-faint);border:1.5px solid var(--teal-faint2);border-radius:12px;padding:18px"></div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" id="ns-back" onclick="nsBack()" style="display:none">← Back</button>
+      <button class="act-btn" onclick="closeModal('new-shift-modal')">Cancel</button>
+      <button class="act-btn green" id="ns-next" onclick="nsNext()">Next →</button>
+      <button class="act-btn green" id="ns-confirm" onclick="nsConfirm()" style="display:none">✓ Create Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shift Assignment Modal -->
+<div class="modal-overlay" id="shift-modal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-hdr">
+      <h3>➕ Assign Shift</h3>
+      <button class="modal-close" onclick="closeModal('shift-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Step 1: Pick booking -->
+      <div id="shift-step1">
+        <div style="font-size:0.78rem;font-weight:600;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Step 1 — Select Booking</div>
+        <input class="search-box" id="shift-bk-search" placeholder="Search by name, ref, date..." oninput="renderShiftBookings()" style="width:100%;margin-bottom:12px">
+        <div style="max-height:280px;overflow-y:auto" id="shift-bookings-list"></div>
+      </div>
+
+      <!-- Step 2: Pick maid -->
+      <div id="shift-step2" style="display:none">
+        <div style="margin-bottom:14px;padding:12px 14px;background:var(--teal-faint);border-radius:10px;border:1.5px solid var(--teal-faint2)">
+          <div style="font-size:0.72rem;color:var(--muted);margin-bottom:4px">Selected Booking</div>
+          <div id="shift-selected-summary" style="font-weight:600;font-size:0.9rem"></div>
+        </div>
+        <div style="font-size:0.78rem;font-weight:600;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:10px">Step 2 — Select Maid</div>
+        <div class="maid-select-grid" id="shift-maid-grid"></div>
+      </div>
+
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" id="shift-back-btn" onclick="shiftBack()" style="display:none">← Back</button>
+      <button class="act-btn" onclick="closeModal('shift-modal')">Cancel</button>
+      <button class="act-btn green" id="shift-confirm-btn" onclick="confirmShift()" style="display:none">✓ Assign Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal-overlay" id="cust-modal">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-hdr">
+      <h3 id="cust-modal-title">Add Customer</h3>
+      <button class="modal-close" onclick="closeModal('cust-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cm-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Full Name *</label>
+          <input class="login-input" id="cm-name" placeholder="Ahmad Al-Rashid">
+        </div>
+        <div class="login-group">
+          <label class="login-label">Phone / WhatsApp *</label>
+          <input class="login-input" id="cm-phone" placeholder="+974 XXXX XXXX">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Area / Zone</label>
+          <input class="login-input" id="cm-area" placeholder="e.g. Al Waab">
+        </div>
+        <div class="login-group">
+          <label class="login-label">Address</label>
+          <input class="login-input" id="cm-address" placeholder="Villa 14, Street 22">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Email</label>
+          <input class="login-input" id="cm-email" placeholder="email@example.com" type="email">
+        </div>
+        <div class="login-group">
+          <label class="login-label">Tag</label>
+          <select class="login-input" id="cm-tag">
+            <option value="new">🆕 New</option>
+            <option value="regular">✅ Regular</option>
+            <option value="loyal">🏅 Loyal</option>
+            <option value="vip">⭐ VIP</option>
+            <option value="inactive">💤 Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="login-group">
+        <label class="login-label">Notes</label>
+        <textarea class="login-input" id="cm-notes" rows="3" placeholder="Preferences, special instructions, allergies..."></textarea>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" onclick="closeModal('cust-modal')">Cancel</button>
+      <button class="act-btn green" onclick="saveCustomer()">Save Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Staff Modal -->
+<div class="modal-overlay" id="staff-modal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-hdr">
+      <h3 id="staff-modal-title">Add Staff Member</h3>
+      <button class="modal-close" onclick="closeModal('staff-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sf-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Full Name *</label>
+          <input class="login-input" id="sf-name" placeholder="e.g. Nelly">
+        </div>
+        <div class="login-group">
+          <label class="login-label">Phone</label>
+          <input class="login-input" id="sf-phone" placeholder="+974 XXXX XXXX">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Nationality</label>
+          <select class="login-input" id="sf-nationality">
+            <option value="">-- Select Nationality --</option>
+            <option>Afghan</option><option>Albanian</option><option>Algerian</option>
+            <option>American</option><option>Andorran</option><option>Angolan</option>
+            <option>Antiguan</option><option>Argentine</option><option>Armenian</option>
+            <option>Australian</option><option>Austrian</option><option>Azerbaijani</option>
+            <option>Bahamian</option><option>Bahraini</option><option>Bangladeshi</option>
+            <option>Barbadian</option><option>Belarusian</option><option>Belgian</option>
+            <option>Belizean</option><option>Beninese</option><option>Bhutanese</option>
+            <option>Bolivian</option><option>Bosnian</option><option>Botswanan</option>
+            <option>Brazilian</option><option>British</option><option>Bruneian</option>
+            <option>Bulgarian</option><option>Burkinabe</option><option>Burundian</option>
+            <option>Cabo Verdean</option><option>Cambodian</option><option>Cameroonian</option>
+            <option>Canadian</option><option>Central African</option><option>Chadian</option>
+            <option>Chilean</option><option>Chinese</option><option>Colombian</option>
+            <option>Comoran</option><option>Congolese</option><option>Costa Rican</option>
+            <option>Croatian</option><option>Cuban</option><option>Cypriot</option>
+            <option>Czech</option><option>Danish</option><option>Djiboutian</option>
+            <option>Dominican</option><option>Dutch</option><option>East Timorese</option>
+            <option>Ecuadorian</option><option>Egyptian</option><option>Emirati</option>
+            <option>Equatorial Guinean</option><option>Eritrean</option><option>Estonian</option>
+            <option>Ethiopian</option><option>Fijian</option><option>Filipino</option>
+            <option>Finnish</option><option>French</option><option>Gabonese</option>
+            <option>Gambian</option><option>Georgian</option><option>German</option>
+            <option>Ghanaian</option><option>Greek</option><option>Grenadian</option>
+            <option>Guatemalan</option><option>Guinean</option><option>Guyanese</option>
+            <option>Haitian</option><option>Honduran</option><option>Hungarian</option>
+            <option>Icelandic</option><option>Indian</option><option>Indonesian</option>
+            <option>Iranian</option><option>Iraqi</option><option>Irish</option>
+            <option>Israeli</option><option>Italian</option><option>Ivorian</option>
+            <option>Jamaican</option><option>Japanese</option><option>Jordanian</option>
+            <option>Kazakhstani</option><option>Kenyan</option><option>Kiribati</option>
+            <option>Kuwaiti</option><option>Kyrgyzstani</option><option>Laotian</option>
+            <option>Latvian</option><option>Lebanese</option><option>Lesothan</option>
+            <option>Liberian</option><option>Libyan</option><option>Lithuanian</option>
+            <option>Luxembourgish</option><option>Madagascan</option><option>Malawian</option>
+            <option>Malaysian</option><option>Maldivian</option><option>Malian</option>
+            <option>Maltese</option><option>Mauritanian</option><option>Mauritian</option>
+            <option>Mexican</option><option>Moldovan</option><option>Mongolian</option>
+            <option>Montenegrin</option><option>Moroccan</option><option>Mozambican</option>
+            <option>Namibian</option><option>Nepalese</option><option>New Zealander</option>
+            <option>Nicaraguan</option><option>Nigerian</option><option>Nigerien</option>
+            <option>North Korean</option><option>North Macedonian</option><option>Norwegian</option>
+            <option>Omani</option><option>Pakistani</option><option>Palestinian</option>
+            <option>Panamanian</option><option>Papua New Guinean</option><option>Paraguayan</option>
+            <option>Peruvian</option><option>Polish</option><option>Portuguese</option>
+            <option>Qatari</option><option>Romanian</option><option>Russian</option>
+            <option>Rwandan</option><option>Salvadoran</option><option>Samoan</option>
+            <option>Saudi</option><option>Senegalese</option><option>Serbian</option>
+            <option>Seychellois</option><option>Sierra Leonean</option><option>Singaporean</option>
+            <option>Slovak</option><option>Slovenian</option><option>Somali</option>
+            <option>South African</option><option>South Korean</option><option>South Sudanese</option>
+            <option>Spanish</option><option>Sri Lankan</option><option>Sudanese</option>
+            <option>Surinamese</option><option>Swedish</option><option>Swiss</option>
+            <option>Syrian</option><option>Taiwanese</option><option>Tajikistani</option>
+            <option>Tanzanian</option><option>Thai</option><option>Togolese</option>
+            <option>Trinidadian</option><option>Tunisian</option><option>Turkish</option>
+            <option>Turkmenistani</option><option>Ugandan</option><option>Ukrainian</option>
+            <option>Uruguayan</option><option>Uzbekistani</option><option>Venezuelan</option>
+            <option>Vietnamese</option><option>Yemeni</option><option>Zambian</option>
+            <option>Zimbabwean</option>
+          </select>
+        </div>
+        <div class="login-group">
+          <label class="login-label">Join Date</label>
+          <input class="login-input" id="sf-joindate" type="date">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">QID</label>
+          <input class="login-input" id="sf-qid" placeholder="e.g. 28412345678">
+        </div>
+        <div class="login-group">
+          <label class="login-label">Basic Salary (QAR)</label>
+          <input class="login-input" id="sf-basic-salary" type="number" min="0" step="0.01" placeholder="e.g. 1500">
+        </div>
+      </div>
+      <div class="login-group">
+        <label class="login-label">Status</label>
+        <select class="login-input" id="sf-status">
+          <option value="Available">✅ Available</option>
+          <option value="On-Duty">🟡 On-Duty</option>
+          <option value="Leave">🔴 On Leave</option>
+        </select>
+      </div>
+      <div class="login-group">
+        <label class="login-label">Notes</label>
+        <input class="login-input" id="sf-notes" placeholder="Any notes about this staff...">
+      </div>
+      <div class="login-group">
+        <label class="login-label">Avatar Color</label>
+        <div class="staff-color-picker" id="sf-color-picker"></div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" onclick="closeModal('staff-modal')">Cancel</button>
+      <button class="act-btn green" onclick="saveStaff()">Save Staff</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="dm-title">Booking Details</h3>
+      <button class="modal-close" onclick="closeModal('detail-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="dm-body"></div>
+    <div class="modal-ftr" id="dm-footer"></div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg">This action cannot be undone.</p>
+    <div class="confirm-btns">
+      <button class="act-btn" onclick="closeModal('confirm-overlay')">Cancel</button>
+      <button class="act-btn green" id="confirm-ok" onclick="">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Service Modal -->
+<div class="modal-overlay" id="service-modal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-hdr">
+      <h3 id="svc-modal-title">Add Service</h3>
+      <button class="modal-close" onclick="closeModal('service-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="svc-id">
+      <div style="display:grid;grid-template-columns:80px 1fr;gap:14px;margin-bottom:16px">
+        <div class="login-group" style="margin-bottom:0">
+          <label class="login-label">Icon</label>
+          <input class="login-input" id="svc-icon" placeholder="🧹" value="🧹" style="font-size:1.4rem;text-align:center">
+        </div>
+        <div class="login-group" style="margin-bottom:0">
+          <label class="login-label">Service Name *</label>
+          <input class="login-input" id="svc-name" placeholder="e.g. Regular Cleaning">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-group">
+          <label class="login-label">Base Rate (QAR/hr)</label>
+          <input class="login-input" id="svc-base-rate" type="number" value="15" min="0">
+        </div>
+        <div class="login-group">
+          <label class="login-label">With Materials (QAR/hr)</label>
+          <input class="login-input" id="svc-mat-rate" type="number" value="25" min="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" onclick="closeModal('service-modal')">Cancel</button>
+      <button class="act-btn green" onclick="saveService()">Save Service</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="payment-modal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-hdr">
+      <h3>💳 Process Payment</h3>
+      <button class="modal-close" onclick="closeModal('payment-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Booking summary -->
+      <div style="background:var(--bg);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Booking</div>
+          <div style="font-weight:700;font-size:0.95rem" id="pay-ref">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Amount Due</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:700;color:var(--teal)" id="pay-total">0 QAR</div>
+        </div>
+      </div>
+
+      <!-- Payment method -->
+      <div style="font-size:0.78rem;font-weight:600;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px">Payment Method</div>
+      <div class="pay-method-grid">
+        <div class="pay-method-opt selected" id="pmo-cash" onclick="selectPayMethod('Cash')">
+          <div class="pmo-icon">💵</div>
+          <div class="pmo-label">Cash</div>
+        </div>
+        <div class="pay-method-opt" id="pmo-online" onclick="selectPayMethod('Online')">
+          <div class="pmo-icon">📱</div>
+          <div class="pmo-label">Online Transfer</div>
+        </div>
+      </div>
+
+      <!-- Amount paid -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:0.78rem;font-weight:600;color:var(--text2);letter-spacing:0.5px;text-transform:uppercase;display:block;margin-bottom:6px">Amount Paid (QAR)</label>
+        <input type="number" id="pay-amount" class="settings-input" style="width:100%;font-size:1.1rem;font-weight:700" min="0" oninput="updatePayDueAmount()">
+      </div>
+
+      <!-- Due Amount -->
+      <div class="pay-due-amount-box paid" id="pay-due-amount-box">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px" id="pay-due-amount-lbl">Due Amount</div>
+        <div class="pay-due-amount-val" id="pay-due-amount-val">0 QAR</div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="act-btn" onclick="closeModal('payment-modal')">Cancel</button>
+      <button class="act-btn green" onclick="submitPayment()">✓ Mark as Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ AUTH ══════════════════════════════════════════════════════════════════════
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'admin';
+
+function doLogin() {
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  if (u === ADMIN_USER && p === ADMIN_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-screen').style.display = 'block';
+    sessionStorage.setItem('cp_admin', '1');
+    init();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('l-pass').value = '';
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('cp_admin');
+  document.getElementById('admin-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('l-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// Enter key on login
+document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('l-user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('l-pass').focus(); });
+
+// Auto-login if session active
+if (sessionStorage.getItem('cp_admin') === '1') {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-screen').style.display = 'block';
+}
+
+// ══ API ═══════════════════════════════════════════════════════════════════════
+const API = 'https://web-production-ca616.up.railway.app';
+
+// ══ DATA CACHE ════════════════════════════════════════════════════════════════
+let _bookings  = [];
+let _staff     = [];
+let _customers = [];
+
+function getBookings()  { return _bookings; }
+
+async function _loadBookings() {
+  try {
+    const res = await fetch(API + '/api/bookings');
+    const data = await res.json();
+    _bookings = Array.isArray(data) ? data : [];
+  } catch(e) { _bookings = []; }
+}
+async function _loadStaff() {
+  try {
+    const res = await fetch(API + '/api/staff');
+    const data = await res.json();
+    _staff = Array.isArray(data) ? data : [];
+  } catch(e) { _staff = []; }
+}
+async function _loadCustomers() {
+  try {
+    const res = await fetch(API + '/api/customers');
+    const data = await res.json();
+    _customers = Array.isArray(data) ? data : [];
+  } catch(e) { _customers = []; }
+}
+async function _loadAll() {
+  await Promise.all([_loadBookings(), _loadStaff(), _loadCustomers(), _loadServices()]);
+}
+
+function localToday() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+
+// ══ NAV ═══════════════════════════════════════════════════════════════════════
+let activeTab = 'dashboard';
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (el) el.classList.add('active');
+  activeTab = tab;
+  const titles = { dashboard:'Dashboard', bookings:'All Bookings', today:"Today's Schedule", reports:'Reports & Analytics', calendar:'Calendar View', staff:'Staff Management', customers:'Customers', settings:'Settings', services:'Services' };
+  document.getElementById('tab-title').textContent = titles[tab] || tab;
+  renderTab(tab);
+}
+
+// ══ SHIFT ASSIGNMENT ══════════════════════════════════════════════════════════
+let shiftSelectedRef = null;
+let shiftSelectedMaid = null;
+
+function openShiftModal(preselectedRef) {
+  shiftSelectedRef = preselectedRef || null;
+  shiftSelectedMaid = null;
+  document.getElementById('shift-bk-search').value = '';
+  if (preselectedRef) {
+    goShiftStep2();
+  } else {
+    goShiftStep1();
+  }
+  renderShiftBookings();
+  document.getElementById('shift-modal').classList.add('open');
+}
+
+function goShiftStep1() {
+  document.getElementById('shift-step1').style.display = 'block';
+  document.getElementById('shift-step2').style.display = 'none';
+  document.getElementById('shift-back-btn').style.display = 'none';
+  document.getElementById('shift-confirm-btn').style.display = 'none';
+  renderShiftBookings();
+}
+
+function goShiftStep2() {
+  const b = getBookings().find(x => x.ref === shiftSelectedRef);
+  if (!b) return;
+  document.getElementById('shift-step1').style.display = 'none';
+  document.getElementById('shift-step2').style.display = 'block';
+  document.getElementById('shift-back-btn').style.display = 'inline-flex';
+  document.getElementById('shift-confirm-btn').style.display = 'none';
+  document.getElementById('shift-selected-summary').innerHTML =
+    `<strong>${b.ref}</strong> · ${b.name} · ${b.date} ${b.time} · ${b.hours}h · ${b.total} QAR
+    ${b.maid ? `<span style="margin-left:8px;color:var(--amber);font-size:0.75rem">Currently: ${b.maid}</span>` : ''}`;
+  renderShiftMaids();
+}
+
+function shiftBack() { shiftSelectedMaid = null; goShiftStep1(); }
+
+function renderShiftBookings() {
+  const q = (document.getElementById('shift-bk-search')?.value || '').toLowerCase();
+  const today = localToday();
+  let bks = getBookings().filter(b => b.status !== 'Cancelled' && b.status !== 'Completed');
+  if (q) bks = bks.filter(b =>
+    b.name.toLowerCase().includes(q) || b.ref.toLowerCase().includes(q) ||
+    b.date.includes(q) || (b.phone||'').includes(q)
+  );
+  // Sort: unassigned first, then by date
+  bks.sort((a,b) => {
+    if (!a.maid && b.maid) return -1;
+    if (a.maid && !b.maid) return 1;
+    return a.date.localeCompare(b.date);
+  });
+
+  const list = document.getElementById('shift-bookings-list');
+  list.innerHTML = bks.length ? bks.map(b => `
+    <div class="shift-booking-card ${shiftSelectedRef===b.ref?'selected':''}" onclick="selectShiftBooking('${b.ref}')">
+      <div style="flex:1">
+        <div class="sbc-ref">${b.ref} ${!b.maid?'<span style="color:var(--amber);font-size:0.68rem">⚠️ Unassigned</span>':''}</div>
+        <div class="sbc-name">${b.name}</div>
+        <div class="sbc-detail">📅 ${b.date} · ⏰ ${b.time} · ⏱ ${b.hours}h · 💰 ${b.total} QAR</div>
+        ${b.maid ? `<div style="font-size:0.72rem;color:var(--teal);margin-top:2px">👤 Assigned: ${b.maid}</div>` : ''}
+      </div>
+      <div style="color:var(--muted);font-size:1.2rem">›</div>
+    </div>`).join('') :
+    `<div style="text-align:center;padding:32px;color:var(--muted)">No active bookings found</div>`;
+}
+
+function selectShiftBooking(ref) {
+  shiftSelectedRef = ref;
+  goShiftStep2();
+}
+
+function renderShiftMaids() {
+  const staff = getStaff();
+  const bks = getBookings();
+  // Use the date of the selected booking, not necessarily today
+  const selectedBk = bks.find(b => b.ref === shiftSelectedRef);
+  const checkDate = selectedBk ? selectedBk.date : localToday();
+  const grid = document.getElementById('shift-maid-grid');
+  grid.innerHTML = staff.map(s => {
+    const jobsOnDate = bks.filter(b => b.maid === s.name && b.date === checkDate).length;
+    const statusDot = { Available:'🟢', 'On-Duty':'🟡', Leave:'🔴' }[s.status] || '🟢';
+    return `<div class="maid-option ${shiftSelectedMaid===s.name?'selected':''}" onclick="selectShiftMaid('${s.name}')">
+      <div class="mo-avatar" style="background:${s.color}">${s.name.substring(0,2).toUpperCase()}</div>
+      <div class="mo-name">${s.name}</div>
+      <div class="mo-jobs">${statusDot} ${s.status}</div>
+      <div class="mo-jobs">${jobsOnDate} job${jobsOnDate!==1?'s':''} that day</div>
+    </div>`;
+  }).join('');
+}
+
+function selectShiftMaid(name) {
+  shiftSelectedMaid = name;
+  renderShiftMaids();
+  document.getElementById('shift-confirm-btn').style.display = 'inline-flex';
+}
+
+async function confirmShift() {
+  if (!shiftSelectedRef || !shiftSelectedMaid) return;
+  try {
+    const res = await fetch(API + '/api/bookings/' + shiftSelectedRef + '/maid', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maid: shiftSelectedMaid }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    const idx = _bookings.findIndex(x => x.ref === shiftSelectedRef);
+    const name = idx > -1 ? _bookings[idx].name : shiftSelectedRef;
+    if (idx > -1) _bookings[idx] = updated;
+    closeModal('shift-modal');
+    renderCalendar();
+    showToast(`✅ ${name}'s booking assigned to ${shiftSelectedMaid}`);
+  } catch (e) { alert('Assign failed: ' + e.message); }
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#0f172a;color:white;padding:12px 20px;border-radius:10px;font-size:0.85rem;font-weight:500;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.3);animation:slideUp 0.3s ease';
+  t.innerHTML = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function renderTab(tab) {
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'bookings') renderBookings();
+  if (tab === 'today') renderToday();
+  if (tab === 'reports') renderReports();
+  if (tab === 'calendar') { Promise.all([_loadBookings(), _loadStaff()]).then(() => renderCalendar()); }
+  if (tab === 'staff') { _loadStaff().then(() => renderStaff()); }
+  if (tab === 'customers') renderCustomers();
+  if (tab === 'settings') renderSettings();
+  if (tab === 'services') _loadServices().then(() => renderServices());
+}
+
+// ══ SETTINGS ══════════════════════════════════════════════════════════════════
+let _settings = JSON.parse(localStorage.getItem('cp_settings') || '{}');
+
+async function _loadSettings() {
+  try {
+    const res = await fetch(API + '/api/settings');
+    if (!res.ok) return;
+    const data = await res.json();
+    _settings = { ..._settings, ...data };
+    localStorage.setItem('cp_settings', JSON.stringify(_settings));
+  } catch {}
+}
+
+function getSettings() { return _settings; }
+
+function saveSett(obj) {
+  _settings = { ..._settings, ...obj };
+  localStorage.setItem('cp_settings', JSON.stringify(_settings));
+  fetch(API + '/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(_settings),
+  }).catch(() => {});
+}
+
+function renderSettings() {
+  const s = getSettings();
+  const el = id => document.getElementById(id);
+  if (el('set-biz-name'))    el('set-biz-name').value    = s.bizName || 'CleanPro';
+  if (el('set-admin-name'))  el('set-admin-name').value  = s.adminName || '';
+  if (el('set-base-rate'))   el('set-base-rate').value   = s.baseRate || 15;
+  if (el('set-mat-rate'))    el('set-mat-rate').value    = s.matRate || 25;
+  if (el('set-min-hours'))   el('set-min-hours').value   = s.minHours || 4;
+  if (el('set-start-hr'))    el('set-start-hr').value    = s.startHr || 8;
+  if (el('set-end-hr'))      el('set-end-hr').value      = s.endHr || 20;
+  if (el('set-assign-method')) el('set-assign-method').value = s.assignMethod || 'least-busy';
+  // Toggles
+  ['auto-assign','notify-assign','notif-new','auto-refresh'].forEach(k => {
+    const t = el('toggle-'+k);
+    if (t) { t.classList.toggle('active', s[k] !== false && s[k] !== 'off'); }
+  });
+  // Theme
+  applyTheme(s.theme || 'dark');
+}
+
+function toggleSetting(key) {
+  const t = document.getElementById('toggle-'+key);
+  if (!t) return;
+  t.classList.toggle('active');
+  saveSett({ [key]: t.classList.contains('active') });
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
+  saveSett({ theme });
+  document.getElementById('theme-light-btn').classList.toggle('active', theme==='light');
+  document.getElementById('theme-dark-btn').classList.toggle('active', theme==='dark');
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle('dark', theme==='dark');
+  const lb = document.getElementById('theme-light-btn');
+  const db = document.getElementById('theme-dark-btn');
+  if (lb) lb.classList.toggle('active', theme==='light');
+  if (db) db.classList.toggle('active', theme==='dark');
+}
+
+function applyBizName(name) {
+  if (!name) return;
+  const el = document.querySelector('.sidebar-logo h2');
+  if (el) el.textContent = '🧹 ' + name;
+  document.title = name + ' — Admin Panel';
+}
+
+function saveSettings() {
+  const el = id => document.getElementById(id);
+  const bizName = el('set-biz-name')?.value.trim();
+  saveSett({
+    bizName,
+    adminName:    el('set-admin-name')?.value.trim(),
+    baseRate:     parseFloat(el('set-base-rate')?.value) || 15,
+    matRate:      parseFloat(el('set-mat-rate')?.value) || 25,
+    minHours:     parseInt(el('set-min-hours')?.value) || 4,
+    startHr:      parseInt(el('set-start-hr')?.value) || 8,
+    endHr:        parseInt(el('set-end-hr')?.value) || 20,
+    assignMethod: el('set-assign-method')?.value || 'least-busy',
+  });
+  applyBizName(bizName);
+  showToast('✅ Settings saved!');
+}
+
+// Auto-assign maid logic
+function autoAssignMaid(booking) {
+  const s = getSettings();
+  if (!s['auto-assign']) return null;
+  const staff = getStaff().filter(x => x.status === 'Available');
+  if (!staff.length) return null;
+  const bks = getBookings();
+  const today = localToday();
+  if (s.assignMethod === 'round-robin') {
+    const lastIdx = parseInt(sessionStorage.getItem('cp_rr_idx')||'0');
+    const next = staff[lastIdx % staff.length];
+    sessionStorage.setItem('cp_rr_idx', (lastIdx+1).toString());
+    return next.name;
+  }
+  // Default: least busy
+  const counts = staff.map(s => ({ name:s.name, count: bks.filter(b=>b.maid===s.name&&b.date===today).length }));
+  counts.sort((a,b)=>a.count-b.count);
+  return counts[0].name;
+}
+
+// ══ NEW SHIFT (Manual Booking) ══════════════════════════════════════════════
+let nsStep = 1;
+let nsSelectedCust = null; // { name, phone }
+
+function openNewShiftModal() {
+  nsStep = 1; nsSelectedCust = null;
+  document.getElementById('ns-cust-search').value = '';
+  document.getElementById('ns-new-name').value = '';
+  document.getElementById('ns-new-phone').value = '';
+  // Set today as default date
+  const d = new Date();
+  const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('ns-date').value = ds;
+  // Populate service dropdown
+  const svcSel = document.getElementById('ns-service');
+  if (svcSel) svcSel.innerHTML = getServices().map(s=>`<option value="${s.name}">${s.name}</option>`).join('');
+  // Populate maid dropdown
+  const maidSel = document.getElementById('ns-maid');
+  maidSel.innerHTML = '<option value="">Auto-assign</option>' +
+    getStaff().map(s=>`<option value="${s.name}">${s.name} (${s.status})</option>`).join('');
+  nsRenderStep();
+  renderNsCustList();
+  document.getElementById('new-shift-modal').classList.add('open');
+}
+
+function nsRenderStep() {
+  [1,2,3,4].forEach(i => {
+    document.getElementById('ns-panel'+i).style.display = i===nsStep?'block':'none';
+    document.getElementById('nss'+i).classList.toggle('active', i<=nsStep);
+  });
+  document.getElementById('ns-back').style.display = nsStep>1?'inline-flex':'none';
+  document.getElementById('ns-next').style.display = nsStep<4?'inline-flex':'none';
+  document.getElementById('ns-confirm').style.display = nsStep===4?'inline-flex':'none';
+  if (nsStep===4) buildNsSummary();
+}
+
+function renderNsCustList() {
+  const q = (document.getElementById('ns-cust-search')?.value||'').toLowerCase();
+  const custs = getCustomers().filter(c =>
+    !q || c.name.toLowerCase().includes(q) || (c.phone||'').includes(q)
+  ).slice(0,8);
+
+  const deselBtn = nsSelectedCust
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--teal-faint);border:1.5px solid var(--teal-faint2);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem">
+        <span>✓ Selected: <strong>${nsSelectedCust.name}</strong></span>
+        <button onclick="nsDeselectCust()" style="background:none;border:none;color:var(--red);font-size:0.78rem;cursor:pointer;font-weight:600;padding:2px 6px">✕ Deselect</button>
+       </div>`
+    : '';
+
+  document.getElementById('ns-cust-list').innerHTML = deselBtn + (custs.length ? custs.map(c => {
+    const isSel = nsSelectedCust?.phone === c.phone;
+    return `<div class="ns-cust-item ${isSel?'selected':''}" onclick="nsSelectCust(${JSON.stringify({name:c.name,phone:c.phone}).replace(/"/g,"'")})">
+      <div class="ns-cust-avatar">${c.name.substring(0,2).toUpperCase()}</div>
+      <div>
+        <div style="font-weight:600;font-size:0.875rem">${c.name}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">${c.phone} · ${c.bookingCount} bookings · ${c.area||'No area'}</div>
+      </div>
+      ${isSel?'<span style="color:var(--teal);font-size:1rem;margin-left:auto">✓</span>':''}
+    </div>`;
+  }).join('') : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.85rem">No customers found</div>`);
+}
+
+function nsSelectCust(c) {
+  // Clicking an already-selected customer deselects it
+  nsSelectedCust = (nsSelectedCust?.phone === c.phone) ? null : c;
+  renderNsCustList();
+}
+
+function nsDeselectCust() {
+  nsSelectedCust = null;
+  document.getElementById('ns-new-name').value = '';
+  document.getElementById('ns-new-phone').value = '';
+  renderNsCustList();
+}
+
+function nsNext() {
+  if (nsStep===1) {
+    // Validate customer
+    const newName = document.getElementById('ns-new-name').value.trim();
+    const newPhone = document.getElementById('ns-new-phone').value.trim();
+    if (!nsSelectedCust && !newName) { showToast('⚠️ Select a customer or enter name'); return; }
+    if (!nsSelectedCust && newName) nsSelectedCust = { name:newName, phone:newPhone };
+    // Show selected customer in step 2
+    document.getElementById('ns-cust-confirm').innerHTML =
+      `👤 <strong>${nsSelectedCust.name}</strong>${nsSelectedCust.phone?' · '+nsSelectedCust.phone:''}`;
+  }
+  if (nsStep===2) {
+    const hrs = parseInt(document.getElementById('ns-hours').value)||4;
+    if (hrs < 4) { showToast('⚠️ Minimum 4 hours'); return; }
+  }
+  if (nsStep===3) {
+    if (!document.getElementById('ns-date').value) { showToast('⚠️ Select a date'); return; }
+  }
+  nsStep = Math.min(4, nsStep+1);
+  nsRenderStep();
+}
+
+function nsBack() { nsStep = Math.max(1, nsStep-1); nsRenderStep(); }
+
+function buildNsSummary() {
+  const mats = document.getElementById('ns-materials').value === '1';
+  const rate = mats ? 25 : 15;
+  const hrs  = parseInt(document.getElementById('ns-hours').value)||4;
+  const clns = parseInt(document.getElementById('ns-cleaners').value)||1;
+  const total = rate * hrs * clns;
+  const maid = document.getElementById('ns-maid').value;
+  document.getElementById('ns-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${[
+        ['Customer',  nsSelectedCust?.name || '—'],
+        ['Phone',     nsSelectedCust?.phone || '—'],
+        ['Service',   document.getElementById('ns-service').value],
+        ['Area',      document.getElementById('ns-area').value||'—'],
+        ['Date',      document.getElementById('ns-date').value],
+        ['Time',      document.getElementById('ns-time').value],
+        ['Hours',     hrs + ' hrs'],
+        ['Cleaners',  clns],
+        ['Materials', mats?'Yes (25 QAR/hr)':'No (15 QAR/hr)'],
+        ['Maid',      maid||'Auto-assign'],
+        ['Total',     `<strong style="color:var(--teal);font-size:1.1rem">${total} QAR</strong>`],
+      ].map(([k,v])=>`<div><div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">${k}</div><div style="font-weight:600;font-size:0.875rem;margin-top:2px">${v}</div></div>`).join('')}
+    </div>`;
+}
+
+async function nsConfirm() {
+  const mats = document.getElementById('ns-materials').value === '1';
+  const rate  = mats ? 25 : 15;
+  const hrs   = parseInt(document.getElementById('ns-hours').value)||4;
+  const clns  = parseInt(document.getElementById('ns-cleaners').value)||1;
+  let maid = document.getElementById('ns-maid').value || autoAssignMaid({}) || '';
+
+  const payload = {
+    name:      nsSelectedCust.name,
+    phone:     nsSelectedCust.phone || '',
+    service:   document.getElementById('ns-service').value,
+    date:      document.getElementById('ns-date').value,
+    time:      document.getElementById('ns-time').value,
+    area:      document.getElementById('ns-area').value,
+    hours:     hrs, cleaners: clns, materials: mats, rate,
+    total:     rate * hrs * clns,
+    maid,
+    notes:     document.getElementById('ns-notes').value,
+    status:    'Confirmed',
+  };
+
+  try {
+    const res = await fetch(API + '/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const newBk = await res.json();
+    // Override status to Confirmed (server saves New, patch it)
+    await fetch(API + '/api/bookings/' + newBk.ref + '/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Confirmed' }),
+    });
+    newBk.status = 'Confirmed';
+    _bookings.unshift(newBk);
+    if (!maid && getSettings()['notify-assign']) showToast('⚠️ No maid assigned — assign manually');
+    closeModal('new-shift-modal');
+    renderCalendar();
+    showToast(`✅ Booking ${newBk.ref} created for ${nsSelectedCust.name}`);
+  } catch (e) { alert('Failed to create booking: ' + e.message); }
+}
+
+// ══ CUSTOMERS DATA ════════════════════════════════════════════════════════════
+// Phones of customers manually deleted — persists in localStorage
+function _getDeletedPhones() {
+  return new Set(JSON.parse(localStorage.getItem('cp_deleted_phones') || '[]'));
+}
+function _addDeletedPhone(phone) {
+  const set = _getDeletedPhones();
+  set.add((phone||'').replace(/\s/g,''));
+  localStorage.setItem('cp_deleted_phones', JSON.stringify([...set]));
+}
+
+function getCustomers() {
+  // Merge explicit customer records with auto-built records from bookings
+  const bks = getBookings();
+  const deleted = _getDeletedPhones();
+  const map = {};
+
+  // Index explicit customers by phone (skip deleted)
+  _customers.forEach(c => {
+    const ph = (c.phone||'').replace(/\s/g,'');
+    if (!deleted.has(ph)) map[ph] = c;
+  });
+
+  // Auto-build from bookings for phones not yet in explicit list (skip deleted)
+  bks.forEach(b => {
+    const phone = (b.phone||'').replace(/\s/g,'');
+    if (!phone || deleted.has(phone)) return;
+    if (!map[phone]) {
+      map[phone] = {
+        id: 'c_' + phone,
+        name: b.name, phone: b.phone,
+        area: b.area||'', address: b.address||'',
+        email: '', notes: '', tag: 'new',
+        createdAt: b.created
+      };
+    }
+  });
+
+  // Enrich with booking stats
+  return Object.values(map).map(c => {
+    const phone = (c.phone||'').replace(/\s/g,'');
+    const custBks = bks.filter(b => (b.phone||'').replace(/\s/g,'') === phone);
+    const spent = custBks.filter(b=>['Confirmed','Completed'].includes(b.status)).reduce((s,b)=>s+b.total,0);
+    const lastVisit = custBks.map(b=>b.date).sort().reverse()[0] || '';
+    const dueAmount = custBks
+      .filter(b => b.status === 'Completed')
+      .reduce((s, b) => s + Math.max(0, (b.total || 0) - (b.paid_amount || 0)), 0);
+    let autoTag = c.tag || 'new';
+    if (!c.tag || c.tag === 'new') {
+      if (custBks.length >= 5) autoTag = 'loyal';
+      else if (custBks.length >= 2) autoTag = 'regular';
+    }
+    return { ...c, bookingCount: custBks.length, totalSpent: spent, lastVisit, tag: autoTag, dueAmount };
+  });
+}
+
+async function saveCustomerData(c) {
+  const isNew = !_customers.find(x => x.id === c.id);
+  const url = isNew ? API + '/api/customers' : API + '/api/customers/' + c.id;
+  const method = isNew ? 'POST' : 'PUT';
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(c),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const saved = await res.json();
+  const idx = _customers.findIndex(x => x.id === saved.id);
+  if (idx > -1) _customers[idx] = saved;
+  else _customers.unshift(saved);
+}
+
+async function deleteCustomerData(id) {
+  const res = await fetch(API + '/api/customers/' + id, { method: 'DELETE' });
+  if (!res.ok) throw new Error(await res.text());
+  _customers = _customers.filter(x => x.id !== id);
+}
+
+function deleteCust(id) {
+  const c = getCustomers().find(x => x.id === id);
+  const name = c ? c.name : id;
+  const phone = c ? c.phone : '';
+
+  confirmAction(
+    'Delete customer?',
+    `Remove <strong>${name}</strong>. Their bookings will remain in the system.`,
+    async () => {
+      try {
+        // Try DB delete (works for explicit customers; no-op for auto-generated)
+        if (_customers.some(x => x.id === id)) {
+          await deleteCustomerData(id);
+        }
+        // Block phone from auto-generation so customer doesn't reappear
+        if (phone) _addDeletedPhone(phone);
+        renderCustomers();
+        showToast(`🗑 ${name} removed`);
+      } catch (e) {
+        showToast('⚠️ Delete failed: ' + e.message);
+      } finally {
+        closeModal('confirm-overlay');
+      }
+    }
+  );
+}
+
+// ══ RENDER CUSTOMERS ══════════════════════════════════════════════════════════
+function renderCustomers() {
+  let custs = getCustomers();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
+  // Stats
+  const loyal  = custs.filter(c => c.bookingCount >= 3).length;
+  const newC   = custs.filter(c => c.createdAt >= monthStart).length;
+  const rev    = custs.reduce((s,c) => s + c.totalSpent, 0);
+  const el = id => document.getElementById(id);
+  if (el('cs-total')) el('cs-total').textContent = custs.length;
+  if (el('cs-loyal')) el('cs-loyal').textContent = loyal;
+  if (el('cs-new'))   el('cs-new').textContent   = newC;
+  if (el('cs-rev'))   el('cs-rev').textContent   = rev;
+
+  // Filters
+  const q    = (el('cust-search')?.value || '').toLowerCase();
+  const tag  = el('cust-tag-filter')?.value || '';
+  const dueAmtFilter = el('cust-due-amount-filter')?.value || '';
+  const srt  = el('cust-sort')?.value || 'recent';
+
+  custs = custs.filter(c => {
+    const m    = c.name.toLowerCase().includes(q) || (c.phone||'').includes(q) || (c.area||'').toLowerCase().includes(q);
+    const tagOk = !tag  || c.tag === tag;
+    const balOk = !dueAmtFilter || (dueAmtFilter === 'outstanding' ? c.dueAmount > 0 : c.dueAmount === 0);
+    return m && tagOk && balOk;
+  });
+
+  if (srt === 'bookings') custs.sort((a,b) => b.bookingCount - a.bookingCount);
+  else if (srt === 'revenue') custs.sort((a,b) => b.totalSpent - a.totalSpent);
+  else if (srt === 'name') custs.sort((a,b) => a.name.localeCompare(b.name));
+  else custs.sort((a,b) => (b.lastVisit||'').localeCompare(a.lastVisit||''));
+
+  if (el('cust-count')) el('cust-count').textContent = custs.length + ' customer' + (custs.length!==1?'s':'');
+
+  const tagHtml = (tag) => {
+    const map = {
+      vip:      ['tag-vip',    '⭐ VIP'],
+      loyal:    ['tag-loyal',  '🏅 Loyal'],
+      new:      ['tag-new',    '🆕 New'],
+      regular:  ['tag-regular','✅ Regular'],
+      inactive: ['tag-inactive','💤 Inactive'],
+    };
+    const [cls, label] = map[tag] || ['tag-new','🆕 New'];
+    return `<span class="cust-tag ${cls}">${label}</span>`;
+  };
+
+  const tbl = el('cust-table');
+  if (!tbl) return;
+  const waIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="display:block"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;
+
+  tbl.innerHTML = custs.length ? custs.map((c, idx) => `
+    <tr>
+      <td><span style="font-size:0.75rem;font-weight:700;color:var(--teal);font-family:'Outfit',sans-serif;letter-spacing:0.5px">CUST-${String(idx+1).padStart(3,'0')}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-dark));display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.85rem;flex-shrink:0">
+            ${c.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}
+          </div>
+          <div>
+            <div style="font-weight:600">${c.name}</div>
+            ${c.email?`<div style="font-size:0.72rem;color:var(--muted)">${c.email}</div>`:''}
+          </div>
+        </div>
+      </td>
+      <td><a href="https://wa.me/${(c.phone||'').replace(/\D/g,'')}" target="_blank" style="color:var(--teal);text-decoration:none;font-weight:500">${c.phone||'—'}</a></td>
+      <td>${c.area||'—'}</td>
+      <td style="text-align:center"><strong>${c.bookingCount}</strong></td>
+      <td style="color:var(--muted);font-size:0.82rem">${c.lastVisit||'—'}</td>
+      <td style="color:var(--teal);font-weight:700">${c.totalSpent} QAR</td>
+      <td style="font-weight:700;white-space:nowrap;color:${c.dueAmount>0?'var(--red)':'var(--green)'}">${c.dueAmount > 0 ? c.dueAmount.toFixed(2)+' QAR' : '✓ Paid'}</td>
+      <td>${tagHtml(c.tag)}</td>
+      <td>
+        <div class="act-row">
+          <button class="act-btn" onclick="openCustModal('${c.id}')">✏️</button>
+          <a href="https://wa.me/${(c.phone||'').replace(/\D/g,'')}" target="_blank" style="display:inline-flex;text-decoration:none">
+            <button class="act-btn green" style="display:flex;align-items:center;gap:4px">${waIcon} WhatsApp</button>
+          </a>
+          <button class="act-btn red" onclick="deleteCust('${c.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`).join('') :
+    `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted)">No customers found</td></tr>`;
+}
+
+// ══ CUSTOMER MODAL ════════════════════════════════════════════════════════════
+function openCustModal(id) {
+  document.getElementById('cust-modal-title').textContent = id ? 'Edit Customer' : 'Add Customer';
+  document.getElementById('cm-id').value = id || '';
+  ['cm-name','cm-phone','cm-area','cm-address','cm-email','cm-notes'].forEach(f => document.getElementById(f).value = '');
+  document.getElementById('cm-tag').value = 'new';
+  if (id) {
+    const c = getCustomers().find(x => x.id === id);
+    if (c) {
+      document.getElementById('cm-name').value    = c.name||'';
+      document.getElementById('cm-phone').value   = c.phone||'';
+      document.getElementById('cm-area').value    = c.area||'';
+      document.getElementById('cm-address').value = c.address||'';
+      document.getElementById('cm-email').value   = c.email||'';
+      document.getElementById('cm-notes').value   = c.notes||'';
+      document.getElementById('cm-tag').value     = c.tag||'new';
+    }
+  }
+  document.getElementById('cust-modal').classList.add('open');
+}
+
+async function saveCustomer() {
+  const name  = document.getElementById('cm-name').value.trim();
+  const phone = document.getElementById('cm-phone').value.trim();
+  if (!name || !phone) { alert('Name and Phone are required!'); return; }
+  const id = document.getElementById('cm-id').value || ('c_' + phone.replace(/\D/g,'') + '_' + Date.now());
+  try {
+    await saveCustomerData({
+      id, name, phone,
+      area:    document.getElementById('cm-area').value.trim(),
+      address: document.getElementById('cm-address').value.trim(),
+      email:   document.getElementById('cm-email').value.trim(),
+      notes:   document.getElementById('cm-notes').value.trim(),
+      tag:     document.getElementById('cm-tag').value,
+    });
+    closeModal('cust-modal');
+    renderCustomers();
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+
+// ══ STAFF DATA ════════════════════════════════════════════════════════════════
+function getStaff() { return _staff; }
+
+// ══ RENDER STAFF ══════════════════════════════════════════════════════════════
+let _staffRange = { from: null, to: null };
+
+function setStaffRange(period, el) {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.querySelectorAll('.rep-range-btn[id^="srf-"]').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (period === 'all')   { _staffRange = { from: null, to: null }; }
+  else if (period === 'today') { _staffRange = { from: today, to: today }; }
+  else if (period === 'week')  {
+    const s = new Date(now); s.setDate(now.getDate() - ((now.getDay()+6)%7));
+    _staffRange = { from: `${s.getFullYear()}-${pad(s.getMonth()+1)}-${pad(s.getDate())}`, to: today };
+  } else if (period === 'month') {
+    _staffRange = { from: `${now.getFullYear()}-${pad(now.getMonth()+1)}-01`, to: today };
+  } else {
+    _staffRange = { from: document.getElementById('staff-from')?.value||null, to: document.getElementById('staff-to')?.value||null };
+  }
+  if (document.getElementById('staff-from')) document.getElementById('staff-from').value = _staffRange.from || '';
+  if (document.getElementById('staff-to'))   document.getElementById('staff-to').value   = _staffRange.to   || '';
+  renderStaff();
+}
+
+function renderStaff() {
+  const staff = getStaff();
+  const bks = getBookings();
+  const today = localToday();
+  const grid = document.getElementById('staff-grid');
+
+  const rangeBks = (_staffRange.from || _staffRange.to)
+    ? bks.filter(b => (!_staffRange.from || b.date >= _staffRange.from) && (!_staffRange.to || b.date <= _staffRange.to))
+    : bks;
+
+  const rangeLabel = _staffRange.from
+    ? (_staffRange.from === _staffRange.to ? _staffRange.from : `${_staffRange.from} → ${_staffRange.to||'now'}`)
+    : 'All Time';
+
+  const statusDot = { Available:'available', 'On-Duty':'on-duty', Leave:'leave' };
+  const statusBadge = { Available:'ssb-available ✅', 'On-Duty':'ssb-on-duty 🟡', Leave:'ssb-leave 🔴' };
+
+  const smSplit = str => (str || '').split(',').map(n => n.trim()).filter(Boolean);
+
+  grid.innerHTML = staff.map(s => {
+    const totalJobs = rangeBks.filter(b => smSplit(b.maid).includes(s.name)).length;
+    const todayJobs = bks.filter(b => smSplit(b.maid).includes(s.name) && b.date === today).length;
+    const revenue   = Math.round(
+      rangeBks
+        .filter(b => smSplit(b.maid).includes(s.name) && ['Confirmed','Completed'].includes(b.status))
+        .reduce((sum, b) => sum + b.total, 0)
+    );
+    const [badgeCls, badgeIcon] = (statusBadge[s.status]||'ssb-available ✅').split(' ');
+    const initials = s.name.substring(0,2).toUpperCase();
+    return `
+    <div class="staff-card">
+      <div class="staff-card-header">
+        <div class="staff-avatar-lg" style="background:${s.color}">
+          ${initials}
+          <div class="staff-status-dot ${statusDot[s.status]||'available'}"></div>
+        </div>
+        <div>
+          <div class="staff-name">${s.name}</div>
+          <div class="staff-role">Cleaning Staff</div>
+          ${s.nationality ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:2px">🌍 ${s.nationality}</div>` : ''}
+          <div class="staff-status-badge ${badgeCls}">${badgeIcon} ${s.status}</div>
+        </div>
+      </div>
+      <div class="staff-stats">
+        <div class="staff-stat-item">
+          <div class="staff-stat-val">${todayJobs}</div>
+          <div class="staff-stat-lbl">Today</div>
+        </div>
+        <div class="staff-stat-item">
+          <div class="staff-stat-val">${totalJobs}</div>
+          <div class="staff-stat-lbl" title="${rangeLabel}">Total Jobs</div>
+        </div>
+        <div class="staff-stat-item">
+          <div class="staff-stat-val">${revenue}</div>
+          <div class="staff-stat-lbl" title="${rangeLabel}">Earnings</div>
+        </div>
+      </div>
+      ${s.phone ? `<div style="font-size:0.78rem;color:var(--text2);margin-bottom:8px">📱 ${s.phone}</div>` : ''}
+      ${s.notes ? `<div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;font-style:italic">"${s.notes}"</div>` : ''}
+      <div class="staff-card-actions">
+        <button class="act-btn" style="flex:1" onclick="editStaff('${s.id}')">✏️ Edit</button>
+        <select class="act-btn" style="flex:1;cursor:pointer" onchange="quickStatus('${s.id}',this.value)">
+          <option ${s.status==='Available'?'selected':''} value="Available">✅ Available</option>
+          <option ${s.status==='On-Duty'?'selected':''} value="On-Duty">🟡 On-Duty</option>
+          <option ${s.status==='Leave'?'selected':''} value="Leave">🔴 Leave</option>
+        </select>
+        <button class="act-btn red" onclick="deleteStaff('${s.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Add staff card
+  grid.innerHTML += `
+    <div class="staff-add-card" onclick="openStaffModal()">
+      <div class="staff-add-icon">➕</div>
+      <div class="staff-add-text">Add New Staff</div>
+      <div style="font-size:0.75rem;color:var(--muted)">Click to add a maid</div>
+    </div>`;
+}
+
+async function quickStatus(id, status) {
+  const s = _staff.find(x => x.id === id);
+  if (!s) return;
+  try {
+    const res = await fetch(API + '/api/staff/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...s, status }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    const idx = _staff.findIndex(x => x.id === id);
+    if (idx > -1) _staff[idx] = updated;
+    renderStaff();
+  } catch (e) { alert('Update failed: ' + e.message); }
+}
+
+function deleteStaff(id) {
+  confirmAction('Delete this staff member?', 'This cannot be undone.', async () => {
+    try {
+      const res = await fetch(API + '/api/staff/' + id, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      _staff = _staff.filter(x => x.id !== id);
+      renderStaff();
+      closeModal('confirm-overlay');
+    } catch (e) { alert('Delete failed: ' + e.message); }
+  });
+}
+
+// ══ STAFF MODAL ═══════════════════════════════════════════════════════════════
+const STAFF_COLORS = ['#0d9488','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#10b981','#ec4899','#6366f1','#0ea5e9','#84cc16'];
+let selectedColor = STAFF_COLORS[0];
+
+function openStaffModal(id) {
+  selectedColor = STAFF_COLORS[0];
+  document.getElementById('staff-modal-title').textContent = id ? 'Edit Staff Member' : 'Add Staff Member';
+  document.getElementById('sf-id').value = id || '';
+  document.getElementById('sf-name').value = '';
+  document.getElementById('sf-phone').value = '';
+  document.getElementById('sf-nationality').value = '';
+  document.getElementById('sf-joindate').value = '';
+  document.getElementById('sf-qid').value = '';
+  document.getElementById('sf-basic-salary').value = '';
+  document.getElementById('sf-status').value = 'Available';
+  document.getElementById('sf-notes').value = '';
+
+  if (id) {
+    const s = getStaff().find(x => x.id === id);
+    if (s) {
+      document.getElementById('sf-name').value = s.name;
+      document.getElementById('sf-phone').value = s.phone || '';
+      document.getElementById('sf-nationality').value = s.nationality || '';
+      document.getElementById('sf-joindate').value = s.joinDate || '';
+      document.getElementById('sf-qid').value = s.qid || '';
+      document.getElementById('sf-basic-salary').value = s.basicSalary || '';
+      document.getElementById('sf-status').value = s.status;
+      document.getElementById('sf-notes').value = s.notes || '';
+      selectedColor = s.color;
+    }
+  }
+  renderColorPicker();
+  document.getElementById('staff-modal').classList.add('open');
+}
+
+function editStaff(id) { openStaffModal(id); }
+
+function renderColorPicker() {
+  document.getElementById('sf-color-picker').innerHTML = STAFF_COLORS.map(c =>
+    `<div class="color-swatch ${c===selectedColor?'selected':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`
+  ).join('');
+}
+
+function pickColor(c) { selectedColor = c; renderColorPicker(); }
+
+async function saveStaff() {
+  const name = document.getElementById('sf-name').value.trim();
+  if (!name) { alert('Name is required!'); return; }
+  const id = document.getElementById('sf-id').value;
+  const data = {
+    id: id || ('s' + Date.now()),
+    name,
+    phone:        document.getElementById('sf-phone').value.trim(),
+    nationality:  document.getElementById('sf-nationality').value,
+    qid:          document.getElementById('sf-qid').value.trim(),
+    basicSalary:  parseFloat(document.getElementById('sf-basic-salary').value) || null,
+    joinDate:     document.getElementById('sf-joindate').value,
+    status:       document.getElementById('sf-status').value,
+    notes:        document.getElementById('sf-notes').value.trim(),
+    color:        selectedColor,
+  };
+  try {
+    const isNew = !id;
+    const url    = isNew ? API + '/api/staff' : API + '/api/staff/' + id;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const saved = await res.json();
+    if (isNew) { _staff.push(saved); }
+    else { const idx = _staff.findIndex(x => x.id === id); if (idx > -1) _staff[idx] = saved; }
+    closeModal('staff-modal');
+    renderStaff();
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+
+// ══ CALENDAR ══════════════════════════════════════════════════════════════════
+const MAID_COLORS = ['#0d9488','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#10b981','#ec4899','#6366f1'];
+const HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20];
+let HOUR_H = 72; // px per hour — changed by zoom
+
+let calViewDate = new Date();
+let calView = 'day'; // 'day' | 'week'
+
+function calZoom(delta) {
+  HOUR_H = Math.max(40, Math.min(140, HOUR_H + delta));
+  document.documentElement.style.setProperty('--hour-h', HOUR_H + 'px');
+  renderCalendar();
+}
+
+function getMaids() {
+  return _staff.map(s => ({ name: s.name, color: s.color }));
+}
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function calGoToday() { calViewDate = new Date(); renderCalendar(); }
+function calNav(dir) {
+  if (calView === 'day') calViewDate.setDate(calViewDate.getDate() + dir);
+  else calViewDate.setDate(calViewDate.getDate() + dir*7);
+  renderCalendar();
+}
+function calSetView(v, el) {
+  calView = v;
+  document.querySelectorAll('.cal-vbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderCalendar();
+}
+
+function timeToMinutes(t) {
+  if (!t) return 0;
+  const [hm, period] = t.split(' ');
+  let [h, m] = hm.split(':').map(Number);
+  if (period === 'PM' && h !== 12) h += 12;
+  if (period === 'AM' && h === 12) h = 0;
+  return h * 60 + (m || 0);
+}
+
+function calcEndTime(timeStr, hours) {
+  const total = timeToMinutes(timeStr) + (hours || 0) * 60;
+  const h24 = Math.floor(total / 60) % 24;
+  const m   = total % 60;
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
+}
+
+function timeRangeLabel(b) {
+  return `${b.time} – ${calcEndTime(b.time, b.hours)} (${b.hours}h)`;
+}
+
+function renderCalendar() {
+  // Keep CSS variable in sync with JS HOUR_H so grid cells and card heights match
+  document.documentElement.style.setProperty('--hour-h', HOUR_H + 'px');
+
+  const bks = getBookings();
+  const maids = getMaids();
+  const wrap = document.getElementById('cal-wrap');
+  const calUnassigned = document.getElementById('cal-unassigned');
+
+  if (maids.length === 0) {
+    wrap.innerHTML = `<div style="padding:60px 20px;text-align:center;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:12px">👥</div>
+      <div style="font-size:1rem;font-weight:600;color:var(--text2);margin-bottom:6px">No staff added yet</div>
+      <div style="font-size:0.85rem">Go to <strong>Staff Management</strong> to add your first staff member.</div>
+    </div>`;
+    if (calUnassigned) calUnassigned.style.display = 'none';
+    return;
+  }
+
+  const now = new Date();
+  const todayStr = localDateStr(now);
+
+  // Dates to show
+  let dates = [];
+  if (calView === 'day') {
+    dates = [new Date(calViewDate)];
+    document.getElementById('cal-date-label').textContent =
+      calViewDate.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  } else {
+    // Week: Mon–Sun
+    const start = new Date(calViewDate);
+    start.setDate(start.getDate() - ((start.getDay()+6)%7));
+    for (let i=0;i<7;i++) { const d=new Date(start); d.setDate(start.getDate()+i); dates.push(d); }
+    document.getElementById('cal-date-label').textContent =
+      dates[0].toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' +
+      dates[6].toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  }
+
+  // For day view: columns = maids. For week view: columns = dates
+  const nowMinutes = now.getHours()*60 + now.getMinutes();
+  const firstHour = HOURS[0];
+
+  if (calView === 'day') {
+    if (calUnassigned) calUnassigned.style.display = '';
+    const dateStr = localDateStr(dates[0]);
+    const dayBks    = bks.filter(b => (b.date || '').substring(0, 10) === dateStr);
+    const activeBks = dayBks.filter(b => b.status !== 'Cancelled');
+
+    const unassignedBks = activeBks.filter(b => !b.maid);
+
+    // Header — maid columns + Unassigned column
+    let headerHtml = `<div class="cal-grid-header"><div class="cal-time-gutter"></div>`;
+    maids.forEach(m => {
+      const splitM2   = str => (str || '').split(',').map(n => n.trim()).filter(Boolean);
+      const maidBks   = activeBks.filter(b => splitM2(b.maid).includes(m.name));
+      const staffMember = getStaff().find(s => s.name === m.name);
+      const statusDot = { Available:'🟢', 'On-Duty':'🟡', Leave:'🔴' }[staffMember?.status] || '🟢';
+      headerHtml += `<div class="cal-maid-header">
+        <div class="cal-maid-avatar" style="background:${m.color}">${m.name.substring(0,2).toUpperCase()}</div>
+        <div>
+          <div class="cal-maid-name">${m.name}</div>
+          <div class="cal-maid-status-txt" style="color:${m.color}">${statusDot} ${maidBks.length} job${maidBks.length!==1?'s':''}</div>
+        </div>
+      </div>`;
+    });
+    // Unassigned column header
+    headerHtml += `<div class="cal-maid-header" style="background:#fffbeb">
+      <div class="cal-maid-avatar" style="background:#94a3b8">⚠️</div>
+      <div>
+        <div class="cal-maid-name" style="color:#92400e">Unassigned</div>
+        <div class="cal-maid-status-txt" style="color:#d97706">${unassignedBks.length} job${unassignedBks.length!==1?'s':''}</div>
+      </div>
+    </div>`;
+    headerHtml += '</div>';
+
+    // Times
+    let timesHtml = '<div class="cal-times">';
+    HOURS.forEach(h => {
+      const label = h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h-12}:00 PM`;
+      timesHtml += `<div class="cal-time-cell">${label}</div>`;
+    });
+    timesHtml += '</div>';
+
+    // Helper: split comma-separated maid string into array
+    const splitM = str => (str || '').split(',').map(n => n.trim()).filter(Boolean);
+
+    // Maid columns + Unassigned column
+    let colsHtml = '<div class="cal-columns">';
+    maids.forEach(m => {
+      // Only active (non-cancelled) bookings for this maid
+      const myBks = activeBks.filter(b => splitM(b.maid).includes(m.name));
+
+      let colHtml = `<div class="cal-col">`;
+      HOURS.forEach(() => { colHtml += `<div class="cal-cell"></div>`; });
+      if (dateStr === todayStr && nowMinutes >= firstHour*60) {
+        const topPx = (nowMinutes - firstHour*60)/60*HOUR_H;
+        colHtml += `<div class="cal-now-line" style="top:${topPx}px"><div class="cal-now-dot"></div></div>`;
+      }
+      myBks.forEach(b => {
+        const assigned  = splitM(b.maid);
+        const pos       = assigned.indexOf(m.name) + 1;   // 1-based position
+        const total     = assigned.length;
+        const isPrimary = pos === 1;
+        const startMin  = timeToMinutes(b.time);
+        const endMin    = startMin + (parseInt(b.hours) || 1) * 60;
+        const topPx     = Math.max(0, (startMin - firstHour*60) / 60 * HOUR_H);
+        const heightPx  = (parseInt(b.hours) || 1) * HOUR_H;
+        const cls       = 'cbc-' + (b.status || 'new').toLowerCase();
+        const posBadge  = total > 1
+          ? `<div style="font-size:0.62rem;font-weight:700;margin-top:2px;opacity:0.9">👤 Cleaner ${pos} of ${total}</div>` : '';
+        const canDone = isPrimary && b.status === 'Confirmed';
+        const doneBtn = canDone
+          ? `<button onclick="event.stopPropagation();openPaymentModal('${b.ref}')" style="margin-top:5px;width:100%;padding:3px 0;background:rgba(0,0,0,0.13);border:none;border-radius:4px;font-size:0.62rem;font-weight:700;cursor:pointer;color:inherit;letter-spacing:0.3px">💳 Done</button>` : '';
+        colHtml += `<div class="cal-booking-card ${cls}" style="top:${topPx}px;height:${heightPx}px;z-index:5${isPrimary?'':';border-style:dashed;opacity:0.88'}" onclick="viewDetail('${b.ref}')">
+          <div class="cbc-time">${timeRangeLabel(b)}</div>
+          <div class="cbc-name">${b.name}</div>
+          <div class="cbc-svc">${b.service}${b.materials&&isPrimary?' · 🧴':''}</div>
+          ${posBadge}
+          ${isPrimary?`<div style="font-size:0.65rem;margin-top:2px;opacity:0.8">${b.total} QAR</div>`:''}
+          ${doneBtn}
+        </div>`;
+      });
+      colHtml += '</div>';
+      colsHtml += colHtml;
+    });
+    // Unassigned column
+    let unassignedCol = `<div class="cal-col" style="background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(251,191,36,0.04) 8px,rgba(251,191,36,0.04) 16px)">`;
+    HOURS.forEach(() => { unassignedCol += `<div class="cal-cell"></div>`; });
+    if (dateStr === todayStr && nowMinutes >= firstHour*60) {
+      const topPx = (nowMinutes - firstHour*60)/60*HOUR_H;
+      unassignedCol += `<div class="cal-now-line" style="top:${topPx}px"><div class="cal-now-dot"></div></div>`;
+    }
+    unassignedBks.forEach(b => {
+      const startMin = timeToMinutes(b.time);
+      const endMin   = startMin + (parseInt(b.hours) || 1) * 60;
+      const topPx    = Math.max(0, (startMin - firstHour*60) / 60 * HOUR_H);
+      const heightPx = Math.max(48, (parseInt(b.hours) || 1) * HOUR_H);
+      unassignedCol += `<div class="cal-booking-card cbc-new" style="top:${topPx}px;height:${heightPx}px;border-color:#f59e0b;background:#fffbeb;color:#92400e" onclick="openShiftModal('${b.ref}')">
+        <div class="cbc-time">${timeRangeLabel(b)}</div>
+        <div class="cbc-name">${b.name}</div>
+        <div class="cbc-svc">${b.service}${(b.cleaners||1)>1?' · 👥'+b.cleaners:''}</div>
+        <div style="font-size:0.62rem;margin-top:3px;font-weight:700;color:#d97706">+ Assign Maid</div>
+      </div>`;
+    });
+    unassignedCol += '</div>';
+    colsHtml += unassignedCol + '</div>';
+
+    wrap.innerHTML = headerHtml + `<div class="cal-body">${timesHtml}${colsHtml}</div>`;
+
+    // All bookings section
+    const ug = document.getElementById('unassigned-grid');
+    const uc = document.getElementById('unassigned-count');
+    if (uc) uc.textContent = dayBks.length;
+    if (ug) {
+      ug.innerHTML = dayBks.length ? dayBks.map(b => {
+        const maidsArr = splitM(b.maid);
+        const maidBadge = maidsArr.length
+          ? maidsArr.map(n => `<span style="margin-left:4px;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:6px;font-size:0.68rem;font-weight:600">👤 ${n}</span>`).join('')
+          : `<span onclick="event.stopPropagation();openShiftModal('${b.ref}')" style="margin-left:6px;padding:2px 8px;background:var(--teal);color:white;border-radius:6px;font-size:0.68rem;font-weight:600;cursor:pointer">+ Assign</span>`;
+        const doneAction = b.status === 'Confirmed'
+          ? `<span onclick="event.stopPropagation();openPaymentModal('${b.ref}')" style="margin-left:6px;padding:2px 10px;background:#f59e0b;color:white;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer">💳 Done</span>` : '';
+        return `<div class="unassigned-pill" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px" onclick="viewDetail('${b.ref}')">
+          <strong>${b.time}</strong> · ${b.name} · ${b.service} · ${b.total} QAR
+          ${maidBadge}${doneAction}
+        </div>`;
+      }).join('') :
+      `<div style="padding:8px 4px;color:var(--muted);font-size:0.82rem">No bookings for this day</div>`;
+    }
+
+  } else {
+    // WEEK VIEW — columns = dates, one row per maid
+    let html = `<div class="cal-grid-header"><div class="cal-time-gutter"></div>`;
+    dates.forEach(d => {
+      const ds = localDateStr(d);
+      const isToday = ds === todayStr;
+      html += `<div class="cal-maid-header" style="${isToday?'background:var(--teal-faint);':''}" >
+        <div>
+          <div class="cal-maid-name" style="${isToday?'color:var(--teal);':''}">${d.toLocaleDateString('en-GB',{weekday:'short'})}</div>
+          <div class="cal-maid-status-txt" style="${isToday?'color:var(--teal);font-weight:700;':'color:var(--muted)'}">${d.getDate()} ${d.toLocaleDateString('en-GB',{month:'short'})}</div>
+        </div>
+      </div>`;
+    });
+    html += '</div><div class="cal-body"><div class="cal-times">';
+    HOURS.forEach(h => {
+      const label = h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h-12} PM`;
+      html += `<div class="cal-time-cell">${label}</div>`;
+    });
+    html += '</div><div class="cal-columns">';
+    dates.forEach(d => {
+      const ds = localDateStr(d);
+      const dayBks = bks.filter(b => b.date === ds && b.status !== 'Cancelled');
+      const isToday = ds === todayStr;
+      html += `<div class="cal-col">`;
+      HOURS.forEach(() => { html += `<div class="cal-cell"></div>`; });
+      if (isToday && nowMinutes >= firstHour*60) {
+        const topPx = (nowMinutes - firstHour*60)/60*HOUR_H;
+        html += `<div class="cal-now-line" style="top:${topPx}px"><div class="cal-now-dot"></div></div>`;
+      }
+      dayBks.forEach(b => {
+        const startMin = timeToMinutes(b.time);
+        const endMin   = startMin + (parseInt(b.hours) || 1) * 60;
+        const topPx    = Math.max(0, (startMin - firstHour*60) / 60 * HOUR_H);
+        const heightPx = (parseInt(b.hours) || 1) * HOUR_H;
+        const cls      = 'cbc-' + (b.status||'new').toLowerCase();
+        const isCancelled = b.status === 'Cancelled';
+        html += `<div class="cal-booking-card ${cls}" style="top:${topPx}px;height:${heightPx}px;${isCancelled?'pointer-events:none;z-index:1;opacity:0.4;':''}" onclick="viewDetail('${b.ref}')">
+          <div class="cbc-time">${timeRangeLabel(b)}</div>
+          <div class="cbc-name">${b.name}</div>
+          <div class="cbc-svc">${b.service}${(b.cleaners||1)>1?' · 👥'+b.cleaners:''}</div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    html += '</div></div>';
+    wrap.innerHTML = html;
+    document.getElementById('cal-unassigned').style.display = 'none';
+  }
+
+  // Grid now starts at 8 AM — scroll to top
+  setTimeout(() => { wrap.scrollTop = 0; }, 50);
+}
+
+function refreshAll() { renderTab(activeTab); }
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const main    = document.querySelector('.main');
+  sidebar.classList.toggle('collapsed');
+  main.style.marginLeft = sidebar.classList.contains('collapsed') ? '64px' : 'var(--sidebar-w)';
+  main.style.transition = 'margin-left 0.25s ease';
+}
+
+// ══ HELPERS ═══════════════════════════════════════════════════════════════════
+function badgeHtml(s) {
+  const map = { New:'badge-new', Confirmed:'badge-confirmed', Completed:'badge-completed', Cancelled:'badge-cancelled' };
+  const icons = { New:'🆕', Confirmed:'✅', Completed:'✓', Cancelled:'✗' };
+  return `<span class="badge ${map[s]||''}">${icons[s]||''} ${s}</span>`;
+}
+
+function actionBtns(b) {
+  let html = `<button class="act-btn" onclick="viewDetail('${b.ref}')">👁 View</button>`;
+  if (b.status === 'New') html += `<button class="act-btn green" onclick="confirmAction('Confirm booking <b>${b.ref}</b>?','',()=>updateStatus('${b.ref}','Confirmed'))">✓ Confirm</button>`;
+  if (b.status === 'Confirmed') html += `<button class="act-btn amber" onclick="openPaymentModal('${b.ref}')">💳 Done</button>`;
+  if (b.status !== 'Cancelled' && b.status !== 'Completed') html += `<button class="act-btn red" onclick="confirmAction('Cancel booking <b>${b.ref}</b>?','This cannot be undone.',()=>updateStatus('${b.ref}','Cancelled'))">✗ Cancel</button>`;
+  return `<div class="act-row">${html}</div>`;
+}
+
+async function updateStatus(ref, status) {
+  try {
+    const res = await fetch(API + '/api/bookings/' + ref + '/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    const idx = _bookings.findIndex(x => x.ref === ref);
+    if (idx > -1) _bookings[idx] = updated;
+    renderTab(activeTab); renderDashboard(); updateBadge();
+  } catch (e) { alert('Update failed: ' + e.message); }
+  closeModal('confirm-overlay'); closeModal('detail-modal');
+}
+
+// ══ PAYMENT MODAL ═════════════════════════════════════════════════════════════
+let _payRef = null;
+let _payTotal = 0;
+let _payMethod = 'Cash';
+
+function openPaymentModal(ref) {
+  const b = _bookings.find(x => x.ref === ref);
+  if (!b) return;
+  _payRef    = ref;
+  _payTotal  = b.total || 0;
+  _payMethod = 'Cash';
+  document.getElementById('pay-ref').textContent   = `${b.ref} · ${b.name}`;
+  document.getElementById('pay-total').textContent  = _payTotal + ' QAR';
+  document.getElementById('pay-amount').value       = '';
+  selectPayMethod('Cash');
+  updatePayDueAmount();
+  document.getElementById('payment-modal').classList.add('open');
+}
+
+function selectPayMethod(method) {
+  _payMethod = method;
+  document.getElementById('pmo-cash').classList.toggle('selected',   method === 'Cash');
+  document.getElementById('pmo-online').classList.toggle('selected', method === 'Online');
+}
+
+function updatePayDueAmount() {
+  const paid     = parseFloat(document.getElementById('pay-amount').value) || 0;
+  const dueAmt   = _payTotal - paid;
+  const box = document.getElementById('pay-due-amount-box');
+  const lbl = document.getElementById('pay-due-amount-lbl');
+  const val = document.getElementById('pay-due-amount-val');
+  if (dueAmt === 0) {
+    box.className = 'pay-due-amount-box paid';
+    lbl.textContent = '✅ Fully Paid';
+    val.textContent = '0 QAR due';
+    val.style.color = '#16a34a';
+  } else if (dueAmt > 0) {
+    box.className = 'pay-due-amount-box owed';
+    lbl.textContent = 'Due Amount';
+    val.textContent = dueAmt.toFixed(2) + ' QAR';
+    val.style.color = 'var(--red)';
+  } else {
+    box.className = 'pay-due-amount-box change';
+    lbl.textContent = 'Change to Return';
+    val.textContent = Math.abs(dueAmt).toFixed(2) + ' QAR';
+    val.style.color = 'var(--amber)';
+  }
+}
+
+async function submitPayment() {
+  const paid = parseFloat(document.getElementById('pay-amount').value) || 0;
+  try {
+    const res = await fetch(API + '/api/bookings/' + _payRef + '/complete', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_method: _payMethod, paid_amount: paid }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || res.statusText);
+
+    // Verify the server actually saved paid_amount (sanity check)
+    if (paid > 0 && (body.paid_amount === undefined || body.paid_amount === null)) {
+      console.warn('[PAYMENT] Server returned no paid_amount — DB column may be missing. Run fix-payment-system.sql');
+    }
+    console.log(`[PAYMENT] Response: paid_amount=${body.paid_amount} due_amount=${body.due_amount} total=${body.total}`);
+
+    const idx = _bookings.findIndex(x => x.ref === _payRef);
+    if (idx > -1) _bookings[idx] = body;
+    closeModal('payment-modal');
+    renderTab(activeTab); renderDashboard(); updateBadge();
+    const maidsArr = (body.maid || '').split(',').map(n => n.trim()).filter(Boolean);
+    const earningsParts = maidsArr.length
+      ? ' · ' + maidsArr.map(n => `${n} +${body.total} QAR`).join(', ')
+      : '';
+    const dueAmt = body.due_amount ?? Math.max(0, body.total - paid);
+    const duePart = dueAmt > 0 ? ` · Due: ${dueAmt} QAR` : ' · Fully paid';
+    showToast(`✅ ${body.ref} done · ${_payMethod} · ${paid} QAR${duePart}${earningsParts}`);
+  } catch (e) { alert('Payment save failed: ' + e.message); }
+}
+
+function updateBadge() {
+  const n = getBookings().filter(b => b.status === 'New').length;
+  document.getElementById('nb-new').textContent = n;
+}
+
+function clearAllData() {
+  confirmAction(
+    '⚠️ Clear ALL data?',
+    'This will permanently delete all bookings, customers, and payment records. Staff data will be kept. This cannot be undone.',
+    async () => {
+      try {
+        const [r1, r2] = await Promise.all([
+          fetch(API + '/api/bookings',  { method: 'DELETE' }),
+          fetch(API + '/api/customers', { method: 'DELETE' }),
+        ]);
+        if (!r1.ok) throw new Error('Bookings delete failed');
+        if (!r2.ok) throw new Error('Customers delete failed');
+        _bookings  = [];
+        _customers = [];
+        localStorage.removeItem('cp_deleted_phones');
+        localStorage.removeItem('cp_notifs');
+        notifList = [];
+        renderNotifBell();
+        closeModal('confirm-overlay');
+        renderDashboard();
+        renderTab(activeTab);
+        updateBadge();
+        showToast('🗑 All bookings, customers & payments cleared. Staff data kept.');
+      } catch (e) {
+        alert('Clear failed: ' + e.message);
+      }
+    }
+  );
+}
+
+// ══ DASHBOARD ═════════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const bks = getBookings();
+  const today = localToday();
+  const now = new Date();
+
+  // ── Date helpers ──
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const toDate = s => new Date(s + 'T00:00:00');
+
+  // ── Revenue ──
+  const earned = bks.filter(b => ['Confirmed','Completed'].includes(b.status));
+  const revToday  = earned.filter(b => b.date === today).reduce((s,b)=>s+b.total,0);
+  const revWeek   = earned.filter(b => toDate(b.date) >= weekStart).reduce((s,b)=>s+b.total,0);
+  const revMonth  = earned.filter(b => toDate(b.date) >= monthStart).reduce((s,b)=>s+b.total,0);
+  const revAll    = earned.reduce((s,b)=>s+b.total,0);
+  document.getElementById('rev-today').textContent  = revToday + ' QAR';
+  document.getElementById('rev-week').textContent   = revWeek + ' QAR';
+  document.getElementById('rev-month').textContent  = revMonth + ' QAR';
+  document.getElementById('rev-all').textContent    = revAll + ' QAR';
+
+  // ── Quick stats ──
+  const todayBks    = bks.filter(b => b.date === today);
+  const pending     = bks.filter(b => b.status === 'New');
+  const confirmedTd = todayBks.filter(b => b.status === 'Confirmed').length;
+  document.getElementById('s-today').textContent     = todayBks.length;
+  document.getElementById('s-today-sub').textContent = todayBks.length ? `${confirmedTd} confirmed, ${todayBks.filter(b=>b.status==='New').length} pending` : 'No jobs today';
+  const totalDue = bks
+    .filter(b => b.status === 'Completed')
+    .reduce((sum, b) => sum + Math.max(0, (b.total || 0) - (b.paid_amount || 0)), 0);
+  document.getElementById('s-pending').textContent     = pending.length;
+  document.getElementById('s-confirmed').textContent   = confirmedTd;
+  document.getElementById('s-total').textContent       = bks.length;
+  document.getElementById('nb-new').textContent        = pending.length;
+  const pbal = document.getElementById('s-pending-bal');
+  if (pbal) pbal.textContent = totalDue.toLocaleString() + ' QAR';
+  document.getElementById('tab-date').textContent    = now.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // ── Today's Schedule ──
+  const sorted = [...todayBks].sort((a,b)=>{
+    const t = s => { const [h,m]=s.replace(/ AM| PM/,'').split(':'); return (parseInt(h)%12+(s.includes('PM')?12:0))*60+parseInt(m||0); };
+    return t(a.time)-t(b.time);
+  });
+  document.getElementById('today-badge').textContent = sorted.length + ' job' + (sorted.length!==1?'s':'');
+  const dotColor = { New:'var(--blue)', Confirmed:'var(--green)', Completed:'var(--teal)', Cancelled:'var(--red)' };
+  document.getElementById('today-schedule-list').innerHTML = sorted.length ? sorted.map(b => `
+    <div class="sched-item">
+      <div class="sched-dot" style="background:${dotColor[b.status]||'var(--muted)'}"></div>
+      <div class="sched-time">${b.time}</div>
+      <div class="sched-info">
+        <div class="sched-name">${b.name}</div>
+        <div class="sched-detail">${b.service} · ${b.hours}h · ${b.cleaners||1} cleaner${(b.cleaners||1)>1?'s':''} ${b.area?'· '+b.area:''}</div>
+      </div>
+      <div class="sched-right">
+        <div class="sched-amount">${b.total} QAR</div>
+        <div class="sched-status">${b.status}</div>
+      </div>
+    </div>`).join('') :
+    `<div class="empty-state-sm"><div class="esi">☀️</div>No jobs scheduled today</div>`;
+
+  // ── Active Leads ──
+  document.getElementById('leads-badge').textContent = pending.length + ' pending';
+  document.getElementById('active-leads-list').innerHTML = pending.length ? pending.slice(0,6).map(b => {
+    const initials = b.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    return `<div class="lead-item">
+      <div class="lead-avatar">${initials}</div>
+      <div class="lead-info">
+        <div class="lead-name">${b.name}</div>
+        <div class="lead-detail">${b.date} · ${b.time} · ${b.service}</div>
+      </div>
+      <div class="lead-actions">
+        <button class="lead-confirm" onclick="updateStatus('${b.ref}','Confirmed')">✓ Confirm</button>
+        <button class="lead-view" onclick="viewDetail('${b.ref}')">View</button>
+      </div>
+    </div>`;
+  }).join('') + (pending.length > 6 ? `<div style="text-align:center;padding:10px;font-size:0.78rem;color:var(--muted)">+${pending.length-6} more — see All Bookings</div>` : '') :
+    `<div class="empty-state-sm"><div class="esi">🎉</div>All caught up! No pending leads</div>`;
+
+  // ── Recent table ──
+  const recent = [...bks].slice(0,8);
+  document.getElementById('recent-count').textContent = `Showing ${recent.length} of ${bks.length}`;
+  document.getElementById('recent-table').innerHTML = recent.length ? recent.map(b => `
+    <tr>
+      <td><strong style="color:var(--teal)">${b.ref}</strong></td>
+      <td><strong>${b.name}</strong><br><small style="color:var(--muted)">${b.phone}</small></td>
+      <td style="font-size:0.8rem">${b.service}</td>
+      <td><strong>${b.date}</strong> <span style="color:var(--muted)">${b.time}</span></td>
+      <td style="white-space:nowrap">
+        <div style="color:var(--teal);font-weight:700">${b.total} QAR</div>
+        ${(() => { const d=Math.max(0,(b.total||0)-(b.paid_amount||0)); return d>0?`<div style="font-size:0.7rem;color:var(--red);font-weight:600">Due: ${d} QAR</div>`:`<div style="font-size:0.7rem;color:var(--green)">✓ Paid</div>`; })()}
+      </td>
+      <td>${badgeHtml(b.status)}</td>
+      <td>${actionBtns(b)}</td>
+    </tr>`).join('') : `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">No bookings yet</td></tr>`;
+}
+
+// ══ ALL BOOKINGS ══════════════════════════════════════════════════════════════
+function renderBookings() {
+  // Refresh service filter options
+  const bkSvc = document.getElementById('bk-service');
+  if (bkSvc) {
+    const cur = bkSvc.value;
+    bkSvc.innerHTML = '<option value="">All Services</option>' +
+      getServices().map(s => `<option value="${s.name}"${s.name===cur?' selected':''}>${s.name}</option>`).join('');
+  }
+  let bks = getBookings();
+  const q = (document.getElementById('bk-search')?.value || '').toLowerCase();
+  const sf = document.getElementById('bk-status')?.value || '';
+  const sv = document.getElementById('bk-service')?.value || '';
+  const so = document.getElementById('bk-sort')?.value || 'newest';
+  bks = bks.filter(b => {
+    const m = b.name.toLowerCase().includes(q) || b.phone.includes(q) || b.ref.toLowerCase().includes(q) || (b.area||'').toLowerCase().includes(q);
+    return m && (!sf || b.status===sf) && (!sv || b.service===sv);
+  });
+  if (so === 'oldest') bks.reverse();
+  else if (so === 'date') bks.sort((a,b) => a.date.localeCompare(b.date));
+  document.getElementById('bk-count').textContent = bks.length + ' booking' + (bks.length!==1?'s':'');
+  document.getElementById('bk-table').innerHTML = bks.length ? bks.map(b => `
+    <tr>
+      <td><strong style="color:var(--teal)">${b.ref}</strong></td>
+      <td><strong>${b.name}</strong></td>
+      <td style="white-space:nowrap">${b.phone}</td>
+      <td style="font-size:0.78rem;max-width:120px">${b.service}</td>
+      <td><strong>${b.date}</strong><br><small style="color:var(--muted)">${b.time}</small></td>
+      <td>${b.area||'—'}</td>
+      <td>${b.hours}h</td>
+      <td>${b.cleaners||1}</td>
+      <td>${b.materials?'✅':'—'}</td>
+      <td style="white-space:nowrap">
+        <div style="color:var(--teal);font-weight:700">${b.total} QAR</div>
+        ${(() => { const d=Math.max(0,(b.total||0)-(b.paid_amount||0)); return d>0?`<div style="font-size:0.7rem;color:var(--red);font-weight:600">Due: ${d} QAR</div>`:`<div style="font-size:0.7rem;color:var(--green)">✓ Paid</div>`; })()}
+      </td>
+      <td>${badgeHtml(b.status)}</td>
+      <td>${actionBtns(b)}</td>
+    </tr>`).join('') : `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--muted)">No bookings found</td></tr>`;
+}
+
+// ══ TODAY'S SCHEDULE ══════════════════════════════════════════════════════════
+function renderToday() {
+  const bks = getBookings();
+  const today = localToday();
+  const todayBks = bks.filter(b => b.date === today).sort((a,b) => {
+    // Sort by time
+    const t = s => { const [h,m] = s.replace(' AM','').replace(' PM','').split(':'); return (parseInt(h)%12 + (s.includes('PM')?12:0))*60+parseInt(m); };
+    return t(a.time) - t(b.time);
+  });
+  const dateStr = new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('today-heading').textContent = "Today — " + dateStr;
+  document.getElementById('today-sub').textContent = todayBks.length ? `${todayBks.length} job${todayBks.length>1?'s':''} scheduled` : 'No jobs scheduled today';
+  document.getElementById('today-pills').innerHTML = ['New','Confirmed','Completed'].map(s => {
+    const c = todayBks.filter(b=>b.status===s).length;
+    return c ? `<div class="today-job-pill">${s}: ${c}</div>` : '';
+  }).join('');
+
+  document.getElementById('schedule-grid').innerHTML = todayBks.length ? todayBks.map(b => `
+    <div class="schedule-card status-${b.status.toLowerCase()}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="sc-time">⏰ ${b.time}</div>
+        ${badgeHtml(b.status)}
+      </div>
+      <div class="sc-name">${b.name}</div>
+      <div class="sc-detail">${b.phone}</div>
+      <div class="sc-badges">
+        <span class="sc-pill">🧹 ${b.service}</span>
+        <span class="sc-pill">⏱ ${b.hours}h</span>
+        <span class="sc-pill">👤 ${b.cleaners||1} cleaner${(b.cleaners||1)>1?'s':''}</span>
+        ${b.materials?'<span class="sc-pill">🧴 Materials</span>':''}
+        <span class="sc-pill">💰 ${b.total} QAR</span>
+      </div>
+      ${b.address?`<div style="font-size:0.75rem;color:var(--muted);margin-top:8px">📍 ${b.address}</div>`:''}
+      ${b.area?`<div style="font-size:0.75rem;color:var(--muted);">🗺 ${b.area}</div>`:''}
+      <div class="sc-actions">${actionBtns(b)}</div>
+    </div>`).join('') :
+    `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--muted)">
+      <div style="font-size:2.5rem;margin-bottom:12px">☀️</div>
+      <div style="font-weight:600">No jobs today</div>
+      <div style="font-size:0.82rem;margin-top:4px">Enjoy the day!</div>
+    </div>`;
+}
+
+// ══ REPORTS ═══════════════════════════════════════════════════════════════════
+// ══ REPORTS DATE RANGE ════════════════════════════════════════════════════════
+let repRange = { from: null, to: null, label: 'Today' };
+
+function setRepRange(type, btn) {
+  const now = new Date();
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  if (btn) { document.querySelectorAll('.rep-range-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+  if (type === 'today')  { repRange = { from:fmt(now), to:fmt(now), label:'Today' }; }
+  else if (type === 'week')  {
+    const s=new Date(now); s.setDate(now.getDate()-now.getDay());
+    repRange = { from:fmt(s), to:fmt(now), label:'This Week' };
+  } else if (type === 'month') {
+    const s=new Date(now.getFullYear(),now.getMonth(),1);
+    repRange = { from:fmt(s), to:fmt(now), label:'This Month' };
+  } else if (type === '3month') {
+    const s=new Date(now); s.setMonth(s.getMonth()-3);
+    repRange = { from:fmt(s), to:fmt(now), label:'Last 3 Months' };
+  } else if (type === 'year') {
+    const s=new Date(now.getFullYear(),0,1);
+    repRange = { from:fmt(s), to:fmt(now), label:'This Year' };
+  } else if (type === 'all') {
+    repRange = { from:'2000-01-01', to:'2099-12-31', label:'All Time' };
+  } else if (type === 'custom') {
+    const f=document.getElementById('rep-from')?.value;
+    const t=document.getElementById('rep-to')?.value;
+    if (f&&t) repRange = { from:f, to:t, label:`${f} → ${t}` };
+  }
+  renderReports();
+}
+
+function getFilteredBks() {
+  const bks = getBookings();
+  if (!repRange.from) return bks;
+  return bks.filter(b => b.date >= repRange.from && b.date <= repRange.to);
+}
+
+function renderReports() {
+  // Init range on first load
+  if (!repRange.from) setRepRange('today', document.querySelector('.rep-range-btn'));
+
+  const bks = getFilteredBks();
+  const lbl = document.getElementById('rep-range-label');
+  if (lbl) lbl.textContent = `📅 Showing data for: ${repRange.label} · ${bks.length} booking${bks.length!==1?'s':''}`;
+
+  // Status bars
+  const statuses = ['New','Confirmed','Completed','Cancelled'];
+  const sColors = ['#3b82f6','#10b981','#0d9488','#ef4444'];
+  const maxS = Math.max(...statuses.map(s=>bks.filter(b=>b.status===s).length),1);
+  const rsEl = document.getElementById('rep-status');
+  if (rsEl) rsEl.innerHTML = statuses.map((s,i) => {
+    const c = bks.filter(b=>b.status===s).length;
+    return `<div class="bar-row"><div class="bar-lbl">${s}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxS)*100}%;background:${sColors[i]}"></div></div><div class="bar-v">${c}</div></div>`;
+  }).join('');
+
+  // Revenue
+  const confirmed = bks.filter(b=>b.status==='Confirmed').reduce((s,b)=>s+b.total,0);
+  const completed = bks.filter(b=>b.status==='Completed').reduce((s,b)=>s+b.total,0);
+  const pipeline  = bks.filter(b=>b.status==='New').reduce((s,b)=>s+b.total,0);
+  const total = confirmed + completed;
+  const avgVal = bks.length ? Math.round(total / Math.max(bks.filter(b=>['Confirmed','Completed'].includes(b.status)).length,1)) : 0;
+  const rrEl = document.getElementById('rep-revenue');
+  if (rrEl) rrEl.innerHTML = `
+    <div class="rev-box"><div class="rev-box-label">Total Earned</div><div class="rev-box-val" style="color:var(--green)">${total}</div><div style="font-size:0.7rem;color:var(--muted)">QAR</div></div>
+    <div class="rev-box"><div class="rev-box-label">Pipeline</div><div class="rev-box-val" style="color:var(--amber)">${pipeline}</div><div style="font-size:0.7rem;color:var(--muted)">QAR</div></div>
+    <div class="rev-box"><div class="rev-box-label">Avg / Booking</div><div class="rev-box-val" style="color:var(--teal)">${avgVal}</div><div style="font-size:0.7rem;color:var(--muted)">QAR</div></div>
+    <div class="rev-box"><div class="rev-box-label">Total Jobs</div><div class="rev-box-val" style="color:var(--blue)">${bks.length}</div><div style="font-size:0.7rem;color:var(--muted)">bookings</div></div>`;
+
+  // Services
+  const svcs = getServices().map(s => s.name);
+  const maxSv = Math.max(...svcs.map(s=>bks.filter(b=>b.service===s).length),1);
+  const rsEl2 = document.getElementById('rep-services');
+  if (rsEl2) rsEl2.innerHTML = svcs.map(s => {
+    const c = bks.filter(b=>b.service===s).length;
+    return `<div class="bar-row"><div class="bar-lbl" style="font-size:0.7rem">${s.split('/')[0].trim()}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxSv)*100}%;background:var(--teal)"></div></div><div class="bar-v">${c}</div></div>`;
+  }).join('');
+
+  // Areas
+  const areas = {};
+  bks.forEach(b => { if (b.area) areas[b.area] = (areas[b.area]||0)+1; });
+  const areaArr = Object.entries(areas).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxA = Math.max(...areaArr.map(x=>x[1]),1);
+  const raEl = document.getElementById('rep-areas');
+  if (raEl) raEl.innerHTML = areaArr.length ? areaArr.map(([a,c]) =>
+    `<div class="bar-row"><div class="bar-lbl">${a}</div><div class="bar-track"><div class="bar-fill" style="width:${(c/maxA)*100}%;background:var(--blue)"></div></div><div class="bar-v">${c}</div></div>`
+  ).join('') : `<div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:20px">No area data yet</div>`;
+}
+
+function exportReport() {
+  const bks = getFilteredBks();
+  const w = window.open('','_blank');
+  const rows = bks.map(b=>`<tr><td>${b.ref}</td><td>${b.name}</td><td>${b.service}</td><td>${b.date}</td><td>${b.time}</td><td>${b.hours}h</td><td>${b.total} QAR</td><td>${b.status}</td></tr>`).join('');
+  const earned = bks.filter(b=>['Confirmed','Completed'].includes(b.status)).reduce((s,b)=>s+b.total,0);
+  w.document.write(`<html><head><title>CleanPro Report — ${repRange.label}</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}.summary{display:flex;gap:24px;margin:16px 0;flex-wrap:wrap}.sbox{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:12px 18px}.sbox-val{font-size:1.4rem;font-weight:700;color:#0d9488}.sbox-lbl{font-size:11px;color:#64748b}</style></head>
+  <body><h1>🧹 CleanPro — Report</h1><p style="color:#64748b">Period: <strong>${repRange.label}</strong> · Generated: ${new Date().toLocaleString()}</p>
+  <div class="summary">
+    <div class="sbox"><div class="sbox-val">${bks.length}</div><div class="sbox-lbl">Total Bookings</div></div>
+    <div class="sbox"><div class="sbox-val">${earned} QAR</div><div class="sbox-lbl">Revenue Earned</div></div>
+    <div class="sbox"><div class="sbox-val">${bks.filter(b=>b.status==='Completed').length}</div><div class="sbox-lbl">Completed</div></div>
+    <div class="sbox"><div class="sbox-val">${bks.filter(b=>b.status==='New').length}</div><div class="sbox-lbl">Pending</div></div>
+  </div>
+  <table><thead><tr><th>Ref</th><th>Customer</th><th>Service</th><th>Date</th><th>Time</th><th>Hours</th><th>Total</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+  <script>window.print()<\/script></body></html>`);
+}
+
+// ══ EXPORT CUSTOMERS ══════════════════════════════════════════════════════════
+function exportCustomersExcel() {
+  const custs = getCustomers();
+  const header = ['Name','Phone','Email','Area','Address','Bookings','Last Visit','Total Spent (QAR)','Tag'];
+  const rows = custs.map(c => [c.name,c.phone,c.email||'',c.area||'',c.address||'',c.bookingCount,c.lastVisit||'',c.totalSpent,c.tag]);
+  let csv = header.join(',') + '\n' + rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `CleanPro_Customers_${localToday()}.csv`;
+  a.click();
+  showToast('✅ Excel (CSV) exported!');
+}
+
+function exportCustomersPDF() {
+  const custs = getCustomers();
+  const w = window.open('','_blank');
+  const rows = custs.map(c=>`<tr><td>${c.name}</td><td>${c.phone}</td><td>${c.area||'—'}</td><td>${c.bookingCount}</td><td>${c.lastVisit||'—'}</td><td>${c.totalSpent} QAR</td><td>${c.tag}</td></tr>`).join('');
+  w.document.write(`<html><head><title>CleanPro Customers</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}</style></head>
+  <body><h1>🧹 CleanPro — Customers</h1><p style="color:#64748b">Total: ${custs.length} customers · Generated: ${new Date().toLocaleString()}</p>
+  <table><thead><tr><th>Name</th><th>Phone</th><th>Area</th><th>Bookings</th><th>Last Visit</th><th>Total Spent</th><th>Tag</th></tr></thead><tbody>${rows}</tbody></table>
+  <script>window.print()<\/script></body></html>`);
+}
+
+// ══ NOTIFICATIONS ══════════════════════════════════════════════════════════════
+let notifList = JSON.parse(localStorage.getItem('cp_notifs') || '[]');
+let notifPanelOpen = false;
+let lastBkCount = 0;
+
+function addNotif(icon, text) {
+  notifList.unshift({ icon, text, time: new Date().toISOString(), read: false });
+  notifList = notifList.slice(0, 30);
+  localStorage.setItem('cp_notifs', JSON.stringify(notifList));
+  renderNotifBell();
+}
+
+function renderNotifBell() {
+  const unread = notifList.filter(n=>!n.read).length;
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = unread > 0 ? 'block' : 'none';
+  renderNotifPanel();
+}
+
+function renderNotifPanel() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!notifList.length) { list.innerHTML = '<div class="notif-empty">No notifications</div>'; return; }
+  list.innerHTML = notifList.map((n,i) => `
+    <div class="notif-item ${n.read?'':'unread'}" onclick="markRead(${i})">
+      <div class="notif-icon">${n.icon}</div>
+      <div>
+        <div class="notif-text">${n.text}</div>
+        <div class="notif-time">${timeAgo(n.time)}</div>
+      </div>
+    </div>`).join('');
+}
+
+function markRead(i) { notifList[i].read=true; localStorage.setItem('cp_notifs',JSON.stringify(notifList)); renderNotifBell(); }
+
+function clearNotifs() { notifList=[]; localStorage.setItem('cp_notifs','[]'); renderNotifBell(); }
+
+function toggleNotifPanel() {
+  notifPanelOpen = !notifPanelOpen;
+  const p = document.getElementById('notif-panel');
+  if (p) p.style.display = notifPanelOpen ? 'flex' : 'none';
+  if (notifPanelOpen) { notifList.forEach(n=>n.read=true); localStorage.setItem('cp_notifs',JSON.stringify(notifList)); renderNotifBell(); }
+}
+
+// Close panel on outside click
+document.addEventListener('click', e => {
+  const wrap = document.querySelector('.notif-bell-wrap');
+  const panel = document.getElementById('notif-panel');
+  if (panel && wrap && !wrap.contains(e.target) && !panel.contains(e.target)) {
+    panel.style.display='none'; notifPanelOpen=false;
+  }
+});
+
+function timeAgo(iso) {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+// Check for new bookings every 30s and notify
+function checkNewBookings() {
+  const bks = getBookings();
+  if (lastBkCount > 0 && bks.length > lastBkCount) {
+    const newest = bks[0];
+    addNotif('📋', `New booking! ${newest.name} · ${newest.date} ${newest.time} · ${newest.total} QAR`);
+  }
+  // Check today's upcoming bookings
+  const today = localToday();
+  const nowMin = new Date().getHours()*60 + new Date().getMinutes();
+  bks.filter(b=>b.date===today&&b.status==='Confirmed').forEach(b=>{
+    const bMin = timeToMinutes(b.time);
+    if (bMin - nowMin === 30) addNotif('⏰', `Reminder: ${b.name} in 30 min · ${b.time} · ${b.service}`);
+  });
+  lastBkCount = bks.length;
+}
+
+// Seed initial notifs from new bookings
+function seedNotifs() {
+  const bks = getBookings();
+  lastBkCount = bks.length;
+  const newBks = bks.filter(b=>b.status==='New').slice(0,3);
+  if (newBks.length && notifList.length===0) {
+    newBks.forEach(b => addNotif('📋', `Pending booking: ${b.name} · ${b.date} ${b.time} · ${b.total} QAR`));
+  }
+  renderNotifBell();
+}
+
+// ══ DETAIL MODAL ══════════════════════════════════════════════════════════════
+function viewDetail(ref) {
+  const b = getBookings().find(x => x.ref === ref);
+  if (!b) return;
+  document.getElementById('dm-title').textContent = b.ref + ' — ' + b.name;
+  const rows = [
+    ['📋 Reference', b.ref], ['👤 Name', b.name], ['📱 Phone', b.phone],
+    ['🧹 Service', b.service], ['📅 Date', b.date], ['⏰ Time', b.time],
+    ['⏱ Hours', b.hours + ' hours'], ['👥 Cleaners', (b.cleaners||1) + ' cleaner(s)'],
+    ['🧴 Materials', b.materials ? '✅ Included (25 QAR/hr)' : '❌ Not needed'],
+    ['💰 Rate', (b.rate||15) + ' QAR/hr'], ['💵 Total Price', b.total + ' QAR'],
+    ['💳 Amount Paid', (b.paid_amount || 0) + ' QAR'],
+    ['📊 Due Amount', (() => { const d = Math.max(0,(b.total||0)-(b.paid_amount||0)); return d > 0 ? `<strong style="color:var(--red)">${d} QAR</strong>` : '<span style="color:var(--green)">✓ Fully Paid</span>'; })()],
+    ['📍 Area', b.area||'—'], ['🏠 Address', b.address||'—'],
+    ['📝 Notes', b.notes||'—'], ['🔖 Status', b.status],
+    ['🕐 Booked At', new Date(b.created).toLocaleString()]
+  ];
+  document.getElementById('dm-body').innerHTML = rows.map(([k,v]) =>
+    `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`
+  ).join('');
+  document.getElementById('dm-footer').innerHTML = `
+    <a href="https://wa.me/${(b.phone||'').replace(/\D/g,'')}" target="_blank" style="text-decoration:none">
+      <button class="act-btn green">💬 WhatsApp</button>
+    </a>
+    ${b.status==='New'?`<button class="act-btn green" onclick="updateStatus('${b.ref}','Confirmed')">✓ Confirm</button>`:''}
+    ${b.status==='Confirmed'?`<button class="act-btn amber" onclick="closeModal('detail-modal');openPaymentModal('${b.ref}')">💳 Done</button>`:''}
+    ${b.status!=='Cancelled'&&b.status!=='Completed'?`<button class="act-btn red" onclick="confirmAction('Cancel this booking?','',()=>updateStatus('${b.ref}','Cancelled'))">✗ Cancel</button>`:''}
+    <button class="act-btn" onclick="closeModal('detail-modal')">Close</button>`;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+// ══ CONFIRM DIALOG ════════════════════════════════════════════════════════════
+function confirmAction(title, msg, fn) {
+  document.getElementById('confirm-title').innerHTML = title;
+  document.getElementById('confirm-msg').textContent = msg || 'Are you sure?';
+  document.getElementById('confirm-ok').onclick = fn;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Close modals on overlay click
+document.getElementById('detail-modal').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal('detail-modal'); });
+document.getElementById('confirm-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal('confirm-overlay'); });
+
+// ══ SERVICES ══════════════════════════════════════════════════════════════════
+let _services = [];
+
+async function _loadServices() {
+  try {
+    const res = await fetch(API + '/api/services');
+    const data = await res.json();
+    _services = Array.isArray(data) ? data : [];
+  } catch { _services = []; }
+}
+
+function getServices() { return _services; }
+
+function renderServices() {
+  const svcs = getServices();
+  const el = id => document.getElementById(id);
+  if (el('svc-count')) el('svc-count').textContent = svcs.length + ' service' + (svcs.length !== 1 ? 's' : '');
+  if (!el('svc-table')) return;
+  el('svc-table').innerHTML = svcs.length ? svcs.map((s, i) => `
+    <tr>
+      <td style="color:var(--muted);font-size:0.82rem">${i + 1}</td>
+      <td style="font-size:1.4rem;text-align:center">${s.icon || '🧹'}</td>
+      <td><strong>${s.name}</strong></td>
+      <td style="color:var(--teal);font-weight:600">${s.baseRate} QAR/hr</td>
+      <td style="color:var(--amber);font-weight:600">${s.matRate} QAR/hr</td>
+      <td>
+        <div class="act-row">
+          <button class="act-btn" onclick="openServiceModal('${s.id}')">✏️ Edit</button>
+          <button class="act-btn red" onclick="deleteService('${s.id}')">🗑 Delete</button>
+        </div>
+      </td>
+    </tr>`).join('') :
+    `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">No services yet. Add one above.</td></tr>`;
+  // Keep service filter dropdown in sync
+  const bkSvc = document.getElementById('bk-service');
+  if (bkSvc) {
+    const cur = bkSvc.value;
+    bkSvc.innerHTML = '<option value="">All Services</option>' +
+      svcs.map(s => `<option value="${s.name}"${s.name===cur?' selected':''}>${s.name}</option>`).join('');
+  }
+}
+
+function openServiceModal(id) {
+  const el = e => document.getElementById(e);
+  el('svc-modal-title').textContent = id ? 'Edit Service' : 'Add Service';
+  el('svc-id').value = id || '';
+  el('svc-icon').value = '🧹';
+  el('svc-name').value = '';
+  el('svc-base-rate').value = 15;
+  el('svc-mat-rate').value = 25;
+  if (id) {
+    const s = getServices().find(x => x.id === id);
+    if (s) {
+      el('svc-icon').value      = s.icon || '🧹';
+      el('svc-name').value      = s.name;
+      el('svc-base-rate').value = s.baseRate;
+      el('svc-mat-rate').value  = s.matRate;
+    }
+  }
+  el('service-modal').classList.add('open');
+}
+
+async function saveService() {
+  const el = e => document.getElementById(e);
+  const name = el('svc-name').value.trim();
+  if (!name) { showToast('⚠️ Service name is required'); return; }
+  const id       = el('svc-id').value;
+  const icon     = el('svc-icon').value.trim()              || '🧹';
+  const baseRate = parseFloat(el('svc-base-rate').value)    || 15;
+  const matRate  = parseFloat(el('svc-mat-rate').value)     || 25;
+  const payload  = { name, icon, baseRate, matRate };
+  try {
+    const res = await fetch(API + '/api/services' + (id ? '/' + id : ''), {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+    closeModal('service-modal');
+    await _loadServices();
+    renderServices();
+    showToast(`✅ Service "${name}" saved`);
+  } catch (e) {
+    showToast('❌ ' + e.message);
+  }
+}
+
+function deleteService(id) {
+  const s = getServices().find(x => x.id === id);
+  if (!s) return;
+  confirmAction(`Delete "${s.name}"?`, 'This removes this service type.', async () => {
+    try {
+      const res = await fetch(API + '/api/services/' + id, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      await _loadServices();
+      renderServices();
+      closeModal('confirm-overlay');
+      showToast(`🗑 "${s.name}" deleted`);
+    } catch (e) {
+      showToast('❌ ' + e.message);
+    }
+  });
+}
+
+// ══ INIT ══════════════════════════════════════════════════════════════════════
+async function init() {
+  await Promise.all([_loadAll(), _loadSettings()]);
+  const s = getSettings();
+  applyTheme(s.theme || 'dark');
+  applyBizName(s.bizName);
+  renderDashboard();
+  updateBadge();
+  seedNotifs();
+}
+
+// Auto-init if already logged in
+if (sessionStorage.getItem('cp_admin') === '1') init();
+
+// Auto-refresh + check new bookings every 30s
+setInterval(async () => {
+  if (sessionStorage.getItem('cp_admin') !== '1') return;
+  await _loadBookings();
+
+  // Auto-assign any unassigned bookings when setting is on
+  const s = getSettings();
+  if (s['auto-assign']) {
+    const unassigned = _bookings.filter(b => !b.maid && b.status !== 'Cancelled' && b.status !== 'Completed');
+    for (const b of unassigned) {
+      const maid = autoAssignMaid(b);
+      if (!maid) continue;
+      try {
+        const res = await fetch(API + '/api/bookings/' + b.ref + '/maid', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maid }),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          const idx = _bookings.findIndex(x => x.ref === b.ref);
+          if (idx > -1) _bookings[idx] = updated;
+          if (s['notify-assign']) showToast(`✅ Auto-assigned ${b.name}'s booking to ${maid}`);
+        }
+      } catch {}
+    }
+  }
+
+  renderTab(activeTab);
+  checkNewBookings();
+}, 30000);
+</script>
+</body>
+</html>
