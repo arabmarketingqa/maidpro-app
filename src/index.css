@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  /* Ink palette */
+  --color-ink-950: oklch(0.13 0.02 250);
+  --color-ink-900: oklch(0.18 0.02 250);
+  --color-ink-800: oklch(0.26 0.02 250);
+  --color-ink-700: oklch(0.36 0.02 250);
+  --color-ink-600: oklch(0.48 0.02 250);
+  --color-ink-500: oklch(0.58 0.02 250);
+  --color-ink-400: oklch(0.70 0.015 250);
+  --color-ink-300: oklch(0.82 0.012 250);
+  --color-ink-200: oklch(0.91 0.008 250);
+  --color-ink-100: oklch(0.96 0.005 250);
+  --color-ink-50:  oklch(0.985 0.003 250);
+
+  /* Mint palette */
+  --color-mint-50:  oklch(0.985 0.012 168);
+  --color-mint-100: oklch(0.96 0.03 168);
+  --color-mint-200: oklch(0.92 0.06 168);
+  --color-mint-300: oklch(0.86 0.09 168);
+  --color-mint-400: oklch(0.80 0.11 168);
+  --color-mint-500: oklch(0.72 0.13 168);
+  --color-mint-600: oklch(0.62 0.13 168);
+  --color-mint-700: oklch(0.52 0.11 168);
+  --color-mint-800: oklch(0.40 0.08 168);
+  --color-mint-900: oklch(0.30 0.05 168);
+
+  /* Surface */
+  --color-surface: oklch(0.985 0.005 165);
+
+  /* Custom shadows */
+  --shadow-card:  0 1px 0 oklch(0.91 0.008 250 / 0.6), 0 6px 24px -12px oklch(0.22 0.02 250 / 0.10);
+  --shadow-float: 0 1px 0 oklch(0.91 0.008 250 / 0.6), 0 18px 40px -20px oklch(0.22 0.02 250 / 0.18);
+  --shadow-mint:  0 8px 24px -12px oklch(0.62 0.13 168 / 0.45);
+
+  /* Custom radius */
+  --radius-xl2: 18px;
+}
+
+/* ── Base ─────────────────────────────────────── */
+html { color: oklch(0.22 0.02 250); }
+body { font-feature-settings: "ss01","cv11"; -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+
+/* Booking page — dark green gradient bg */
+body.booking-bg { background: oklch(0.46 0.07 168); }
+body.booking-bg::before {
+  content: ""; position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at top left,  oklch(0.55 0.08 168) 0%, transparent 55%),
+    radial-gradient(ellipse at bottom right, oklch(0.38 0.06 168) 0%, transparent 55%),
+    oklch(0.46 0.07 168);
+  z-index: -1;
+}
+
+/* Admin page — light surface bg */
+body.admin-bg { background: oklch(0.97 0.008 165); }
+
+/* ── Custom utilities ─────────────────────────── */
+.hairline        { box-shadow: inset 0 0 0 1px oklch(0.91 0.008 250); }
+.hairline-strong { box-shadow: inset 0 0 0 1px oklch(0.86 0.012 250); }
+
+.stripes {
+  background-image: repeating-linear-gradient(135deg,
+    oklch(0.96 0.005 250) 0 10px,
+    oklch(0.92 0.008 250) 10px 20px);
+}
+
+.map-stripes {
+  background-color: oklch(0.96 0.012 168);
+  background-image:
+    linear-gradient(0deg,  oklch(0.92 0.02 168 / 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.92 0.02 168 / 0.6) 1px, transparent 1px),
+    linear-gradient(0deg,  oklch(0.92 0.02 168 / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.92 0.02 168 / 0.3) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+}
+
+/* Strip number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* Date-row scrollbar */
+.nice-scroll::-webkit-scrollbar       { height: 6px; }
+.nice-scroll::-webkit-scrollbar-thumb { background: oklch(0.91 0.008 250); border-radius: 999px; }
+
+/* Global scrollbar (admin) */
+::-webkit-scrollbar       { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: oklch(0.86 0.012 250); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.78 0.012 250); border: 2px solid transparent; background-clip: padding-box; }
+
+/* ── Animations ───────────────────────────────── */
+@keyframes fadeUp   { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+.fade-up { animation: fadeUp .28s ease both; }
+
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0   oklch(0.72 0.13 168 / 0.45); }
+  70%  { box-shadow: 0 0 0 24px oklch(0.72 0.13 168 / 0); }
+  100% { box-shadow: 0 0 0 0   oklch(0.72 0.13 168 / 0); }
+}
+.pulse-ring { animation: pulseRing 1.6s ease-out 1; }
+
+@keyframes pulseDot { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+.pulse-dot { animation: pulseDot 1.6s ease-in-out infinite; }
+
+/* ── Focus ring ───────────────────────────────── */
+:focus-visible { outline: 2px solid oklch(0.62 0.13 168); outline-offset: 2px; border-radius: 10px; }
+
+/* ── Admin-specific ───────────────────────────── */
+.row-hover:hover { background: oklch(0.985 0.012 168); }
+
+.sidebar-bg {
+  background: linear-gradient(180deg, oklch(0.20 0.02 250) 0%, oklch(0.16 0.02 250) 100%);
+}
+
+.mint-rail::before {
+  content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px;
+  background: oklch(0.72 0.13 168); border-radius: 0 3px 3px 0;
+}
+
+.switch        { position: relative; width: 38px; height: 22px; border-radius: 999px; background: oklch(0.86 0.012 250); transition: background .18s ease; cursor: pointer; flex-shrink: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 999px; background: white; box-shadow: 0 1px 2px oklch(0.18 0.02 250 / 0.25); transition: transform .18s ease; }
+.switch.on        { background: oklch(0.62 0.13 168); }
+.switch.on::after { transform: translateX(16px); }
+.switch.dim       { opacity: 0.45; pointer-events: none; }

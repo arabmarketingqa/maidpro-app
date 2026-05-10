@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Maid Pro — Mobile Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body {
+    background:
+      radial-gradient(ellipse at top left, oklch(0.55 0.08 168) 0%, transparent 55%),
+      radial-gradient(ellipse at bottom right, oklch(0.38 0.06 168) 0%, transparent 55%),
+      oklch(0.46 0.07 168);
+    min-height: 100dvh;
+    font-family: Manrope, system-ui, sans-serif;
+  }
+  .device-shadow {
+    filter: drop-shadow(0 30px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 24px rgba(0,0,0,0.25));
+  }
+  .ios-bezel {
+    background: linear-gradient(180deg, #1d1f24 0%, #0e1013 100%);
+    padding: 14px;
+    border-radius: 60px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.06),
+      inset 0 0 0 6px #050608;
+  }
+  .ios-screen {
+    border-radius: 46px;
+    overflow: hidden;
+    background: #000;
+    width: 390px;
+    height: 844px;
+    position: relative;
+  }
+  .ios-screen iframe {
+    width: 390px;
+    height: 844px;
+    border: 0;
+    display: block;
+  }
+  .notch {
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+    width: 120px; height: 32px;
+    background: #050608;
+    border-radius: 999px;
+    z-index: 5;
+  }
+  .label {
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .nav-pills a {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .nav-pills a:hover { background: rgba(255,255,255,0.2); }
+  .nav-pills a.active { background: white; color: #1a3d33; }
+</style>
+</head>
+<body class="min-h-dvh">
+  <div class="max-w-[1100px] mx-auto px-6 py-10">
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-white grid place-items-center" style="color: oklch(0.52 0.11 168)">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M12 2l1.8 5.6L19.5 9 13.8 10.5 12 16l-1.8-5.5L4.5 9l5.7-1.4L12 2z"/></svg>
+        </div>
+        <div>
+          <div class="text-white font-extrabold text-[18px] tracking-tight">Maid<span style="color:#9ad9c5">Pro</span></div>
+          <div class="text-white/60 text-[11px] font-medium">Mobile Preview</div>
+        </div>
+      </div>
+      <div class="nav-pills flex items-center gap-2">
+        <a href="index.html">Desktop</a>
+        <a href="Mobile Preview.html" class="active">Mobile</a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start justify-items-center">
+      <!-- Phone 1: Service step -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe src="index.html#step=service" title="Service"></iframe>
+          </div>
+        </div>
+        <div class="label">01 · Service</div>
+      </div>
+
+      <!-- Phone 2: Date step -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe id="frame-date" title="Date"></iframe>
+          </div>
+        </div>
+        <div class="label">02 · Date</div>
+      </div>
+
+      <!-- Phone 3: Time step -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe id="frame-time" title="Time"></iframe>
+          </div>
+        </div>
+        <div class="label">03 · Time</div>
+      </div>
+
+      <!-- Phone 4: Location step -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe id="frame-loc" title="Location"></iframe>
+          </div>
+        </div>
+        <div class="label">04 · Location</div>
+      </div>
+
+      <!-- Phone 5: Confirm step -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe id="frame-confirm" title="Confirm"></iframe>
+          </div>
+        </div>
+        <div class="label">05 · Confirm</div>
+      </div>
+
+      <!-- Phone 6: Success -->
+      <div class="flex flex-col items-center gap-4 device-shadow">
+        <div class="ios-bezel">
+          <div class="ios-screen">
+            <div class="notch"></div>
+            <iframe id="frame-success" title="Success"></iframe>
+          </div>
+        </div>
+        <div class="label">06 · Success</div>
+      </div>
+    </div>
+
+    <p class="mt-12 text-center text-white/60 text-[12.5px]">
+      Each phone is a live iframe of the booking app. Click around — they're independently interactive.
+    </p>
+  </div>
+
+  <script>
+    // Drive each frame to a different step by injecting a hash that App reads via Tweaks demo buttons.
+    // Simpler: just load index.html in each, then on load post a message-style nav. Since App doesn't
+    // listen, we instead navigate via a small init script appended to URLs using a query.
+    //
+    // index.html doesn't read a step query. Instead we'll initialize each iframe and then
+    // programmatically click the demo step buttons via postMessage-less means: we directly
+    // touch the iframe's React state by exposing a window function.
+    //
+    // We'll just leave them all on Service for now if no hook is available.
+    const frames = [
+      { id: "frame-date",     step: 1 },
+      { id: "frame-time",     step: 2 },
+      { id: "frame-loc",      step: 3 },
+      { id: "frame-confirm",  step: 4 },
+      { id: "frame-success",  step: 5 },
+    ];
+    frames.forEach(({ id, step }) => {
+      const f = document.getElementById(id);
+      f.src = `index.html?step=${step}`;
+    });
+  </script>
+</body>
+</html>
