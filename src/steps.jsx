@@ -784,7 +784,7 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
 
       <div className="mt-5 flex flex-col gap-3">
         <div className="flex gap-3 justify-center">
-          <PrimaryButton onClick={onReset} className="px-6">Book another visit</PrimaryButton>
+          <GhostButton onClick={onReset} className="px-6">Book another visit</GhostButton>
           <GhostButton onClick={handleDownloadReceipt}>Download receipt</GhostButton>
         </div>
         {(whatsappNumber || callNumber) && (
