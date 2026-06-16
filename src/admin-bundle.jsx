@@ -1089,10 +1089,9 @@ const AssignStaff = ({ booking, store, set }) => {
     if (!set || !store) return;
     const has = assigned.includes(id);
     const next = has ? assigned.filter(x => x !== id) : [...assigned, id];
-    // Auto-split total booking hours equally across all assigned maids
+    // All maids work the full booking duration simultaneously — no splitting
     const totalHours = Number(booking._raw?.hours ?? booking.hours ?? 4);
-    const split = next.length > 0 ? parseFloat((totalHours / next.length).toFixed(2)) : 0;
-    const newStaffHours = Object.fromEntries(next.map(sid => [sid, split]));
+    const newStaffHours = Object.fromEntries(next.map(sid => [sid, totalHours]));
     set({
       assignments: { ...(store.assignments || {}), [booking.ref]: next },
       staffHours:  { ...(store.staffHours  || {}), [booking.ref]: newStaffHours },
@@ -3558,17 +3557,10 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
                 })}
                 {todays.filter(b => (store.assignments?.[b.ref] || []).includes(s.id)).map(b => {
                   const bookingStart = parseHour(b.time); if (bookingStart == null) return null;
-                  // Calculate this maid's sequential start offset within the booking
-                  const assignedList = store.assignments?.[b.ref] || [];
-                  const hoursMap     = store.staffHours?.[b.ref]  || {};
-                  const defaultSplit = b.hours / Math.max(assignedList.length, 1);
-                  let offset = 0;
-                  for (const sid of assignedList) {
-                    if (sid === s.id) break;
-                    offset += Number(hoursMap[sid] ?? defaultSplit);
-                  }
-                  const myHours  = Number(hoursMap[s.id] ?? defaultSplit);
-                  const start    = bookingStart + offset;
+                  // All maids work simultaneously — each starts at bookingStart for their full hours
+                  const hoursMap = store.staffHours?.[b.ref] || {};
+                  const myHours  = Number(hoursMap[s.id] ?? b.hours);
+                  const start    = bookingStart;
                   const startIdx = Math.max(0, start - SCHEDULE_HOURS[0]);
                   const span     = Math.min(SCHEDULE_HOURS.length - startIdx, myHours);
                   if (span <= 0) return null;
@@ -3797,20 +3789,20 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const paidNum = parseFloat(paidAmount) || 0
   const due = Math.max(0, total - paidNum)
 
-  // ── Staff hours helpers (Feature 1) ──────────────────────────────────────
+  // ── Staff hours helpers ───────────────────────────────────────────────────
+  // All maids work the FULL booking duration simultaneously.
+  // staff_hours stores per-maid overrides (e.g. a maid left early).
   const totalBookingHours = Number(booking._raw?.hours ?? booking.hours ?? 4)
   const assignedIds       = store.assignments?.[booking.ref] || []
   const rawHrsMap         = store.staffHours?.[booking.ref]  || {}
-  // Fall back to equal split for any maid with no explicit entry
+  // Default: each maid works the full booking duration
   const currentStaffHrs   = Object.fromEntries(
     assignedIds.map(sid => [
       sid,
-      rawHrsMap[sid] != null
-        ? Number(rawHrsMap[sid])
-        : parseFloat((totalBookingHours / Math.max(assignedIds.length, 1)).toFixed(2)),
+      rawHrsMap[sid] != null ? Number(rawHrsMap[sid]) : totalBookingHours,
     ])
   )
-  const totalAllocated = assignedIds.reduce((s, sid) => s + (currentStaffHrs[sid] || 0), 0)
+  const allHoursMatch = assignedIds.every(sid => Math.abs((currentStaffHrs[sid] || 0) - totalBookingHours) < 0.05)
 
   const updateStaffHours = async (staffId, hrs) => {
     const updated = { ...rawHrsMap, [staffId]: Math.max(0.5, Number(hrs)) }
@@ -3818,10 +3810,10 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     if (booking._raw?.id)
       await supabase.from('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
   }
-  const autoSplitHours = async () => {
+  const resetToFullHours = async () => {
     if (!assignedIds.length) return
-    const split   = parseFloat((totalBookingHours / assignedIds.length).toFixed(2))
-    const updated = Object.fromEntries(assignedIds.map(id => [id, split]))
+    // Reset every maid back to the full booking duration (simultaneous work)
+    const updated = Object.fromEntries(assignedIds.map(id => [id, totalBookingHours]))
     set({ staffHours: { ...(store.staffHours || {}), [booking.ref]: updated } })
     if (booking._raw?.id)
       await supabase.from('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
@@ -3905,10 +3897,10 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
         {assignedIds.length > 0 && (
           <div className="rounded-xl bg-ink-50 p-4 space-y-2.5">
             <div className="flex items-center justify-between">
-              <Label>Staff Hours Split</Label>
-              <button onClick={autoSplitHours}
+              <Label>Staff Work Hours <span className="text-[11px] font-normal text-ink-400 ml-1">(all maids work simultaneously)</span></Label>
+              <button onClick={resetToFullHours}
                 className="text-[12px] font-semibold text-mint-700 hover:underline">
-                Auto-split equally
+                Reset to {totalBookingHours}h each
               </button>
             </div>
             {assignedIds.map(sid => {
@@ -3930,14 +3922,11 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
               )
             })}
             <div className={`pt-2 border-t border-ink-200 flex items-center justify-between text-[11.5px] font-mono
-              ${Math.abs(totalAllocated - totalBookingHours) < 0.05 ? 'text-mint-700' : 'text-amber-600'}`}>
-              <span>Allocated: {totalAllocated.toFixed(1)}h</span>
-              <span>Booking total: {totalBookingHours}h</span>
-              {Math.abs(totalAllocated - totalBookingHours) < 0.05 && (
-                <span className="flex items-center gap-1 font-semibold">
-                  <AdminIcon name="check" className="w-3 h-3"/>Balanced
-                </span>
-              )}
+              ${allHoursMatch ? 'text-mint-700' : 'text-amber-600'}`}>
+              <span>Booking: {totalBookingHours}h × {assignedIds.length} maid{assignedIds.length > 1 ? 's' : ''} simultaneously</span>
+              {allHoursMatch
+                ? <span className="flex items-center gap-1 font-semibold"><AdminIcon name="check" className="w-3 h-3"/>All match</span>
+                : <span className="font-semibold">Custom hours set</span>}
             </div>
           </div>
         )}

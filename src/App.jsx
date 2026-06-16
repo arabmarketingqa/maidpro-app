@@ -617,7 +617,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col py-3 px-4" style={{ background: 'oklch(0.46 0.07 168)' }}>
+      <div className="h-[100dvh] flex flex-col py-2 px-3 sm:py-3 sm:px-4" style={{ background: 'oklch(0.46 0.07 168)' }}>
         <div className="max-w-[700px] w-full mx-auto flex flex-col h-full">
           {/* Top bar skeleton — same dimensions as the real bar so layout never shifts */}
           <div className="mb-3 flex items-center justify-between flex-shrink-0">
@@ -640,12 +640,12 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col py-3 px-4"
+    <div className="h-[100dvh] flex flex-col py-2 px-3 sm:py-3 sm:px-4"
       style={{ background: 'oklch(0.46 0.07 168)' }}>
       <div className="max-w-[700px] w-full mx-auto flex flex-col h-full">
 
         {/* Top bar */}
-        <div className="mb-3 flex items-center justify-between flex-shrink-0">
+        <div className="mb-2 sm:mb-3 flex items-center justify-between flex-shrink-0">
           {/* Logo + company name */}
           <div className="flex items-center gap-2">
             {liveBrand?.logo ? (
@@ -656,7 +656,7 @@ function App() {
                 <Icon name="sparkle-fill" className="w-4 h-4" />
               </div>
             )}
-            <div className="font-extrabold tracking-tight text-white text-[18px]">
+            <div className="font-extrabold tracking-tight text-white text-[15px] sm:text-[18px]">
               {liveBrand?.name}
             </div>
           </div>
@@ -674,13 +674,13 @@ function App() {
 
           {/* Stepper */}
           {!isSuccess && (
-            <div className="px-5 sm:px-7 pt-4 pb-3 border-b border-ink-100 flex-shrink-0">
+            <div className="px-4 sm:px-7 pt-3 pb-2 sm:pt-4 sm:pb-3 border-b border-ink-100 flex-shrink-0">
               <Stepper steps={visibleSteps} idx={idx} onJump={goTo} maxReached={maxReached} />
             </div>
           )}
 
           {/* Step content — scrolls if needed, fills space */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 py-4"
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
             {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
@@ -692,11 +692,12 @@ function App() {
 
           {/* Bottom bar — price + nav */}
           {!isSuccess && (
-            <div className="flex-shrink-0 border-t border-ink-100 px-5 sm:px-7 py-3 flex items-center gap-3">
+            <div className="flex-shrink-0 border-t border-ink-100 px-4 sm:px-7 pt-2.5 sm:pt-3 flex items-center gap-2 sm:gap-3"
+              style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))' }}>
 
               {showPrice && (
                 <div className="flex-1 flex items-center min-w-0">
-                  <div className="text-[22px] font-extrabold text-ink-900 tabular-nums"><Money value={breakdown.total} /></div>
+                  <div className="text-[18px] sm:text-[22px] font-extrabold text-ink-900 tabular-nums"><Money value={breakdown.total} /></div>
                 </div>
               )}
 
@@ -709,7 +710,12 @@ function App() {
                   <Icon name="arrow-left" className="w-4 h-4" />Back
                 </GhostButton>
                 <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting}>
-                  {submitting ? 'Saving…' : (labelMap[stepKey] || "Continue")}
+                  {submitting ? 'Saving…' : (
+                    <>
+                      <span className="sm:hidden">{stepKey === 'confirm' ? 'Confirm' : 'Continue'}</span>
+                      <span className="hidden sm:inline">{labelMap[stepKey] || 'Continue'}</span>
+                    </>
+                  )}
                   {!submitting && <Icon name="arrow-right" className="w-4 h-4" />}
                 </PrimaryButton>
               </div>

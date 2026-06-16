@@ -59,13 +59,13 @@ const CustomMonthlyConfig = ({ state, set, discountPct = 10 }) => {
 
   return (
     <div className="mt-2.5 p-4 rounded-2xl bg-white hairline space-y-4 fade-up">
-      <div className="grid grid-cols-3 gap-3">
-        <BigCounter label="Days / week" value={days} onChange={v => set({ customDays: v })}
+      <div className="grid grid-cols-3 gap-2">
+        <BigCounter label="Days/wk" value={days} onChange={v => set({ customDays: v })}
           min={1} max={7} suffix={days === 1 ? "day" : "days"} />
-        <BigCounter label="Maids needed" value={maids} onChange={v => set({ customMaids: v })}
+        <BigCounter label="Maids" value={maids} onChange={v => set({ customMaids: v })}
           min={1} max={4} suffix={maids === 1 ? "maid" : "maids"} />
-        <BigCounter label="Hours / day" value={hours} onChange={v => set({ customHours: v })}
-          min={2} max={10} suffix="hours" />
+        <BigCounter label="Hrs/day" value={hours} onChange={v => set({ customHours: v })}
+          min={2} max={10} suffix="hrs" />
       </div>
 
       {/* Specific days checkbox */}
@@ -212,7 +212,7 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
           const active = state.mode === t.id;
           return (
             <button key={t.id} onClick={() => set({ mode: t.id })}
-              className={`h-11 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition-all
+              className={`h-10 sm:h-11 rounded-xl text-[13px] sm:text-[14px] font-bold inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-all
                 ${active ? "bg-ink-900 text-white shadow-card" : "bg-ink-50 text-ink-600 hover:bg-ink-100"}`}>
               <SvcIcon name={icon} className="w-4 h-4" strokeWidth={1.75} />{t.label}
             </button>
@@ -229,7 +229,7 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
               const active = state.nationality === n.id;
               return (
                 <button key={n.id} onClick={() => set({ nationality: n.id, nationalityRate: n.rate })}
-                  className={`h-11 px-3 rounded-xl text-[13px] font-semibold flex items-center gap-2 transition-all
+                  className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-xl text-[12.5px] sm:text-[13px] font-semibold flex items-center gap-2 transition-all
                     ${active ? "bg-mint-50 ring-2 ring-mint-500 text-ink-900" : "bg-white hairline text-ink-700 hover:bg-ink-50"}`}>
                   <Flag code={n.flag} size={24}/>
                   <span className="flex-1 text-left truncate">{n.name}</span>
@@ -251,17 +251,16 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
             const theme = SERVICE_COLORS[t.id] || SVC_COLOR_DEFAULT;
             return (
               <button key={t.id} onClick={() => set({ serviceType: t.id })}
-                className={`h-12 px-3 rounded-xl text-[13px] font-semibold flex items-center gap-3 transition-all
+                className={`h-11 sm:h-12 px-2.5 sm:px-3 rounded-xl text-[12.5px] sm:text-[13px] font-semibold flex items-center gap-2.5 sm:gap-3 transition-all
                   ${active ? theme.active : theme.idle}`}>
-                {/* Icon badge — mirrors nationality flag box */}
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
                   ${active ? "bg-white/30" : "bg-white hairline"}`}>
                   {t.icon
-                    ? <SvcIcon name={t.icon} className={`w-4.5 h-4.5 ${theme.icon}`} strokeWidth={1.6}/>
-                    : <span className="text-[16px]">{t.emoji}</span>}
+                    ? <SvcIcon name={t.icon} className={`w-4 h-4 ${theme.icon}`} strokeWidth={1.6}/>
+                    : <span className="text-[15px]">{t.emoji}</span>}
                 </div>
                 <span className={`flex-1 text-left truncate ${theme.name}`}>{t.name}</span>
-                <span className={`font-mono text-[12px] flex-shrink-0 ${theme.rate}`}>{getHourlyRate(t)} QAR/hr</span>
+                <span className={`font-mono text-[11.5px] sm:text-[12px] flex-shrink-0 ${theme.rate}`}>{getHourlyRate(t)} QAR/hr</span>
                 {active && <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${theme.check} bg-white/30`}><Icon name="check" className="w-3 h-3" strokeWidth={3}/></span>}
               </button>
             );
@@ -280,16 +279,16 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
 
       {/* Materials add-on — hourly only */}
       {state.mode === "hourly" && (
-        <label className={`flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all
+        <label className={`flex items-center gap-2.5 sm:gap-3 p-3 sm:p-4 rounded-xl cursor-pointer transition-all
           ${state.materials ? "bg-mint-50 ring-2 ring-mint-500" : "bg-ink-50 hairline hover:bg-ink-100"}`}>
           <input type="checkbox" className="sr-only" checked={state.materials} onChange={e => set({ materials: e.target.checked })} />
-          <div className={`w-10 h-10 rounded-xl grid place-items-center flex-shrink-0 transition-colors
+          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl grid place-items-center flex-shrink-0 transition-colors
             ${state.materials ? "bg-mint-500" : "bg-white hairline"}`}>
-            <SvcIcon name="SprayCan" className={`w-5 h-5 ${state.materials ? "text-white" : "text-ink-400"}`} strokeWidth={1.75} />
+            <SvcIcon name="SprayCan" className={`w-4.5 h-4.5 sm:w-5 sm:h-5 ${state.materials ? "text-white" : "text-ink-400"}`} strokeWidth={1.75} />
           </div>
-          <div className="flex-1">
-            <div className="font-bold text-ink-900 text-[14px]">Cleaning materials</div>
-            <div className="text-[12.5px] text-ink-500 mt-0.5">Mop, bucket &amp; all supplies · +{materialsRate || 10} QAR/hr</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-ink-900 text-[13px] sm:text-[14px]">Cleaning materials</div>
+            <div className="text-[11.5px] sm:text-[12.5px] text-ink-500 mt-0.5">Mop, bucket &amp; all supplies · +{materialsRate || 10} QAR/hr</div>
           </div>
           <span className={`w-6 h-6 rounded-full grid place-items-center flex-shrink-0 transition-colors
             ${state.materials ? "bg-mint-500 text-white" : "bg-white hairline text-transparent"}`}>
@@ -521,13 +520,13 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
                 const unavailable = past || full;
                 return (
                   <button key={t} disabled={unavailable} onClick={() => !unavailable && set({ time: t })}
-                    className={`h-[60px] rounded-xl flex flex-col items-center justify-center gap-1 transition-all
+                    className={`h-[52px] sm:h-[60px] rounded-xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all
                       ${active     ? "bg-mint-500 text-white shadow-mint"
                       : past       ? "bg-ink-100 text-ink-300 cursor-not-allowed"
                       : full       ? "bg-red-50 text-red-300 cursor-not-allowed hairline"
                       :              "bg-white hairline text-ink-900 hover:bg-mint-50"}`}>
-                    <span className="font-mono text-[14px] font-bold tabular-nums">{t}</span>
-                    <span className={`text-[10.5px] font-semibold
+                    <span className="font-mono text-[13px] sm:text-[14px] font-bold tabular-nums">{t}</span>
+                    <span className={`text-[10px] sm:text-[10.5px] font-semibold
                       ${active ? "text-white/80" : past ? "text-ink-400" : full ? "text-red-400" : "text-mint-600"}`}>
                       {past ? "Past" : full ? "Full" : "Available"}
                     </span>

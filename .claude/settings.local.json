@@ -65,7 +65,9 @@
       "Bash(dir /a .env*)",
       "Bash(npx vite *)",
       "Bash(git remote *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

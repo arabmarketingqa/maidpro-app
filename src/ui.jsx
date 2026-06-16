@@ -78,19 +78,19 @@ const BigCounter = ({ label, value, onChange, min = 1, max = 99, suffix }) => {
   const dec = () => onChange(Math.max(min, value - 1));
   const inc = () => onChange(Math.min(max, value + 1));
   return (
-    <div className="rounded-xl bg-white hairline px-4 py-3 flex items-center justify-between gap-3">
-      <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-ink-500 min-w-0">{label}</div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+    <div className="rounded-xl bg-white hairline p-2.5 sm:px-4 sm:py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3">
+      <div className="text-[10px] sm:text-[12px] font-bold uppercase tracking-[0.1em] text-ink-500 text-center sm:text-left min-w-0">{label}</div>
+      <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-shrink-0">
         <button onClick={dec} disabled={value <= min}
-          className="w-9 h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
-          <Icon name="minus" className="w-4 h-4" />
+          className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
+          <Icon name="minus" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
-        <div className="w-14 text-center font-mono text-[18px] font-bold text-ink-900 tabular-nums">
-          {value}<span className="text-[11px] text-ink-400 ml-0.5">{suffix}</span>
+        <div className="w-11 sm:w-14 text-center font-mono text-[16px] sm:text-[18px] font-bold text-ink-900 tabular-nums">
+          {value}<span className="text-[10px] sm:text-[11px] text-ink-400 ml-0.5">{suffix}</span>
         </div>
         <button onClick={inc} disabled={value >= max}
-          className="w-9 h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
-          <Icon name="plus" className="w-4 h-4" />
+          className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
+          <Icon name="plus" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
       </div>
     </div>
@@ -132,9 +132,9 @@ const GhostButton = ({ children, onClick, className = "" }) => (
 );
 
 const SectionLabel = ({ title, subtitle }) => (
-  <div className="mb-4">
-    <h2 className="text-[20px] font-bold text-ink-900 tracking-tight">{title}</h2>
-    {subtitle && <p className="text-[13px] text-ink-500 mt-1">{subtitle}</p>}
+  <div className="mb-3 sm:mb-4">
+    <h2 className="text-[17px] sm:text-[20px] font-bold text-ink-900 tracking-tight">{title}</h2>
+    {subtitle && <p className="text-[12px] sm:text-[13px] text-ink-500 mt-0.5 sm:mt-1">{subtitle}</p>}
   </div>
 );
 
