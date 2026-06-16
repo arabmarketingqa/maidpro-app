@@ -4338,24 +4338,25 @@ const NewBookingModal = ({ store, onClose }) => {
   )
 }
 /* ─── Reports Section ─── */
-const ReportsSection = ({ bookings }) => {
+const ReportsSection = ({ bookings, store }) => {
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
   const todayStr = today.toISOString().slice(0,10);
   const [from, setFrom] = React.useState(firstOfMonth);
-  const [to, setTo] = React.useState(todayStr);
+  const [to,   setTo]   = React.useState(todayStr);
 
-  const inRange = bookings.filter(b => {
-    const d = b._raw?.date || '';
-    return d >= from && d <= to;
-  });
-
+  const inRange = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
   const confirmed = inRange.filter(b => ['Confirmed','Completed'].includes(b.status));
-  const revenue = confirmed.reduce((s, b) => s + b.total, 0);
-  const paidTotal = inRange.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
-  const dueTotal = inRange.reduce((s, b) => s + Math.max(0, b.total - (Number(b._raw?.paid_amount) || 0)), 0);
-  const avgVal = confirmed.length > 0 ? (revenue / confirmed.length) : 0;
+  const revenue   = confirmed.reduce((s, b) => s + b.total, 0);
+  const paidTotal = inRange.reduce((s, b) => s + (b.paid_amount || 0), 0);
+  const dueTotal  = inRange.reduce((s, b) => s + Math.max(0, b.total - (b.paid_amount || 0)), 0);
+  const avgVal    = confirmed.length > 0 ? revenue / confirmed.length : 0;
+  const cancelled = inRange.filter(b => b.status === 'Cancelled').length;
+  const completed = inRange.filter(b => b.status === 'Completed').length;
+  const newBks    = inRange.filter(b => b.status === 'New').length;
+  const cancRate  = inRange.length > 0 ? ((cancelled / inRange.length) * 100).toFixed(1) : '0';
 
+  // Breakdowns
   const byService = {};
   inRange.forEach(b => {
     const svc = b.service || 'Unknown';
@@ -4363,18 +4364,62 @@ const ReportsSection = ({ bookings }) => {
     byService[svc].count += 1;
     if (['Confirmed','Completed'].includes(b.status)) byService[svc].revenue += b.total;
   });
-
   const byStatus = {};
   inRange.forEach(b => { byStatus[b.status] = (byStatus[b.status] || 0) + 1; });
 
-  const cancelled = inRange.filter(b => b.status === 'Cancelled').length;
-  const completed = inRange.filter(b => b.status === 'Completed').length;
-  const cancRate = inRange.length > 0 ? ((cancelled / inRange.length) * 100).toFixed(1) : '0';
+  // Daily revenue trend (capped at 90 days for the chart)
+  const dayMs    = 86400000;
+  const fromD    = new Date(from + 'T00:00:00');
+  const toD      = new Date(to   + 'T00:00:00');
+  const totalDays = Math.max(1, Math.round((toD - fromD) / dayMs) + 1);
+  const trendDays = Array.from({ length: Math.min(totalDays, 90) }, (_, i) => {
+    const d    = new Date(fromD.getTime() + i * dayMs);
+    const dStr = d.toISOString().slice(0, 10);
+    const lbl  = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const rev  = confirmed.filter(b => b._raw?.date === dStr).reduce((s, b) => s + b.total, 0);
+    const cnt  = inRange.filter(b => b._raw?.date === dStr).length;
+    return { date: dStr, label: lbl, revenue: rev, count: cnt };
+  });
+  const TW = 560, TH = 88;
+  const maxRev = Math.max(...trendDays.map(d => d.revenue), 1);
+  const tPts = trendDays.map((d, i) => ({
+    x: trendDays.length === 1 ? TW / 2 : (i / (trendDays.length - 1)) * TW,
+    y: TH - 4 - (d.revenue / maxRev) * (TH - 20),
+    ...d,
+  }));
+  const linePath = tPts.length > 1 ? 'M ' + tPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ') : '';
+  const areaPath = tPts.length > 1 ? `${linePath} L ${tPts[tPts.length-1].x},${TH} L ${tPts[0].x},${TH} Z` : '';
+  // Pick up to 5 evenly-spaced x-axis labels
+  const labelIdxs = trendDays.length <= 7
+    ? trendDays.map((_, i) => i)
+    : [0, ...Array.from({ length: 3 }, (_, k) => Math.round((k + 1) * (trendDays.length - 1) / 4)), trendDays.length - 1]
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+  // Staff performance — match assigned_staff UUIDs to store.staff
+  const activeStaff = (store?.staff || []).filter(s => s.active !== false);
+  const staffPerf = activeStaff.map(s => {
+    const bks = inRange.filter(b => (b._raw?.assigned_staff || []).includes(s.id));
+    const rev = bks.filter(b => ['Confirmed','Completed'].includes(b.status)).reduce((acc, b) => acc + b.total, 0);
+    return { ...s, bkCount: bks.length, bkRevenue: rev };
+  }).sort((a, b) => b.bkCount - a.bkCount);
+  const maxBkCount = Math.max(...staffPerf.map(s => s.bkCount), 1);
+
+  // Top customers by booking count
+  const custMap = {};
+  inRange.forEach(b => {
+    const key = (b.phone && b.phone !== '—') ? b.phone : b.customer;
+    if (!custMap[key]) custMap[key] = { name: b.customer, phone: b.phone, count: 0, spent: 0 };
+    custMap[key].count += 1;
+    if (['Confirmed','Completed'].includes(b.status)) custMap[key].spent += b.total;
+  });
+  const topCustomers = Object.values(custMap).sort((a, b) => b.count - a.count).slice(0, 8);
+  const maxCustCount = Math.max(...topCustomers.map(c => c.count), 1);
 
   return (
     <div className="space-y-5 fade-up">
-      {/* Date filter */}
-      <Card title="Date Range Filter" subtitle="Filter all report metrics by booking date.">
+
+      {/* ── Date range ── */}
+      <Card title="Date Range" subtitle="All metrics below update with this filter.">
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <Label className="mb-1.5">From</Label>
@@ -4386,12 +4431,12 @@ const ReportsSection = ({ bookings }) => {
             <input type="date" value={to} onChange={e => setTo(e.target.value)}
               className="h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {[
-              { label: 'Today',     f: () => { setFrom(todayStr); setTo(todayStr); } },
-              { label: 'This week', f: () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); setFrom(d.toISOString().slice(0,10)); setTo(todayStr); } },
-              { label: 'This month',f: () => { setFrom(firstOfMonth); setTo(todayStr); } },
-              { label: 'All time',  f: () => { setFrom('2020-01-01'); setTo(todayStr); } },
+              { label: 'Today',      f: () => { setFrom(todayStr); setTo(todayStr); } },
+              { label: 'This week',  f: () => { const d=new Date(); d.setDate(d.getDate()-d.getDay()); setFrom(d.toISOString().slice(0,10)); setTo(todayStr); } },
+              { label: 'This month', f: () => { setFrom(firstOfMonth); setTo(todayStr); } },
+              { label: 'All time',   f: () => { setFrom('2020-01-01'); setTo(todayStr); } },
             ].map(p => (
               <button key={p.label} onClick={p.f}
                 className="h-10 px-3 rounded-lg hairline text-[12.5px] font-semibold text-ink-700 hover:bg-ink-100 transition-colors">
@@ -4401,22 +4446,26 @@ const ReportsSection = ({ bookings }) => {
           </div>
         </div>
         <div className="mt-3 text-[12.5px] text-ink-500">
-          Showing <span className="font-bold text-ink-900">{inRange.length}</span> bookings from <span className="font-mono">{from}</span> to <span className="font-mono">{to}</span>
+          <span className="font-bold text-ink-900">{inRange.length}</span> bookings · <span className="font-mono">{from}</span> → <span className="font-mono">{to}</span>
         </div>
       </Card>
 
-      {/* KPI tiles */}
+      {/* ── 8-tile KPI grid ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: 'Total Bookings',    value: inRange.length,               unit: '',     icon: 'list',     tone: 'ink'  },
-          { label: 'Confirmed Revenue', value: revenue.toLocaleString(),      unit: 'QAR',  icon: 'money',    tone: 'mint' },
-          { label: 'Amount Collected',  value: paidTotal.toLocaleString(),    unit: 'QAR',  icon: 'check',    tone: 'mint' },
-          { label: 'Outstanding Due',   value: dueTotal.toLocaleString(),     unit: 'QAR',  icon: 'trend',    tone: 'ink'  },
+          { label: 'Total Bookings',    value: inRange.length,                      unit: '',    icon: 'list',  tone: 'ink'  },
+          { label: 'Confirmed Revenue', value: revenue.toLocaleString(),             unit: 'QAR', icon: 'money', tone: 'mint' },
+          { label: 'Amount Collected',  value: paidTotal.toLocaleString(),           unit: 'QAR', icon: 'check', tone: 'mint' },
+          { label: 'Outstanding Due',   value: dueTotal.toLocaleString(),            unit: 'QAR', icon: 'trend', tone: 'ink'  },
+          { label: 'Avg Booking Value', value: Math.round(avgVal).toLocaleString(),  unit: 'QAR', icon: 'money', tone: 'ink'  },
+          { label: 'Completed',         value: completed,                            unit: '',    icon: 'check', tone: 'mint' },
+          { label: 'New / Unassigned',  value: newBks,                              unit: '',    icon: 'list',  tone: 'ink'  },
+          { label: 'Cancellation Rate', value: cancRate,                             unit: '%',   icon: 'trend', tone: cancelled > 0 ? 'red' : 'ink' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-xl2 hairline shadow-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">{k.label}</span>
-              <span className={`w-8 h-8 grid place-items-center rounded-lg ${k.tone === 'mint' ? 'bg-mint-100 text-mint-700' : 'bg-ink-100 text-ink-700'}`}>
+              <span className={`w-8 h-8 grid place-items-center rounded-lg ${k.tone==='mint'?'bg-mint-100 text-mint-700':k.tone==='red'?'bg-red-50 text-red-500':'bg-ink-100 text-ink-700'}`}>
                 <AdminIcon name={k.icon} className="w-4 h-4"/>
               </span>
             </div>
@@ -4428,20 +4477,52 @@ const ReportsSection = ({ bookings }) => {
         ))}
       </div>
 
+      {/* ── Revenue trend chart ── */}
+      <Card title="Daily Revenue Trend" subtitle={`Confirmed + completed revenue per day${totalDays > 90 ? ' (showing first 90 days)' : ''}.`}>
+        {revenue === 0 ? (
+          <div className="h-24 flex items-center justify-center text-[13px] text-ink-400">No confirmed revenue in this range.</div>
+        ) : (
+          <>
+            <svg viewBox={`0 0 ${TW} ${TH + 22}`} width="100%" className="h-[120px]" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="rprtGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="oklch(0.62 0.13 168)" stopOpacity="0.22"/>
+                  <stop offset="100%" stopColor="oklch(0.62 0.13 168)" stopOpacity="0.02"/>
+                </linearGradient>
+              </defs>
+              {tPts.length > 1 && <path d={areaPath} fill="url(#rprtGrad)"/>}
+              {tPts.length > 1 && <path d={linePath} fill="none" stroke="oklch(0.62 0.13 168)" strokeWidth="2"/>}
+              {tPts.filter(p => p.revenue > 0).map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r="3" fill="oklch(0.62 0.13 168)" stroke="#fff" strokeWidth="1.5"/>
+              ))}
+              {labelIdxs.map(i => (
+                <text key={i} x={tPts[i].x} y={TH + 18} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="monospace">
+                  {tPts[i].label}
+                </text>
+              ))}
+            </svg>
+            <div className="flex justify-between text-[11.5px] font-mono text-ink-500 mt-1">
+              <span>Period total: <span className="font-bold text-ink-800">QAR {revenue.toLocaleString()}</span></span>
+              <span>Peak day: <span className="font-bold text-ink-800">QAR {Math.round(maxRev).toLocaleString()}</span></span>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* ── Service + Status ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* By service */}
-        <Card title="Revenue by Service" subtitle="Breakdown of confirmed + completed bookings.">
+        <Card title="Revenue by Service" subtitle="Confirmed + completed bookings.">
           {Object.keys(byService).length === 0 ? (
             <div className="text-[13px] text-ink-400 py-4 text-center">No bookings in selected range.</div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {Object.entries(byService).sort((a,b) => b[1].revenue - a[1].revenue).map(([svc, d]) => {
                 const pct = revenue > 0 ? (d.revenue / revenue) * 100 : 0;
                 return (
                   <div key={svc}>
                     <div className="flex items-center justify-between text-[13px] mb-1">
                       <span className="font-medium text-ink-800 truncate">{svc}</span>
-                      <span className="font-mono tabular-nums text-ink-700 ml-3 flex-shrink-0">{d.count} jobs · QAR {d.revenue.toLocaleString()}</span>
+                      <span className="font-mono tabular-nums text-ink-600 ml-3 flex-shrink-0 text-[12px]">{d.count} jobs · QAR {d.revenue.toLocaleString()}</span>
                     </div>
                     <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
                       <div className="h-full bg-mint-500 rounded-full transition-all" style={{ width: `${pct}%` }}/>
@@ -4453,15 +4534,14 @@ const ReportsSection = ({ bookings }) => {
           )}
         </Card>
 
-        {/* By status */}
-        <Card title="Bookings by Status" subtitle="Status distribution for the selected period.">
+        <Card title="Bookings by Status" subtitle="Distribution for the selected period.">
           {Object.keys(byStatus).length === 0 ? (
             <div className="text-[13px] text-ink-400 py-4 text-center">No bookings in selected range.</div>
           ) : (
             <div className="space-y-3">
-              {Object.entries(byStatus).sort((a,b) => b[1] - a[1]).map(([st, cnt]) => {
+              {Object.entries(byStatus).sort((a,b) => b[1]-a[1]).map(([st, cnt]) => {
                 const pct = inRange.length > 0 ? (cnt / inRange.length) * 100 : 0;
-                const color = { Completed: 'bg-mint-500', Confirmed: 'bg-sky-500', New: 'bg-amber-500', Cancelled: 'bg-red-400', Pending: 'bg-violet-400', 'In Progress': 'bg-blue-400' }[st] || 'bg-ink-400';
+                const color = { Completed:'bg-mint-500', Confirmed:'bg-sky-500', New:'bg-amber-500', Cancelled:'bg-red-400', Pending:'bg-violet-400', 'In Progress':'bg-blue-400' }[st] || 'bg-ink-400';
                 return (
                   <div key={st}>
                     <div className="flex items-center justify-between text-[13px] mb-1">
@@ -4478,15 +4558,73 @@ const ReportsSection = ({ bookings }) => {
                 <span>Completed: <span className="font-bold text-mint-700">{completed}</span></span>
                 <span>Cancellation rate: <span className="font-bold text-red-600">{cancRate}%</span></span>
                 <span>Avg booking: <span className="font-bold text-ink-900">QAR {Math.round(avgVal).toLocaleString()}</span></span>
-                <span>Total collected: <span className="font-bold text-mint-700">QAR {paidTotal.toLocaleString()}</span></span>
+                <span>Collected: <span className="font-bold text-mint-700">QAR {paidTotal.toLocaleString()}</span></span>
               </div>
             </div>
           )}
         </Card>
       </div>
 
-      {/* Booking list for range */}
-      <Card title="Bookings in Range" subtitle="All bookings within the selected date range." padded={false}>
+      {/* ── Staff performance ── */}
+      {staffPerf.length > 0 && (
+        <Card title="Staff Performance" subtitle="Bookings assigned to each active staff member in the selected range.">
+          <div className="space-y-3">
+            {staffPerf.map(s => {
+              const pct = (s.bkCount / maxBkCount) * 100;
+              const c   = STAFF_COLORS[s.color] || STAFF_COLORS.mint;
+              return (
+                <div key={s.id}>
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <div className={`w-7 h-7 rounded-full ${c.bg} ${c.text} flex-shrink-0 grid place-items-center text-[11px] font-bold`}>
+                      {(s.name || '?')[0].toUpperCase()}
+                    </div>
+                    <span className="text-[13px] font-medium text-ink-800 flex-1 truncate">{s.name}</span>
+                    <span className="font-mono tabular-nums text-[12px] text-ink-600 flex-shrink-0">
+                      {s.bkCount} job{s.bkCount !== 1 ? 's' : ''}{s.bkRevenue > 0 ? ` · QAR ${s.bkRevenue.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-ink-100 rounded-full overflow-hidden ml-10">
+                    <div className={`h-full ${c.bg} rounded-full transition-all`} style={{ width: `${pct}%` }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Top customers ── */}
+      {topCustomers.length > 0 && (
+        <Card title="Top Customers" subtitle="Ranked by booking count in the selected range.">
+          <div className="space-y-2.5">
+            {topCustomers.map((c, i) => {
+              const pct = (c.count / maxCustCount) * 100;
+              return (
+                <div key={c.phone || c.name || i}>
+                  <div className="flex items-center justify-between text-[13px] mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-ink-100 text-ink-600 flex-shrink-0 grid place-items-center text-[10px] font-bold">{i+1}</span>
+                      <span className="font-medium text-ink-800 truncate">{c.name}</span>
+                      {c.phone && c.phone !== '—' && (
+                        <span className="text-ink-400 text-[11px] font-mono flex-shrink-0 hidden sm:inline">{c.phone}</span>
+                      )}
+                    </div>
+                    <span className="font-mono tabular-nums text-[12px] text-ink-600 ml-3 flex-shrink-0">
+                      {c.count} booking{c.count !== 1 ? 's' : ''}{c.spent > 0 ? ` · QAR ${c.spent.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-sky-400 rounded-full transition-all" style={{ width: `${pct}%` }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Bookings table ── */}
+      <Card title="Bookings in Range" subtitle="Full list for the selected date range." padded={false}>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -4505,18 +4643,18 @@ const ReportsSection = ({ bookings }) => {
               {inRange.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-[13px] text-ink-400">No bookings in selected range.</td></tr>
               ) : inRange.map(b => {
-                const paid = Number(b._raw?.paid_amount) || 0;
-                const due = Math.max(0, b.total - paid);
+                const paid = b.paid_amount || 0;
+                const due  = Math.max(0, b.total - paid);
                 return (
                   <tr key={b.ref} className="border-t border-ink-200/70 hover:bg-ink-50/50">
                     <td className="px-5 py-3 font-mono text-[12.5px] text-ink-600">{b.ref}</td>
                     <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
                     <td className="px-3 py-3 text-[12.5px] text-ink-600">{b.service}</td>
-                    <td className="px-3 py-3 text-[12.5px] text-ink-600">{b.date}</td>
+                    <td className="px-3 py-3 text-[12.5px] font-mono text-ink-600">{b._raw?.date || b.date}</td>
                     <td className="px-3 py-3"><StatusPill status={b.status}/></td>
                     <td className="px-3 py-3 text-right font-mono tabular-nums text-[13px] text-ink-700">{b.total.toLocaleString()}</td>
                     <td className="px-3 py-3 text-right font-mono tabular-nums text-[13px] text-mint-700">{paid.toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-bold" style={{color: due>0?'#dc2626':'#16a34a'}}>{due.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-bold" style={{color:due>0?'#dc2626':'#16a34a'}}>{due.toLocaleString()}</td>
                   </tr>
                 );
               })}
@@ -4875,7 +5013,7 @@ const App = () => {
     customers:     <CustomerSection />,
     staff:         <StaffSection store={store} set={set} bookings={bookings}/>,
     settings:      <SettingsSection store={store} set={set}/>,
-    reports:       <ReportsSection bookings={bookings}/>
+    reports:       <ReportsSection bookings={bookings} store={store}/>
   };
 
   return (
