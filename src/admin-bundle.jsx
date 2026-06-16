@@ -17,7 +17,8 @@ const toFlag = toISO; // kept for backward compat
 // Returns true if staff member works on the day of week of dateStr ("YYYY-MM-DD"). 0=Sun…6=Sat.
 const isWorkingDay = (s, dateStr) => {
   const days = s.working_days;
-  if (!Array.isArray(days) || days.length === 0) return true; // default: all days
+  if (!Array.isArray(days)) return true;   // column not in DB yet → assume all days
+  if (days.length === 0) return false;     // all days explicitly turned off → never working
   return days.includes(new Date(dateStr + 'T00:00:00').getDay());
 };
 

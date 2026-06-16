@@ -68,7 +68,9 @@ const overlaps = (aStart, aHours, bStart, bHours) => {
 // Mirror of isWorkingDay from admin-bundle.jsx
 const isWorkingDay = (s, dow) => {
   const days = s.working_days;
-  return !Array.isArray(days) || days.length === 0 || days.includes(dow);
+  if (!Array.isArray(days)) return true;
+  if (days.length === 0) return false;
+  return days.includes(dow);
 };
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

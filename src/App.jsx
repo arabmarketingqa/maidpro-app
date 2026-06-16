@@ -451,7 +451,9 @@ function App() {
         const workingStaff = staffList.filter(s => {
           if (s.active === false) return false;       // on-hold staff don't count
           const days = s.working_days;
-          return !Array.isArray(days) || days.length === 0 || days.includes(dow);
+          if (!Array.isArray(days)) return true;
+          if (days.length === 0) return false;
+          return days.includes(dow);
         });
         setSlotData({ bookings: bks || [], availableCount: workingStaff.length, workingStaffIds: workingStaff.map(s => s.id), loading: false });
       } catch (e) {
@@ -557,7 +559,9 @@ function App() {
           const bookingDow = new Date(bookingDate + 'T00:00:00').getDay();
           pool = pool.filter(s => {
             const days = s.working_days;
-            return !Array.isArray(days) || days.length === 0 || days.includes(bookingDow);
+            if (!Array.isArray(days)) return true;
+            if (days.length === 0) return false;
+            return days.includes(bookingDow);
           });
 
           // 3. For hourly: filter by skill (exclude @prefix entries when matching)
