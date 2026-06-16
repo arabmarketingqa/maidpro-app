@@ -172,13 +172,14 @@ const SVC_COLOR_DEFAULT = {
   check:  'text-violet-600',
 };
 
-const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveMonthly, liveStayIn, liveLimits, materialsRate, liveAvailableStaff }) => {
+const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveMonthly, liveStayIn, liveLimits, materialsRate, totalStaff }) => {
   const NATS     = nationalities || NATIONALITIES;
   const minHours = Number(liveLimits?.minHours) || 2;
   const maxHours = Number(liveLimits?.maxHours) || 12;
-  // Max maids = admin-configured cap only. Daily availability is enforced on the
-  // time-slot step via isFull() — slots show as full when not enough staff are free.
-  const maxMaids = Number(liveLimits?.maxMaids) || 99;
+  // Cap at whichever is lower: admin-set limit or actual total staff in the system.
+  // Daily availability is enforced separately at the time-slot step via isFull().
+  const adminCap = Number(liveLimits?.maxMaids) || 99;
+  const maxMaids = totalStaff ? Math.min(adminCap, totalStaff) : adminCap;
   const SERVICES = (liveServices && liveServices.length) ? liveServices : SERVICE_TYPES;
   const MONTHLY  = (liveMonthly  && liveMonthly.length)  ? liveMonthly  : MONTHLY_PACKAGES;
   const STAYIN   = (liveStayIn   && liveStayIn.length)   ? liveStayIn   : STAYIN_PACKAGES;

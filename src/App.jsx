@@ -172,6 +172,20 @@ function App() {
   const [liveBusinessHours, setLiveBusinessHours] = React.useState(() => _cache?.businessHours ?? { open: 8, close: 19 });
   const [liveAvailability, setLiveAvailability] = React.useState({});
   const [slotData, setSlotData] = React.useState({ bookings: [], availableCount: 0, loading: false });
+  const [totalStaffCount, setTotalStaffCount] = React.useState(null);
+
+  // Fetch total staff count once on mount and keep in sync via realtime
+  React.useEffect(() => {
+    const fetch = async () => {
+      const { data } = await supabase.from('staff').select('id');
+      if (data) setTotalStaffCount(data.length);
+    };
+    fetch();
+    const ch = supabase.channel('staff-count-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, fetch)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, []);
   // Skeleton only shows on cache miss — cache hit renders the full form instantly
   const [isLoading, setIsLoading] = React.useState(() => !_cache);
 
@@ -710,7 +724,7 @@ function App() {
           {/* Step content — scrolls if needed, fills space */}
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
-            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} liveAvailableStaff={slotData.availableCount} />}
+            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
             {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}
