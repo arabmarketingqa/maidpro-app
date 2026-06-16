@@ -182,7 +182,7 @@ function App() {
   const fetchAvailableSkills = React.useCallback(async (nationality, mode) => {
     if (mode !== 'hourly' || !nationality) { setAvailableSkillIds(null); return; }
     const { data } = await supabase.from('staff').select('skills')
-      .eq('status', 'Available').eq('nationality', nationality);
+      .eq('nationality', nationality);
     if (!data) return;
 
     const skillSet = new Set();
@@ -206,7 +206,7 @@ function App() {
   // Only show nationalities that have ≥1 available maid configured for the given mode
   // For hourly: maid must also have ≥1 skill selected (otherwise they can't take any booking)
   const fetchAvailableNatIds = React.useCallback(async (mode = 'hourly') => {
-    const { data } = await supabase.from('staff').select('nationality, skills').eq('status', 'Available');
+    const { data } = await supabase.from('staff').select('nationality, skills');
     if (!data) return;
 
     const anyModeConfig = data.some(s =>
@@ -418,7 +418,7 @@ function App() {
       try {
         const [{ data: bks }, { data: staff }] = await Promise.all([
           supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
-          supabase.from('staff').select('id, working_days').eq('status', 'Available'),
+          supabase.from('staff').select('id, working_days'),
         ]);
         const dow = new Date(dateStr + 'T00:00:00').getDay();
         const workingStaff = (staff || []).filter(s => {
@@ -511,7 +511,7 @@ function App() {
 
         const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
         const { data: availStaff } = await supabase.from('staff')
-          .select('id, skills, working_days').eq('status', 'Available');
+          .select('id, skills, working_days');
 
         if (availStaff && availStaff.length > 0) {
           // 1. Filter by service mode (@mode entries in skills array)

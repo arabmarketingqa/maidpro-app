@@ -2449,12 +2449,15 @@ const RegularsView = () => {
       setGenerating(null); return;
     }
 
-    // Resolve staff: prefer saved preference, otherwise auto-pick available
+    // Resolve staff: prefer saved preference, otherwise auto-pick by working_days
     let staffToUse = (schedule.assigned_staff || []).filter(Boolean);
     if (!staffToUse.length) {
-      const { data: avail } = await supabase.from('staff').select('id, skills').eq('status', 'Available');
+      const { data: avail } = await supabase.from('staff').select('id, skills, working_days');
       if (avail?.length) {
+        // For the schedule date, pick staff whose working_days includes that DOW
+        const scheduleDow = schedule.date ? new Date(schedule.date + 'T00:00:00').getDay() : new Date().getDay();
         staffToUse = avail
+          .filter(s => isWorkingDay(s, schedule.date || new Date().toISOString().split('T')[0]))
           .filter(s => { const sk = Array.isArray(s.skills) ? s.skills : []; return !sk.some(x => x.startsWith('@')) || sk.some(x => x === '@hourly'); })
           .slice(0, Math.max(1, Number(schedule.maids) || 1)).map(s => s.id);
       }
@@ -2858,7 +2861,7 @@ const RegularsView = () => {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-ink-500 mb-1">Maids</label>
-                <input type="number" min="1" max={staffList.filter(s => s.status === 'Available').length || 99} value={draft.maids}
+                <input type="number" min="1" max={staffList.length || 99} value={draft.maids}
                   onChange={e => setDraft(d => ({ ...d, maids: e.target.value }))}
                   className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none"/>
               </div>
@@ -3246,19 +3249,20 @@ const StaffSection = ({ store, set, bookings }) => {
     supabase.from('staff').insert({ ...newStaff, serviceTypes: undefined });
     setModalOpen(false);
   };
-  const activeMaids = store.staff.filter(s => s.status === "Available").length;
   const totalMaids = store.staff.length;
-  const busy = store.staff.filter(s => s.status === "Busy").length;
-  const leave = store.staff.filter(s => s.status === "On-Leave").length;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const workingToday = store.staff.filter(s => isWorkingDay(s, todayStr)).length;
+  const offToday = totalMaids - workingToday;
+  const customSchedule = store.staff.filter(s => Array.isArray(s.working_days) && s.working_days.length < 7).length;
 
   return (
     <div className="space-y-5 fade-up">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: "Total Maids",   value: totalMaids,  icon: "users",  tone: "ink" },
-          { label: "Available Now", value: activeMaids, icon: "check",  tone: "mint" },
-          { label: "Busy",          value: busy,        icon: "sliders",tone: "ink" },
-          { label: "On-Leave",      value: leave,       icon: "x",      tone: "ink" },
+          { label: "Total Maids",      value: totalMaids,     icon: "users",   tone: "ink" },
+          { label: "Working Today",    value: workingToday,   icon: "check",   tone: "mint" },
+          { label: "Off Today",        value: offToday,       icon: "x",       tone: "ink" },
+          { label: "Custom Schedule",  value: customSchedule, icon: "calendar",tone: "ink" },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-xl2 hairline shadow-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
@@ -3570,11 +3574,14 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
             {staff.map(s => {
               const off = isOffDay(s);
               return (
-                <div key={s.id} className="flex flex-col items-center gap-1.5 py-3 px-2">
+                <div key={s.id} className={`flex flex-col items-center gap-1.5 py-3 px-2 ${off ? 'opacity-50' : ''}`}>
                   <StaffAvatar s={s} size={44}/>
                   <div className="text-[12.5px] font-bold text-ink-900 truncate max-w-full">{s.name.split(" ")[0]}</div>
-                  <div className="flex items-center gap-1 text-[10.5px] font-mono uppercase tracking-[0.12em] text-ink-500">
-                    <StatusDot status={off ? "On-Leave" : s.status}/>{off ? "Off Day" : s.status}
+                  <div className={`flex items-center gap-1 text-[10.5px] font-mono uppercase tracking-[0.12em] ${off ? 'text-ink-400' : 'text-mint-700 font-semibold'}`}>
+                    {off
+                      ? <span className="inline-block w-2 h-2 rounded-full bg-ink-300"/>
+                      : <span className="inline-block w-2 h-2 rounded-full bg-mint-500"/>}
+                    {off ? 'Off Today' : 'Working'}
                   </div>
                 </div>
               );
@@ -3591,7 +3598,7 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
             {staff.map((s, sIdx) => (
               <React.Fragment key={s.id}>
                 {SCHEDULE_HOURS.map((h, hIdx) => {
-                  const isOff = s.status === "On-Leave" || isOffDay(s);
+                  const isOff = isOffDay(s);
                   return (
                     <div key={`${s.id}-${h}`}
                          className={`border-b border-r border-ink-200/70 ${isOff ? "bg-ink-50/60" : "bg-white"}`}
@@ -3713,7 +3720,7 @@ const SettingsSection = ({ store, set }) => {
           <div>
             <div className="text-[13.5px] font-semibold text-ink-900">Enable Auto Assign</div>
             <div className="text-[12px] text-ink-500 mt-0.5 max-w-sm">
-              When on, every new booking is instantly assigned to the <span className="font-semibold">available maid</span> carrying the <span className="font-semibold">fewest active jobs</span>. Only maids with status "Available" are considered.
+              When on, every new booking is instantly assigned to the maid carrying the <span className="font-semibold">fewest active jobs</span>. Only maids whose <span className="font-semibold">working days</span> include the booking date are considered.
             </div>
           </div>
           <Switch on={!!rules.autoAssign} onChange={v => setR({ autoAssign: v })} ariaLabel="Auto Assign"/>
@@ -4068,7 +4075,7 @@ const NewBookingModal = ({ store, onClose }) => {
     setSlotData(p => ({ ...p, loading: true }))
     Promise.all([
       supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', f.date).neq('status', 'Cancelled'),
-      supabase.from('staff').select('id, working_days').eq('status', 'Available'),
+      supabase.from('staff').select('id, working_days'),
     ]).then(([{ data: bks }, { data: staff }]) => {
       const workingStaff = (staff || []).filter(s => isWorkingDay(s, f.date));
       setSlotData({ bookings: bks || [], availableCount: workingStaff.length, workingStaffIds: workingStaff.map(s => s.id), loading: false })
@@ -4116,7 +4123,7 @@ const NewBookingModal = ({ store, onClose }) => {
     if (!f.name.trim()||!f.phone.trim()) { setErr('Name and phone are required'); return }
     if (isPastSlot(f.time)) { setErr('This time slot is in the past. Please choose a future time.'); return }
     const free = freeMaidsAt(f.time)
-    if (slotData.availableCount === 0) { setErr('No available maids right now. Update staff status before creating a booking.'); return }
+    if (slotData.availableCount === 0) { setErr('No staff have this date as a working day. Update working days in Staff Management.'); return }
     if (free < Number(f.cleaners)) { setErr(`Not enough free maids for this slot — only ${free} available (${Number(f.cleaners)} needed). Choose a different time or reduce maid count.`); return }
     setSaving(true); setErr('')
 
@@ -4125,7 +4132,7 @@ const NewBookingModal = ({ store, onClose }) => {
     try {
       const needed = Number(f.cleaners) || 1
       const mode   = 'hourly' // NewBookingModal always books hourly-style
-      const { data: availStaff } = await supabase.from('staff').select('id, skills, working_days').eq('status', 'Available')
+      const { data: availStaff } = await supabase.from('staff').select('id, skills, working_days')
       if (availStaff && availStaff.length > 0) {
         // Filter by service mode — modes stored as "@hourly","@monthly","@stayin" inside skills
         let pool = availStaff.filter(s => {
@@ -4268,8 +4275,8 @@ const NewBookingModal = ({ store, onClose }) => {
               ${slotData.availableCount === 0 ? 'bg-red-50 text-red-700' : 'bg-mint-50 text-mint-800'}`}>
               <AdminIcon name={slotData.availableCount === 0 ? 'x' : 'check'} className="w-3.5 h-3.5 flex-shrink-0"/>
               {slotData.availableCount === 0
-                ? 'No available maids on this date — update staff status first.'
-                : `${slotData.availableCount} maid${slotData.availableCount !== 1 ? 's' : ''} available on this date. Free at selected time: ${freeMaidsAt(f.time)}.`}
+                ? 'No staff work on this date — update working days in Staff Management.'
+                : `${slotData.availableCount} maid${slotData.availableCount !== 1 ? 's' : ''} working on this date. Free at selected time: ${freeMaidsAt(f.time)}.`}
             </div>
           )}
           <div><Label className="mb-1.5">Hours</Label><TextField type="number" value={f.hours} onChange={v=>upd({hours:v})} suffix="hrs"/></div>
@@ -4676,8 +4683,8 @@ const App = () => {
     const { data: bkRow } = await supabase.from('bookings').select('assigned_staff').eq('id', newRow.id).maybeSingle();
     if (bkRow?.assigned_staff?.length > 0) return;
 
-    // Get available staff with skills (service modes encoded as @mode inside skills)
-    const { data: availableStaff } = await supabase.from('staff').select('id, skills, working_days').eq('status', 'Available');
+    // Get all staff — availability is determined solely by working_days, not status
+    const { data: availableStaff } = await supabase.from('staff').select('id, skills, working_days');
     if (!availableStaff || availableStaff.length === 0) return;
 
     // Filter by booking mode (look for @mode prefix in skills array)
