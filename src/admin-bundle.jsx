@@ -76,6 +76,7 @@ const AdminIcon = ({ name, className = "w-5 h-5", strokeWidth = 1.6 }) => {
     case "arrow-left":  return <svg {...c}><path d="M19 12H5M12 5l-7 7 7 7"/></svg>;
     case "arrow-right": return <svg {...c}><path d="M5 12h14M12 5l7 7-7 7"/></svg>;
     case "contact":     return <svg {...c}><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>;
+    case "print":       return <svg {...c}><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="10" rx="1.5"/><path d="M6 14h12M6 18h12"/><rect x="6" y="14" width="3" height="5"/></svg>;
     default: return null;
   }
 };
@@ -4466,220 +4467,145 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         </div>
       </Card>
 
-      {reportType === 'daily' && <>
-      {/* ── 8-tile KPI grid ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[
-          { label: 'Total Bookings',    value: inRange.length,                      unit: '',    icon: 'list',  tone: 'ink'  },
-          { label: 'Confirmed Revenue', value: revenue.toLocaleString(),             unit: 'QAR', icon: 'money', tone: 'mint' },
-          { label: 'Amount Collected',  value: paidTotal.toLocaleString(),           unit: 'QAR', icon: 'check', tone: 'mint' },
-          { label: 'Outstanding Due',   value: dueTotal.toLocaleString(),            unit: 'QAR', icon: 'trend', tone: 'ink'  },
-          { label: 'Avg Booking Value', value: Math.round(avgVal).toLocaleString(),  unit: 'QAR', icon: 'money', tone: 'ink'  },
-          { label: 'Completed',         value: completed,                            unit: '',    icon: 'check', tone: 'mint' },
-          { label: 'New / Unassigned',  value: newBks,                              unit: '',    icon: 'list',  tone: 'ink'  },
-          { label: 'Cancellation Rate', value: cancRate,                             unit: '%',   icon: 'trend', tone: cancelled > 0 ? 'red' : 'ink' },
-        ].map(k => (
-          <div key={k.label} className="bg-white rounded-xl2 hairline shadow-card p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">{k.label}</span>
-              <span className={`w-8 h-8 grid place-items-center rounded-lg ${k.tone==='mint'?'bg-mint-100 text-mint-700':k.tone==='red'?'bg-red-50 text-red-500':'bg-ink-100 text-ink-700'}`}>
-                <AdminIcon name={k.icon} className="w-4 h-4"/>
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-[26px] sm:text-[30px] leading-none font-bold tracking-tight text-ink-900 tabular-nums">{k.value}</span>
-              {k.unit && <span className="text-[12px] font-mono text-ink-500">{k.unit}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
+      {reportType === 'daily' && (() => {
+        // Resolve assigned staff names for each booking
+        const staffList = store?.staff || [];
+        const getMaids = (b) => {
+          const ids = b._raw?.assigned_staff || [];
+          if (!ids.length) return '—';
+          return ids.map(id => (staffList.find(s => s.id === id)?.name || '—')).join(', ');
+        };
 
-      {/* ── Revenue trend chart ── */}
-      <Card title="Daily Revenue Trend" subtitle={`Confirmed + completed revenue per day${totalDays > 90 ? ' (showing first 90 days)' : ''}.`}>
-        {revenue === 0 ? (
-          <div className="h-24 flex items-center justify-center text-[13px] text-ink-400">No confirmed revenue in this range.</div>
-        ) : (
-          <>
-            <svg viewBox={`0 0 ${TW} ${TH + 22}`} width="100%" className="h-[120px]" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="rprtGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.62 0.13 168)" stopOpacity="0.22"/>
-                  <stop offset="100%" stopColor="oklch(0.62 0.13 168)" stopOpacity="0.02"/>
-                </linearGradient>
-              </defs>
-              {tPts.length > 1 && <path d={areaPath} fill="url(#rprtGrad)"/>}
-              {tPts.length > 1 && <path d={linePath} fill="none" stroke="oklch(0.62 0.13 168)" strokeWidth="2"/>}
-              {tPts.filter(p => p.revenue > 0).map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r="3" fill="oklch(0.62 0.13 168)" stroke="#fff" strokeWidth="1.5"/>
-              ))}
-              {labelIdxs.map(i => (
-                <text key={i} x={tPts[i].x} y={TH + 18} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="monospace">
-                  {tPts[i].label}
-                </text>
-              ))}
-            </svg>
-            <div className="flex justify-between text-[11.5px] font-mono text-ink-500 mt-1">
-              <span>Period total: <span className="font-bold text-ink-800">QAR {revenue.toLocaleString()}</span></span>
-              <span>Peak day: <span className="font-bold text-ink-800">QAR {Math.round(maxRev).toLocaleString()}</span></span>
-            </div>
-          </>
-        )}
-      </Card>
+        const totalHours  = inRange.reduce((s, b) => s + (b.hours || 0), 0);
+        const totalAmount = inRange.reduce((s, b) => s + b.total, 0);
 
-      {/* ── Service + Status ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Card title="Revenue by Service" subtitle="Confirmed + completed bookings.">
-          {Object.keys(byService).length === 0 ? (
-            <div className="text-[13px] text-ink-400 py-4 text-center">No bookings in selected range.</div>
-          ) : (
-            <div className="space-y-2.5">
-              {Object.entries(byService).sort((a,b) => b[1].revenue - a[1].revenue).map(([svc, d]) => {
-                const pct = revenue > 0 ? (d.revenue / revenue) * 100 : 0;
-                return (
-                  <div key={svc}>
-                    <div className="flex items-center justify-between text-[13px] mb-1">
-                      <span className="font-medium text-ink-800 truncate">{svc}</span>
-                      <span className="font-mono tabular-nums text-ink-600 ml-3 flex-shrink-0 text-[12px]">{d.count} jobs · QAR {d.revenue.toLocaleString()}</span>
-                    </div>
-                    <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-mint-500 rounded-full transition-all" style={{ width: `${pct}%` }}/>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+        const handlePrint = () => {
+          const brandName = store?.brand?.name || 'Maid Pro';
+          const rows = inRange.map((b, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${b._raw?.date || '—'}</td>
+              <td>${getMaids(b)}</td>
+              <td>${b.customer || '—'}</td>
+              <td style="text-align:center">${b.hours ?? '—'}</td>
+              <td style="text-align:right">QAR ${(b.total || 0).toLocaleString()}</td>
+            </tr>`).join('');
 
-        <Card title="Bookings by Status" subtitle="Distribution for the selected period.">
-          {Object.keys(byStatus).length === 0 ? (
-            <div className="text-[13px] text-ink-400 py-4 text-center">No bookings in selected range.</div>
-          ) : (
-            <div className="space-y-3">
-              {Object.entries(byStatus).sort((a,b) => b[1]-a[1]).map(([st, cnt]) => {
-                const pct = inRange.length > 0 ? (cnt / inRange.length) * 100 : 0;
-                const color = { Completed:'bg-mint-500', Confirmed:'bg-sky-500', New:'bg-amber-500', Cancelled:'bg-red-400', Pending:'bg-violet-400', 'In Progress':'bg-blue-400' }[st] || 'bg-ink-400';
-                return (
-                  <div key={st}>
-                    <div className="flex items-center justify-between text-[13px] mb-1">
-                      <span className="font-medium text-ink-800">{st}</span>
-                      <span className="font-mono tabular-nums text-ink-600">{cnt} ({pct.toFixed(0)}%)</span>
-                    </div>
-                    <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }}/>
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="pt-2 border-t border-ink-100 grid grid-cols-2 gap-2 text-[12.5px] text-ink-600">
-                <span>Completed: <span className="font-bold text-mint-700">{completed}</span></span>
-                <span>Cancellation rate: <span className="font-bold text-red-600">{cancRate}%</span></span>
-                <span>Avg booking: <span className="font-bold text-ink-900">QAR {Math.round(avgVal).toLocaleString()}</span></span>
-                <span>Collected: <span className="font-bold text-mint-700">QAR {paidTotal.toLocaleString()}</span></span>
+          const html = `<!DOCTYPE html><html><head>
+            <meta charset="utf-8"/>
+            <title>Daily Report — ${from} to ${to}</title>
+            <style>
+              *{box-sizing:border-box;margin:0;padding:0}
+              body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:28px 32px}
+              .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #111}
+              .logo{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+              .meta{text-align:right;font-size:11px;color:#555;line-height:1.6}
+              h2{font-size:14px;font-weight:700;margin-bottom:4px}
+              .range{font-size:11px;color:#666;margin-bottom:18px}
+              table{width:100%;border-collapse:collapse}
+              thead tr{background:#f3f4f6}
+              th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left}
+              th.r{text-align:right} th.c{text-align:center}
+              td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;font-size:11.5px}
+              tbody tr:nth-child(even){background:#fafafa}
+              tfoot td{font-weight:700;font-size:12px;border-top:2px solid #111;border-bottom:none;padding-top:10px}
+              .total-label{text-align:right}
+              @media print{body{padding:16px 20px}}
+            </style>
+          </head><body>
+            <div class="header">
+              <div class="logo">${brandName}</div>
+              <div class="meta">
+                <div><strong>Daily Jobs Report</strong></div>
+                <div>Period: ${from} → ${to}</div>
+                <div>Printed: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
               </div>
             </div>
-          )}
-        </Card>
-      </div>
+            <div class="range">${inRange.length} job${inRange.length !== 1 ? 's' : ''} in selected range</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px">No#</th>
+                  <th style="width:100px">Date</th>
+                  <th>Maid</th>
+                  <th>Customer</th>
+                  <th class="c" style="width:60px">Hours</th>
+                  <th class="r" style="width:110px">Amount</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="4" class="total-label">Total</td>
+                  <td style="text-align:center">${totalHours}</td>
+                  <td style="text-align:right">QAR ${totalAmount.toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </body></html>`;
 
-      {/* ── Staff performance ── */}
-      {staffPerf.length > 0 && (
-        <Card title="Staff Performance" subtitle="Bookings assigned to each active staff member in the selected range.">
-          <div className="space-y-3">
-            {staffPerf.map(s => {
-              const pct = (s.bkCount / maxBkCount) * 100;
-              const c   = STAFF_COLORS[s.color] || STAFF_COLORS.mint;
-              return (
-                <div key={s.id}>
-                  <div className="flex items-center gap-3 mb-1.5">
-                    <div className={`w-7 h-7 rounded-full ${c.bg} ${c.text} flex-shrink-0 grid place-items-center text-[11px] font-bold`}>
-                      {(s.name || '?')[0].toUpperCase()}
-                    </div>
-                    <span className="text-[13px] font-medium text-ink-800 flex-1 truncate">{s.name}</span>
-                    <span className="font-mono tabular-nums text-[12px] text-ink-600 flex-shrink-0">
-                      {s.bkCount} job{s.bkCount !== 1 ? 's' : ''}{s.bkRevenue > 0 ? ` · QAR ${s.bkRevenue.toLocaleString()}` : ''}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-ink-100 rounded-full overflow-hidden ml-10">
-                    <div className={`h-full ${c.bg} rounded-full transition-all`} style={{ width: `${pct}%` }}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+          const w = window.open('', '_blank', 'width=900,height=700');
+          if (!w) return;
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          setTimeout(() => { w.print(); }, 300);
+        };
 
-      {/* ── Top customers ── */}
-      {topCustomers.length > 0 && (
-        <Card title="Top Customers" subtitle="Ranked by booking count in the selected range.">
-          <div className="space-y-2.5">
-            {topCustomers.map((c, i) => {
-              const pct = (c.count / maxCustCount) * 100;
-              return (
-                <div key={c.phone || c.name || i}>
-                  <div className="flex items-center justify-between text-[13px] mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-ink-100 text-ink-600 flex-shrink-0 grid place-items-center text-[10px] font-bold">{i+1}</span>
-                      <span className="font-medium text-ink-800 truncate">{c.name}</span>
-                      {c.phone && c.phone !== '—' && (
-                        <span className="text-ink-400 text-[11px] font-mono flex-shrink-0 hidden sm:inline">{c.phone}</span>
-                      )}
-                    </div>
-                    <span className="font-mono tabular-nums text-[12px] text-ink-600 ml-3 flex-shrink-0">
-                      {c.count} booking{c.count !== 1 ? 's' : ''}{c.spent > 0 ? ` · QAR ${c.spent.toLocaleString()}` : ''}
-                    </span>
-                  </div>
-                  <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-sky-400 rounded-full transition-all" style={{ width: `${pct}%` }}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* ── Bookings table ── */}
-      <Card title="Bookings in Range" subtitle="Full list for the selected date range." padded={false}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 bg-ink-50/40">
-                <th className="px-5 py-3">Ref</th>
-                <th className="px-3 py-3">Customer</th>
-                <th className="px-3 py-3">Service</th>
-                <th className="px-3 py-3">Date</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3 text-right">Total</th>
-                <th className="px-3 py-3 text-right">Paid</th>
-                <th className="px-5 py-3 text-right">Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inRange.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-[13px] text-ink-400">No bookings in selected range.</td></tr>
-              ) : inRange.map(b => {
-                const paid = b.paid_amount || 0;
-                const due  = Math.max(0, b.total - paid);
-                return (
-                  <tr key={b.ref} className="border-t border-ink-200/70 hover:bg-ink-50/50">
-                    <td className="px-5 py-3 font-mono text-[12.5px] text-ink-600">{b.ref}</td>
-                    <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
-                    <td className="px-3 py-3 text-[12.5px] text-ink-600">{b.service}</td>
-                    <td className="px-3 py-3 text-[12.5px] font-mono text-ink-600">{b._raw?.date || b.date}</td>
-                    <td className="px-3 py-3"><StatusPill status={b.status}/></td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums text-[13px] text-ink-700">{b.total.toLocaleString()}</td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums text-[13px] text-mint-700">{paid.toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-bold" style={{color:due>0?'#dc2626':'#16a34a'}}>{due.toLocaleString()}</td>
+        return (
+          <Card
+            title="Jobs Report"
+            subtitle={`${inRange.length} job${inRange.length !== 1 ? 's' : ''} · ${from} → ${to}`}
+            padded={false}
+            action={
+              <button onClick={handlePrint}
+                className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-ink-900 text-white text-[12.5px] font-semibold hover:bg-ink-700 transition-colors">
+                <AdminIcon name="print" className="w-3.5 h-3.5"/>
+                Print
+              </button>
+            }>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 bg-ink-50/60 border-b border-ink-200/70">
+                    <th className="px-5 py-3 w-12">No#</th>
+                    <th className="px-3 py-3 w-28">Date</th>
+                    <th className="px-3 py-3">Maid</th>
+                    <th className="px-3 py-3">Customer</th>
+                    <th className="px-3 py-3 text-center w-20">Hours</th>
+                    <th className="px-5 py-3 text-right w-32">Amount</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      </>}
+                </thead>
+                <tbody>
+                  {inRange.length === 0 ? (
+                    <tr><td colSpan={6} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
+                  ) : inRange.map((b, i) => (
+                    <tr key={b.ref} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
+                      <td className="px-5 py-3 font-mono text-[12px] text-ink-400 tabular-nums">{i + 1}</td>
+                      <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.date || '—'}</td>
+                      <td className="px-3 py-3 text-[13px] text-ink-700">{getMaids(b)}</td>
+                      <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{b.hours ?? '—'}</td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold text-ink-900">
+                        QAR {(b.total || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {inRange.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t-2 border-ink-200 bg-ink-50/60">
+                      <td colSpan={4} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
+                      <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900 tabular-nums">{totalHours}</td>
+                      <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900 tabular-nums">QAR {totalAmount.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </Card>
+        );
+      })()}
 
       {reportType === 'staff' && (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-ink-400">
