@@ -543,9 +543,16 @@ function App() {
         id = "MP-" + Array.from({length:6}, () => c[Math.floor(Math.random()*c.length)]).join('');
       }
 
+      // Respect the autoAssign setting — if off, booking lands unassigned for admin to pick manually
+      let autoAssign = true;
+      try {
+        const { data: sr } = await supabase.from('settings').select('value').eq('key', 'bookingRules').maybeSingle();
+        autoAssign = sr?.value?.autoAssign ?? true;
+      } catch (_) {}
+
       // Pick the N least-busy maids filtered by service mode + skill
       let assigned_staff = [];
-      try {
+      if (autoAssign) try {
         const needed   = breakdown.maids || 1;
         const mode     = state.mode || 'hourly';
         // Find the skill ID for the selected service (e.g. "Regular Cleaning" → "regular")

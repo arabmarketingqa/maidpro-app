@@ -489,25 +489,22 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
 
   // Returns true when there aren't enough free staff for the customer's requested cleaners
   const isFull = (h) => {
-    const { bookings, availableCount, workingStaffIds } = slotData;
-    // No working staff on this day → all slots blocked
+    const { bookings, availableCount } = slotData;
     if (!availableCount) return true;
     const needed = Math.max(1, Number(state.maids) || 1);
-    const busyMaids = new Set();
+    // Count maid-slots consumed by all overlapping bookings using their cleaners count.
+    // This works whether auto-assign is on (bookings have assigned_staff) or off
+    // (bookings are intentionally unassigned but still occupy capacity).
+    let usedSlots = 0;
     bookings.forEach(b => {
       const startH = parseSlotHour(b.time);
       if (isNaN(startH)) return;
       const endH = startH + (b.hours || 1);
       if (startH <= h && h < endH) {
-        if (Array.isArray(b.assigned_staff) && b.assigned_staff.length > 0) {
-          b.assigned_staff.forEach(id => {
-            if (!workingStaffIds || workingStaffIds.includes(id)) busyMaids.add(id);
-          });
-        }
-        // Unassigned bookings: no maid was committed to them → don't reduce free count
+        usedSlots += Math.max(1, Number(b.cleaners) || 1);
       }
     });
-    return (availableCount - busyMaids.size) < needed;
+    return (availableCount - usedSlots) < needed;
   };
 
   const noStaffDay = !slotData.loading && slotData.availableCount === 0;
