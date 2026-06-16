@@ -4342,6 +4342,7 @@ const ReportsSection = ({ bookings, store }) => {
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
   const todayStr = today.toISOString().slice(0,10);
+  const [reportType, setReportType] = React.useState('daily');
   const [from, setFrom] = React.useState(firstOfMonth);
   const [to,   setTo]   = React.useState(todayStr);
 
@@ -4418,6 +4419,18 @@ const ReportsSection = ({ bookings, store }) => {
   return (
     <div className="space-y-5 fade-up">
 
+      {/* ── Report type selector ── */}
+      <div className="flex items-center gap-3">
+        <label className="text-[11.5px] font-bold uppercase tracking-[0.12em] text-ink-500 flex-shrink-0">Report Type</label>
+        <select
+          value={reportType}
+          onChange={e => setReportType(e.target.value)}
+          className="h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)] min-w-[200px]">
+          <option value="daily">Daily Report</option>
+          <option value="staff">Staff Report</option>
+        </select>
+      </div>
+
       {/* ── Date range ── */}
       <Card title="Date Range" subtitle="All metrics below update with this filter.">
         <div className="flex flex-wrap items-end gap-4">
@@ -4450,6 +4463,7 @@ const ReportsSection = ({ bookings, store }) => {
         </div>
       </Card>
 
+      {reportType === 'daily' && <>
       {/* ── 8-tile KPI grid ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
@@ -4662,6 +4676,15 @@ const ReportsSection = ({ bookings, store }) => {
           </table>
         </div>
       </Card>
+      </>}
+
+      {reportType === 'staff' && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-ink-400">
+          <AdminIcon name="contact" className="w-10 h-10 opacity-30"/>
+          <p className="text-[14px] font-medium">Staff Report — coming soon.</p>
+          <p className="text-[12.5px]">Tell us what data you'd like to see here.</p>
+        </div>
+      )}
     </div>
   );
 };
