@@ -177,13 +177,25 @@ function App() {
   // Fetch total staff count once on mount and keep in sync via realtime
   React.useEffect(() => {
     const fetch = async () => {
-      const { data, error } = await supabase.from('staff').select('id, active');
+      const { data, error } = await supabase.from('staff').select('id, active, working_days');
       if (data) {
-        setTotalStaffCount(data.filter(s => s.active !== false).length);
+        setTotalStaffCount(data.filter(s => {
+          if (s.active === false) return false;
+          const days = s.working_days;
+          if (!Array.isArray(days)) return true;  // column not in DB → count them
+          if (days.length === 0) return false;     // all days turned off → never works
+          return true;
+        }).length);
       } else if (error) {
-        // active column not yet in DB — count all staff
-        const { data: fb } = await supabase.from('staff').select('id');
-        if (fb) setTotalStaffCount(fb.length);
+        // working_days or active column not yet in DB — try active only
+        const { data: d2, error: e2 } = await supabase.from('staff').select('id, active');
+        if (d2) {
+          setTotalStaffCount(d2.filter(s => s.active !== false).length);
+        } else {
+          // both columns missing — count all staff
+          const { data: fb } = await supabase.from('staff').select('id');
+          if (fb) setTotalStaffCount(fb.length);
+        }
       }
     };
     fetch();
