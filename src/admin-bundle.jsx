@@ -1497,28 +1497,75 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
       </div>
 
       {/* mobile cards */}
-      <ul className="md:hidden divide-y divide-ink-200/70">
-        {filtered.map(b => (
-          <li key={b.ref} className="px-4 py-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono tabular-nums text-[12px] text-ink-500">{b.ref}</span>
+      <ul className="md:hidden divide-y divide-ink-100">
+        {filtered.map(b => {
+          const assignedIds   = (store?.assignments?.[b.ref]) || [];
+          const assignedStaff = assignedIds.map(id => (store?.staff || []).find(s => s.id === id)).filter(Boolean);
+          const due           = Math.max(0, b.total - (b.paid_amount || 0));
+          const isPaid        = b.payment_status === 'Paid' || due === 0;
+
+          return (
+            <li key={b.ref}>
+              <button
+                onClick={() => setDetailBooking(b)}
+                className="w-full text-left px-4 py-4 hover:bg-ink-50/60 active:bg-ink-100 transition-colors">
+
+                {/* Row 1: avatar + name + ref + total */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-mint-100 text-mint-800 grid place-items-center text-[13px] font-bold flex-shrink-0">
+                    {b.customer.split(' ').map(s => s[0]).slice(0,2).join('')}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-[14.5px] text-ink-900 truncate">{b.customer}</div>
+                    <div className="text-[11.5px] font-mono text-ink-400">{b.ref} · {b.phone}</div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-mono font-bold text-[15px] text-ink-900">QAR {b.total.toLocaleString()}</div>
+                    <div className="text-[11px] font-mono text-ink-400">{b.maids}×{b.hours}h</div>
+                  </div>
+                </div>
+
+                {/* Row 2: service + date + time */}
+                <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-ink-100 text-[11.5px] font-semibold text-ink-700">
+                    {b.service}
+                  </span>
+                  <span className="text-[12px] text-ink-500 font-mono">{b.date}{b.time ? ` · ${b.time}` : ''}</span>
+                </div>
+
+                {/* Row 3: status + payment */}
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusPill status={b.status}/>
-                  <PaymentBadge booking={b}/>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-semibold
+                    ${isPaid ? 'bg-mint-100 text-mint-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-mint-500' : 'bg-amber-500'}`}/>
+                    {isPaid ? 'Paid' : `Due QAR ${due.toLocaleString()}`}
+                  </span>
                 </div>
-                <div className="mt-1 text-[14.5px] font-bold text-ink-900 truncate">{b.customer}</div>
-                <div className="text-[12px] text-ink-500">{b.service} · {b.date}</div>
-              </div>
-              <div className="text-right">
-                <div className="font-mono tabular-nums text-[14px] font-semibold text-ink-900">
-                  <span className="text-ink-500 mr-1 text-[10px]">QAR</span>{b.total.toLocaleString()}
+
+                {/* Row 4: assigned staff */}
+                <div className="mt-2.5 flex items-center gap-2">
+                  {assignedStaff.length === 0 ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[11.5px] font-semibold text-amber-700">
+                      <AdminIcon name="users" className="w-3.5 h-3.5"/>
+                      Unassigned — tap to assign
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-1.5">
+                        {assignedStaff.slice(0,4).map(s => <StaffAvatar key={s.id} s={s} size={24}/>)}
+                      </div>
+                      <span className="text-[12px] text-ink-600 font-medium">
+                        {assignedStaff.length === 1 ? assignedStaff[0].name : `${assignedStaff.length} maids assigned`}
+                      </span>
+                    </div>
+                  )}
+                  <AdminIcon name="chevron" className="w-4 h-4 text-ink-300 ml-auto flex-shrink-0 -rotate-90"/>
                 </div>
-                <div className="text-[11.5px] font-mono text-ink-500 mt-0.5">{b.maids}×{b.hours}h</div>
-              </div>
-            </div>
-          </li>
-        ))}
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       {filtered.length === 0 && (
@@ -3981,13 +4028,25 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:p-4">
       <div className="absolute inset-0 bg-ink-950/50" onClick={() => onClose(false)}/>
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl ring-1 ring-ink-200 p-6 space-y-4 overflow-y-auto max-h-[90vh]">
+      {/* Mobile: slides up from bottom as full-width sheet. Desktop: centred card. */}
+      <div className="relative mt-auto sm:mt-0 w-full sm:max-w-lg bg-white sm:rounded-2xl shadow-xl ring-1 ring-ink-200 overflow-y-auto"
+        style={{
+          maxHeight: 'calc(100dvh - 48px)',
+          borderRadius: '20px 20px 0 0',
+        }}
+        // override border-radius on sm+
+      >
+        {/* Drag handle — mobile only */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-ink-200"/>
+        </div>
+        <div className="px-5 pb-6 pt-3 sm:pt-5 sm:px-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-mint-50 text-mint-700 grid place-items-center flex-shrink-0"><AdminIcon name="list" className="w-5 h-5"/></div>
           <div className="flex-1 min-w-0"><div className="font-bold text-ink-900 text-[16px] font-mono">{booking.ref}</div><div className="text-[12px] text-ink-500">{booking.date} {booking.time}</div></div>
-          <button onClick={() => onClose(false)} className="w-8 h-8 grid place-items-center rounded-lg text-ink-500 hover:bg-ink-100"><AdminIcon name="x" className="w-4 h-4"/></button>
+          <button onClick={() => onClose(false)} className="w-10 h-10 grid place-items-center rounded-xl text-ink-500 hover:bg-ink-100"><AdminIcon name="x" className="w-5 h-5"/></button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {[['Customer',booking.customer],['Phone',booking.phone],['Service',booking.service],['Mode',booking.mode],['Maids x Hours',booking.maids+' x '+booking.hours+'h'],['Total','QAR '+booking.total.toLocaleString()]].map(([l,v])=>(
@@ -4076,10 +4135,12 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
         {saveError && (
           <div className="px-3 py-2 rounded-lg bg-red-50 text-[12.5px] text-red-700 font-medium">{saveError}</div>
         )}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-200">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-200"
+          style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
           <GhostBtn onClick={() => onClose(false)}>Cancel</GhostBtn>
           <PrimaryBtn onClick={save} disabled={saving}><AdminIcon name="check" className="w-4 h-4"/>{saving ? 'Saving...' : 'Save changes'}</PrimaryBtn>
         </div>
+        </div>{/* end px-5 padding wrapper */}
       </div>
     </div>
   )
