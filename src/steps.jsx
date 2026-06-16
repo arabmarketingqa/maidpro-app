@@ -176,10 +176,9 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
   const NATS     = nationalities || NATIONALITIES;
   const minHours = Number(liveLimits?.minHours) || 2;
   const maxHours = Number(liveLimits?.maxHours) || 12;
-  // Dynamic max: capped by available staff count; admin limit is a secondary cap if set
-  const adminCap = Number(liveLimits?.maxMaids) || 99;
-  const staffCap = liveAvailableStaff || 99;
-  const maxMaids = Math.min(adminCap, staffCap);
+  // Max maids = admin-configured cap only. Daily availability is enforced on the
+  // time-slot step via isFull() — slots show as full when not enough staff are free.
+  const maxMaids = Number(liveLimits?.maxMaids) || 99;
   const SERVICES = (liveServices && liveServices.length) ? liveServices : SERVICE_TYPES;
   const MONTHLY  = (liveMonthly  && liveMonthly.length)  ? liveMonthly  : MONTHLY_PACKAGES;
   const STAYIN   = (liveStayIn   && liveStayIn.length)   ? liveStayIn   : STAYIN_PACKAGES;
