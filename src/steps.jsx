@@ -784,8 +784,14 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
 
       <div className="mt-5 flex flex-col gap-3">
         <div className="flex gap-3 justify-center">
-          <GhostButton onClick={onReset} className="px-6">Book another visit</GhostButton>
-          <GhostButton onClick={handleDownloadReceipt}>Download receipt</GhostButton>
+          <button onClick={onReset}
+            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl text-[14px] font-semibold text-white bg-mint-500 hover:bg-mint-600 transition-colors">
+            Book another visit
+          </button>
+          <button onClick={handleDownloadReceipt}
+            className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-xl text-[14px] font-semibold text-white bg-mint-500 hover:bg-mint-600 transition-colors">
+            Download receipt
+          </button>
         </div>
         {(whatsappNumber || callNumber) && (
           <div className="flex gap-3 justify-center">
