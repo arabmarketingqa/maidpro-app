@@ -487,10 +487,12 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
   // Block any slot whose start hour has already begun (2:31 PM → block up to and including 2 PM)
   const cutoffHour = now.getHours();
 
-  // Returns true when all working+available maids are occupied for hour h
+  // Returns true when there aren't enough free staff for the customer's requested cleaners
   const isFull = (h) => {
     const { bookings, availableCount, workingStaffIds } = slotData;
-    if (!availableCount) return false;
+    // No working staff on this day → all slots blocked
+    if (!availableCount) return true;
+    const needed = Math.max(1, Number(state.maids) || 1);
     const busyMaids = new Set();
     let unassignedCleaners = 0;
     bookings.forEach(b => {
@@ -508,12 +510,24 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
         }
       }
     });
-    return (busyMaids.size + unassignedCleaners) >= availableCount;
+    const freeStaff = Math.max(0, availableCount - busyMaids.size - unassignedCleaners);
+    return freeStaff < needed;
   };
+
+  const noStaffDay = !slotData.loading && slotData.availableCount === 0;
 
   return (
     <div className="fade-up">
-      <SectionLabel title="Pick a time slot" subtitle={slotData.loading ? "Checking availability…" : "Select your preferred start time."} />
+      <SectionLabel title="Pick a time slot" subtitle={slotData.loading ? "Checking availability…" : noStaffDay ? "No staff scheduled for this day." : "Select your preferred start time."} />
+      {noStaffDay && (
+        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-3 text-[13px] text-amber-800">
+          <span className="text-[18px]">🗓</span>
+          <div>
+            <span className="font-semibold">No staff available on this day.</span>
+            <span className="text-amber-700 ml-1">Please choose a different date.</span>
+          </div>
+        </div>
+      )}
       <div className="space-y-4">
         {TIME_GROUPS.map(g => (
           <div key={g.label}>

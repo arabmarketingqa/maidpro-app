@@ -3605,10 +3605,18 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
                          style={{ gridColumn: sIdx + 2, gridRow: hIdx + 1 }}/>
                   );
                 })}
-                {todays.filter(b => (store.assignments?.[b.ref] || []).includes(s.id)).map(b => {
+                {todays.filter(b => {
+                  // Use the DB-sourced assigned_staff from the raw row first — most reliable
+                  const ids = (b._raw?.assigned_staff?.length > 0)
+                    ? b._raw.assigned_staff
+                    : (store.assignments?.[b.ref] || []);
+                  return ids.includes(s.id);
+                }).map(b => {
                   const bookingStart = parseHour(b.time); if (bookingStart == null) return null;
                   // All maids work simultaneously — each starts at bookingStart for their full hours
-                  const hoursMap = store.staffHours?.[b.ref] || {};
+                  const hoursMap = (b._raw?.staff_hours && Object.keys(b._raw.staff_hours).length > 0)
+                    ? b._raw.staff_hours
+                    : (store.staffHours?.[b.ref] || {});
                   const myHours  = Number(hoursMap[s.id] ?? b.hours);
                   const start    = bookingStart;
                   const startIdx = Math.max(0, start - SCHEDULE_HOURS[0]);
