@@ -487,9 +487,9 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
   // Block any slot whose start hour has already begun (2:31 PM → block up to and including 2 PM)
   const cutoffHour = now.getHours();
 
-  // Returns true when all available maids are occupied for hour h
+  // Returns true when all working+available maids are occupied for hour h
   const isFull = (h) => {
-    const { bookings, availableCount } = slotData;
+    const { bookings, availableCount, workingStaffIds } = slotData;
     if (!availableCount) return false;
     const busyMaids = new Set();
     let unassignedCleaners = 0;
@@ -499,7 +499,10 @@ const StepTime = ({ state, set, slotData = { bookings: [], availableCount: 0, lo
       const endH = startH + (b.hours || 1);
       if (startH <= h && h < endH) {
         if (Array.isArray(b.assigned_staff) && b.assigned_staff.length > 0) {
-          b.assigned_staff.forEach(id => busyMaids.add(id));
+          b.assigned_staff.forEach(id => {
+            // Only count as busy if in the working pool for this date
+            if (!workingStaffIds || workingStaffIds.includes(id)) busyMaids.add(id);
+          });
         } else {
           unassignedCleaners += (b.cleaners || 1);
         }

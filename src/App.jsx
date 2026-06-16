@@ -418,9 +418,14 @@ function App() {
       try {
         const [{ data: bks }, { data: staff }] = await Promise.all([
           supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
-          supabase.from('staff').select('id').eq('status', 'Available'),
+          supabase.from('staff').select('id, working_days').eq('status', 'Available'),
         ]);
-        setSlotData({ bookings: bks || [], availableCount: (staff || []).length, loading: false });
+        const dow = new Date(dateStr + 'T00:00:00').getDay();
+        const workingStaff = (staff || []).filter(s => {
+          const days = s.working_days;
+          return !Array.isArray(days) || days.length === 0 || days.includes(dow);
+        });
+        setSlotData({ bookings: bks || [], availableCount: workingStaff.length, workingStaffIds: workingStaff.map(s => s.id), loading: false });
       } catch (e) {
         console.warn('slot fetch error:', e?.message);
         setSlotData({ bookings: [], availableCount: 0, loading: false });
@@ -504,8 +509,9 @@ function App() {
         // Find the skill ID for the selected service (e.g. "Regular Cleaning" → "regular")
         const svcId    = (liveServices || []).find(s => s.name === breakdown.serviceName)?.id;
 
+        const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
         const { data: availStaff } = await supabase.from('staff')
-          .select('id, skills').eq('status', 'Available');
+          .select('id, skills, working_days').eq('status', 'Available');
 
         if (availStaff && availStaff.length > 0) {
           // 1. Filter by service mode (@mode entries in skills array)
@@ -515,7 +521,14 @@ function App() {
             return modes.length === 0 || modes.includes(mode);
           });
 
-          // 2. For hourly: filter by skill (exclude @prefix entries when matching)
+          // 2. Filter by working day for the booking date
+          const bookingDow = new Date(bookingDate + 'T00:00:00').getDay();
+          pool = pool.filter(s => {
+            const days = s.working_days;
+            return !Array.isArray(days) || days.length === 0 || days.includes(bookingDow);
+          });
+
+          // 3. For hourly: filter by skill (exclude @prefix entries when matching)
           if (mode === 'hourly' && svcId) {
             const skilled = pool.filter(s =>
               (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId)
