@@ -416,12 +416,21 @@ function App() {
     setSlotData(p => ({ ...p, loading: true }));
     (async () => {
       try {
-        const [{ data: bks }, { data: staff }] = await Promise.all([
+        const [{ data: bks }, staffRes] = await Promise.all([
           supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
           supabase.from('staff').select('id, working_days'),
         ]);
         const dow = new Date(dateStr + 'T00:00:00').getDay();
-        const workingStaff = (staff || []).filter(s => {
+
+        // If working_days column doesn't exist yet, fall back to id-only query
+        // so staff are still counted (all treated as working every day until migration runs)
+        let staffList = staffRes.data;
+        if (staffRes.error || !staffList) {
+          const { data: fallback } = await supabase.from('staff').select('id');
+          staffList = (fallback || []).map(s => ({ id: s.id, working_days: null }));
+        }
+
+        const workingStaff = staffList.filter(s => {
           const days = s.working_days;
           return !Array.isArray(days) || days.length === 0 || days.includes(dow);
         });
