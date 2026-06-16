@@ -3704,7 +3704,7 @@ const HOUR_OPTIONS = Array.from({ length: 18 }, (_, i) => {
 });
 
 const SettingsSection = ({ store, set }) => {
-  const brand = store.brand || { name:'Maid Pro', phone:'+974 4400 1188', currency:'QAR', timezone:'Asia/Qatar (GMT+3)', logo:'' }
+  const brand = store.brand || { name:'Maid Pro', whatsapp:'', callNumber:'', currency:'QAR', timezone:'Asia/Qatar (GMT+3)', logo:'' }
   const rules = store.bookingRules || { autoConfirm:true, smsReminders:true, guestCheckout:false, idVerification:true, noShowFee:false, maidPhotos:true, autoAssign:true }
   const hours = store.businessHours || { open: 8, close: 19 }
   const setB = p => set({ brand: { ...brand, ...p } })
@@ -3730,7 +3730,8 @@ const SettingsSection = ({ store, set }) => {
       <Card title="Brand Identity" subtitle="Company name, logo and contact details — shown in the sidebar and booking page.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div><Label>Brand name</Label><TextField value={brand.name} onChange={v=>setB({name:v})} className="mt-2"/></div>
-          <div><Label>Support phone</Label><TextField value={brand.phone} onChange={v=>setB({phone:v})} className="mt-2"/></div>
+          <div><Label>WhatsApp number</Label><TextField value={brand.whatsapp||''} onChange={v=>setB({whatsapp:v})} placeholder="+974 5000 0000" className="mt-2"/></div>
+          <div><Label>Call number</Label><TextField value={brand.callNumber||''} onChange={v=>setB({callNumber:v})} placeholder="+974 4400 0000" className="mt-2"/></div>
           <div className="md:col-span-2">
             <Label>Company Logo</Label>
             <div className="mt-2 flex items-center gap-3 flex-wrap">
