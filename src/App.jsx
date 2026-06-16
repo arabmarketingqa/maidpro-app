@@ -756,7 +756,7 @@ function App() {
             {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}
             {stepKey === "confirm" && <StepConfirm  state={state} set={set} breakdown={breakdown} goTo={goTo} />}
-            {isSuccess             && <StepSuccess  state={state} breakdown={breakdown} bookingId={bookingId} onReset={reset} />}
+            {isSuccess             && <StepSuccess  state={state} breakdown={breakdown} bookingId={bookingId} onReset={reset} brand={liveBrand} />}
           </div>
 
           {/* Bottom bar — price + nav */}

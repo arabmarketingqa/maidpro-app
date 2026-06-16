@@ -649,8 +649,102 @@ const StepConfirm = ({ state, set, breakdown, goTo }) => {
 };
 
 /* ────────────── STEP 6: Success ────────────── */
-const StepSuccess = ({ state, breakdown, bookingId, onReset }) => {
+const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
   const fmtDate = state.date ? state.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "—";
+
+  const handleDownloadReceipt = () => {
+    const brandName  = brand?.name  || 'Maid Pro';
+    const brandPhone = brand?.phone || '';
+    const brandLogo  = brand?.logo  || '';
+    const printDate  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const logoHtml = brandLogo
+      ? `<img src="${brandLogo}" alt="${brandName}" style="height:52px;max-width:150px;object-fit:contain;display:block;"/>`
+      : `<div style="width:44px;height:44px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;">${brandName.slice(0,1)}</div>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<title>Receipt — ${bookingId}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Arial,sans-serif;font-size:13px;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:480px;margin:40px auto;padding:36px 40px;border:1px solid #e5e7eb;border-radius:16px}
+  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;border-bottom:3px solid #16a34a;margin-bottom:24px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand-name{font-size:18px;font-weight:800;color:#111;letter-spacing:-0.4px}
+  .brand-phone{font-size:11px;color:#6b7280;margin-top:2px}
+  .receipt-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#16a34a;text-align:right}
+  .receipt-date{font-size:11px;color:#6b7280;text-align:right;margin-top:2px}
+  .ref-block{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+  .ref-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#15803d}
+  .ref-num{font-size:22px;font-weight:800;font-family:monospace;color:#14532d;letter-spacing:2px}
+  .badge{display:inline-block;background:#16a34a;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border-radius:20px}
+  .rows{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:20px}
+  .row{display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid #f3f4f6;font-size:13px}
+  .row:last-child{border-bottom:none}
+  .row-label{color:#6b7280;font-size:12px}
+  .row-value{font-weight:600;color:#111;text-align:right;max-width:60%}
+  .total-row{background:#f9fafb;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;border-top:2px solid #16a34a}
+  .total-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280}
+  .total-value{font-size:20px;font-weight:800;color:#14532d}
+  .footer{margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:11px;color:#9ca3af;line-height:1.8}
+  @media print{body{margin:0}.page{border:none;border-radius:0;margin:0;max-width:100%;padding:28px 32px}}
+</style></head><body>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      ${logoHtml}
+      <div>
+        <div class="brand-name">${brandName}</div>
+        ${brandPhone ? `<div class="brand-phone">${brandPhone}</div>` : ''}
+      </div>
+    </div>
+    <div>
+      <div class="receipt-label">Receipt</div>
+      <div class="receipt-date">${printDate}</div>
+    </div>
+  </div>
+
+  <div class="ref-block">
+    <div>
+      <div class="ref-label">Booking Reference</div>
+      <div class="ref-num">${bookingId}</div>
+    </div>
+    <div class="badge">${breakdown.serviceName}</div>
+  </div>
+
+  <div class="rows">
+    <div class="row"><span class="row-label">Customer</span><span class="row-value">${state.name || '—'}</span></div>
+    <div class="row"><span class="row-label">Phone</span><span class="row-value">${state.phone || '—'}</span></div>
+    <div class="row"><span class="row-label">Date</span><span class="row-value">${fmtDate}</span></div>
+    ${state.time ? `<div class="row"><span class="row-label">Time</span><span class="row-value">${state.time}</span></div>` : ''}
+    <div class="row"><span class="row-label">Duration</span><span class="row-value">${breakdown.hours} hour${breakdown.hours !== 1 ? 's' : ''}</span></div>
+    <div class="row"><span class="row-label">Maids</span><span class="row-value">${breakdown.maids}</span></div>
+    ${state.address ? `<div class="row"><span class="row-label">Location</span><span class="row-value">${state.address}</span></div>` : ''}
+  </div>
+
+  <div class="total-row">
+    <span class="total-label">Total Amount</span>
+    <span class="total-value">QAR ${(breakdown.total || 0).toLocaleString()}</span>
+  </div>
+
+  <div class="footer">
+    Thank you for choosing ${brandName}!<br/>
+    ${brandPhone ? `Contact us: ${brandPhone}` : 'We look forward to serving you.'}
+  </div>
+</div>
+</body></html>`;
+
+    const w = window.open('', '_blank', 'width=600,height=750');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 300);
+  };
+
   return (
     <div className="fade-up text-center max-w-md mx-auto py-4">
       <div className="w-20 h-20 rounded-full bg-mint-500 text-white grid place-items-center mx-auto shadow-mint mb-4">
@@ -677,7 +771,7 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset }) => {
 
       <div className="mt-5 flex gap-3 justify-center">
         <PrimaryButton onClick={onReset} className="px-6">Book another visit</PrimaryButton>
-        <GhostButton>View receipt</GhostButton>
+        <GhostButton onClick={handleDownloadReceipt}>Download receipt</GhostButton>
       </div>
     </div>
   );
