@@ -530,7 +530,7 @@ const StepLocation = ({ state, set }) => {
 
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
             <div className="bg-white/95 backdrop-blur hairline rounded-lg px-3 py-1.5 text-[12px] font-mono text-ink-700">
-              {geo ? `${geo.lat.toFixed(4)}° N · ${geo.lng.toFixed(4)}° E` : "—"}
+{geo ? `${geo.lat.toFixed(4)}° N · ${geo.lng.toFixed(4)}° E` : ""}
             </div>
             <div className="bg-white/95 backdrop-blur hairline rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-ink-500">
               MAP PLACEHOLDER

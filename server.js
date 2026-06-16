@@ -18,22 +18,17 @@ const supabase = createClient(
 
 async function readSettings() {
   try {
-    const { data, error } = await supabase
-      .from('settings')
-      .select('data')
-      .eq('id', 'main')
-      .single();
+    const { data, error } = await supabase.from('settings').select('key,value');
     if (error || !data) return {};
-    return data.data || {};
+    return Object.fromEntries(data.map(r => [r.key, r.value]));
   } catch { return {}; }
 }
 
 async function writeSettings(patch) {
   try {
-    const cur = await readSettings();
-    const updated = { ...cur, ...patch };
-    await supabase.from('settings').upsert({ id: 'main', data: updated });
-    return updated;
+    const rows = Object.entries(patch).map(([key, value]) => ({ key, value }));
+    if (rows.length) await supabase.from('settings').upsert(rows, { onConflict: 'key' });
+    return patch;
   } catch { return patch; }
 }
 

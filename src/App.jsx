@@ -1,9 +1,15 @@
 import React from 'react'
 import { Icon, Pill, PrimaryButton, GhostButton } from './ui'
+import { SvcIcon } from './serviceIcons'
 import { computePrice, Money } from './pricing'
 import { StepService, StepDate, StepTime, StepLocation, StepConfirm, StepSuccess } from './steps'
 import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle } from './tweaks-panel'
-import { supabase } from './supabase'
+import { supabase, SETTINGS_SYNC_CHANNEL, SETTINGS_SYNC_KEY } from './supabase'
+import { readBookingCache, writeBookingCache, invalidateBookingCache } from './bookingCache'
+
+const toFlag = (s) => s && /^[A-Z]{2}$/i.test(s.trim())
+  ? String.fromCodePoint(...[...s.trim().toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
+  : (s || '🌍');
 
 const STEPS = [
   { id: "service", label: "Service" },
@@ -13,9 +19,19 @@ const STEPS = [
   { id: "confirm", label: "Confirm" },
 ];
 
+const localDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const initialState = () => {
-  const today = new Date(); today.setHours(0,0,0,0);
+  const now = new Date();
+  const today = new Date(now); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1);
+  // Default to today if the last time slot (7 PM) hasn't passed yet, otherwise tomorrow
+  const defaultDate = now.getHours() < 19 ? today : tomorrow;
   return {
     mode: "hourly",
     serviceType: "regular",
@@ -30,9 +46,9 @@ const initialState = () => {
     customHours: 4,
     specificDays: false,
     specificDayList: [],
-    date: tomorrow,
+    date: defaultDate,
     timePeriod: "morning",
-    time: "8:00 AM",
+    time: "",
     search: "",
     address: "",
     unit: "",
@@ -44,15 +60,19 @@ const initialState = () => {
   };
 };
 
-function makeBookingId() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "MP-";
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
+async function makeBookingId() {
+  const { data } = await supabase
+    .from('bookings').select('ref').order('id', { ascending: false }).limit(1);
+  let n = 1;
+  if (data?.[0]?.ref) {
+    const m = String(data[0].ref).match(/^MP-(\d+)$/);
+    if (m) n = parseInt(m[1], 10) + 1;
+  }
+  return `MP-${String(n).padStart(3, '0')}`;
 }
 
 const Stepper = ({ steps = STEPS, idx, onJump, maxReached }) => (
-  <ol className="flex items-start justify-between w-full">
+  <ol className="flex items-center justify-between w-full">
     {steps.map((s, i) => {
       const done = i < idx;
       const active = i === idx;
@@ -63,22 +83,22 @@ const Stepper = ({ steps = STEPS, idx, onJump, maxReached }) => (
             <button
               disabled={!reachable}
               onClick={() => reachable && onJump(i)}
-              className={`flex flex-col items-center gap-1.5 ${reachable ? "cursor-pointer" : "cursor-not-allowed"}`}
+              className={`flex flex-col items-center gap-1 ${reachable ? "cursor-pointer" : "cursor-not-allowed"}`}
             >
-              <span className={`w-9 h-9 rounded-full grid place-items-center text-[13px] font-bold transition-all
-                ${active ? "bg-mint-700 text-white"
+              <span className={`w-8 h-8 rounded-full grid place-items-center text-[13px] font-bold transition-all
+                ${active ? "bg-mint-600 text-white shadow-sm"
                   : done ? "bg-mint-500 text-white"
-                  : "bg-white hairline text-ink-400"}`}>
+                  : "bg-ink-100 text-ink-400"}`}>
                 {done ? <Icon name="check" className="w-4 h-4" strokeWidth={3} /> : i + 1}
               </span>
-              <span className={`text-[10.5px] font-bold tracking-[0.12em] uppercase
-                ${active ? "text-ink-900" : done ? "text-ink-700" : "text-ink-400"}`}>
+              <span className={`text-[10px] font-bold tracking-[0.1em] uppercase hidden sm:block
+                ${active ? "text-ink-900" : done ? "text-ink-600" : "text-ink-300"}`}>
                 {s.label}
               </span>
             </button>
           </li>
-          {i < STEPS.length - 1 && (
-            <li className="flex-1 h-px bg-ink-200 relative overflow-hidden mt-[18px] mx-1">
+          {i < steps.length - 1 && (
+            <li className="flex-1 h-px bg-ink-200 relative overflow-hidden mt-[16px] mx-1">
               <span className={`absolute inset-y-0 left-0 bg-mint-500 transition-all duration-300 ${i < idx ? "w-full" : "w-0"}`}></span>
             </li>
           )}
@@ -132,14 +152,321 @@ function App() {
   })();
   const [idx, setIdx] = React.useState(initStep);
   const [maxReached, setMaxReached] = React.useState(initStep);
+  const [bookingError, setBookingError] = React.useState('');
   const [bookingId, setBookingId] = React.useState(initStep === 5 ? "MP-X7K9PM" : null);
   const [submitting, setSubmitting] = React.useState(false);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const limitsApplied = React.useRef(false);
+  // Stale-while-revalidate: synchronous localStorage read on every mount
+  const _cache = React.useMemo(() => readBookingCache(), []);
+  const [liveNats, setLiveNats] = React.useState(() => _cache?.nats ?? null);
+  const [liveModes, setLiveModes] = React.useState(() => _cache?.modes ?? null);
+  const [liveModesData, setLiveModesData] = React.useState(() => _cache?.modesData ?? null);
+  const [liveNatBlockEnabled, setLiveNatBlockEnabled] = React.useState(() => _cache?.natBlockEnabled ?? true);
+  const [liveServices, setLiveServices] = React.useState(() => _cache?.services ?? null);
+  const [liveMonthly, setLiveMonthly] = React.useState(() => _cache?.monthly ?? null);
+  const [liveStayIn, setLiveStayIn] = React.useState(() => _cache?.stayIn ?? null);
+  const [liveLimits, setLiveLimits] = React.useState(() => _cache?.limits ?? null);
+  const [liveMaterialsRate, setLiveMaterialsRate] = React.useState(() => _cache?.materialsRate ?? null);
+  const [liveBrand, setLiveBrand] = React.useState(() => _cache?.brand ?? null);
+  const [liveBusinessHours, setLiveBusinessHours] = React.useState(() => _cache?.businessHours ?? { open: 8, close: 19 });
+  const [liveAvailability, setLiveAvailability] = React.useState({});
+  const [slotData, setSlotData] = React.useState({ bookings: [], availableCount: 0, loading: false });
+  // Skeleton only shows on cache miss — cache hit renders the full form instantly
+  const [isLoading, setIsLoading] = React.useState(() => !_cache);
+
+  /* Fetch all live settings from Supabase and subscribe to realtime */
+  const [availableNatIds, setAvailableNatIds] = React.useState(null);
+  const [availableSkillIds, setAvailableSkillIds] = React.useState(null); // skill IDs available for selected nat+mode
+
+  const fetchAvailableSkills = React.useCallback(async (nationality, mode) => {
+    if (mode !== 'hourly' || !nationality) { setAvailableSkillIds(null); return; }
+    const { data } = await supabase.from('staff').select('skills')
+      .eq('status', 'Available').eq('nationality', nationality);
+    if (!data) return;
+
+    const skillSet = new Set();
+    let anyModeConfig = false;
+
+    data.forEach(s => {
+      const sk = Array.isArray(s.skills) ? s.skills : [];
+      const modeEntries = sk.filter(x => x.startsWith('@'));
+      if (modeEntries.length > 0) anyModeConfig = true;
+      const hasHourly = modeEntries.map(x => x.slice(1)).includes('hourly');
+      if (hasHourly) sk.filter(x => !x.startsWith('@')).forEach(id => skillSet.add(id));
+    });
+
+    // No mode config at all → show all services (null means no filter)
+    if (!anyModeConfig) { setAvailableSkillIds(null); return; }
+
+    // Has mode config: return skills found (may be empty array if @hourly but no skills)
+    setAvailableSkillIds([...skillSet]);
+  }, []);
+
+  // Only show nationalities that have ≥1 available maid configured for the given mode
+  // For hourly: maid must also have ≥1 skill selected (otherwise they can't take any booking)
+  const fetchAvailableNatIds = React.useCallback(async (mode = 'hourly') => {
+    const { data } = await supabase.from('staff').select('nationality, skills').eq('status', 'Available');
+    if (!data) return;
+
+    const anyModeConfig = data.some(s =>
+      (Array.isArray(s.skills) ? s.skills : []).some(x => x.startsWith('@'))
+    );
+
+    const ids = [...new Set(
+      data.filter(s => {
+        const sk = Array.isArray(s.skills) ? s.skills : [];
+        const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1));
+        const realSkills = sk.filter(x => !x.startsWith('@'));
+
+        // No mode config at all → show all (admin hasn't set up yet)
+        if (!anyModeConfig) return true;
+
+        // Must have this mode enabled
+        if (!modes.includes(mode)) return false;
+
+        // Hourly additionally requires at least one skill
+        if (mode === 'hourly' && realSkills.length === 0) return false;
+
+        return true;
+      }).map(s => s.nationality).filter(Boolean)
+    )];
+
+    setAvailableNatIds(ids);
+  }, []);
+
+  React.useEffect(() => {
+    // ── Pure transforms: process raw DB rows → update state + return value for caching ──
+    const applyNats = (rows) => {
+      const nats = rows
+        .filter(n => n.enabled !== false)
+        .map(n => ({ id: n.id, name: n.name, flag: toFlag(n.flag || '🌍'), rate: Number(n.rate) || 15 }));
+      setLiveNats(nats);
+      return nats;
+    };
+
+    const applySettingsMap = (m) => {
+      let modes = null, modesData = null, natBlockEnabled = true, services = null, monthly = null;
+      let stayIn = null, limits = null, materialsRate = null;
+      let businessHours = { open: 8, close: 19 }, brand = null;
+
+      if (m.modes && Array.isArray(m.modes)) {
+        modesData = m.modes.filter(x => x.on !== false);
+        modes = modesData.map(x => x.id);
+        setLiveModes(modes);
+        setLiveModesData(modesData);
+      } else {
+        setLiveModes(null);
+        setLiveModesData(null);
+      }
+      if (m.nationalities_block && typeof m.nationalities_block.enabled === 'boolean') {
+        natBlockEnabled = m.nationalities_block.enabled;
+        setLiveNatBlockEnabled(natBlockEnabled);
+      }
+      if (m.services && Array.isArray(m.services) && m.services.length) {
+        services = m.services.filter(s => s.on !== false);
+        setLiveServices(services);
+      }
+      if (m.monthly && Array.isArray(m.monthly) && m.monthly.length) {
+        const msCfg = m.monthlySettings || {};
+        const customEnabled = msCfg.customEnabled !== false;
+        const customDiscount = Number(msCfg.customDiscount ?? 10);
+        const regularPkgs = m.monthly.filter(x => !x.custom);
+        monthly = customEnabled
+          ? [...regularPkgs, { id: 'custom', name: 'Custom Package', icon: 'Eraser', emoji: '🧩', custom: true, customDiscount }]
+          : regularPkgs;
+        setLiveMonthly(monthly);
+      }
+      if (m.stayIn && Array.isArray(m.stayIn) && m.stayIn.length) {
+        const emojiMap = { si1: '🏠', si3: '🗝️', si6: '💎', si12: '👑' };
+        stayIn = m.stayIn.map(p => ({ ...p, emoji: p.emoji || emojiMap[p.id] || '🏠' }));
+        setLiveStayIn(stayIn);
+      }
+      if (m.limits && typeof m.limits === 'object') {
+        limits = m.limits;
+        setLiveLimits(limits);
+      }
+      if (m.materials && typeof m.materials.rate === 'number') {
+        materialsRate = m.materials.rate;
+        setLiveMaterialsRate(materialsRate);
+      }
+      if (m.businessHours && typeof m.businessHours.open === 'number') {
+        businessHours = m.businessHours;
+        setLiveBusinessHours(businessHours);
+      }
+      if (m.brand && m.brand.name) {
+        brand = m.brand;
+        setLiveBrand(m.brand);
+      }
+      return { modes, modesData, natBlockEnabled, services, monthly, stayIn, limits, materialsRate, businessHours, brand };
+    };
+
+    // ── Fetchers used by realtime/polling (update state, no cache write) ──
+    const fetchNats = async () => {
+      const { data } = await supabase.from('nationalities').select('*').order('name');
+      return data ? applyNats(data) : null;
+    };
+
+    const fetchSettings = async () => {
+      const { data, error } = await supabase.from('settings').select('key, value')
+        .in('key', ['modes', 'nationalities_block', 'services', 'monthly', 'monthlySettings', 'stayIn', 'limits', 'materials', 'businessHours', 'brand']);
+      if (error) { console.warn('fetchSettings error:', error.message); return null; }
+      return data ? applySettingsMap(Object.fromEntries(data.map(r => [r.key, r.value]))) : null;
+    };
+
+    const fetchAvailability = async () => {
+      const { data } = await supabase.from('availability').select('*');
+      if (data && data.length > 0) {
+        const avail = {};
+        data.forEach(r => { avail[r.date] = { blocked: r.blocked, morning: r.morning, afternoon: r.afternoon }; });
+        setLiveAvailability(avail);
+      }
+    };
+
+    // ── Critical path: nats + settings in parallel, then write to cache ──
+    const fetchCritical = () =>
+      Promise.all([fetchNats(), fetchSettings()])
+        .then(([nats, settings]) => {
+          if (nats && settings) writeBookingCache({ nats, ...settings });
+        });
+
+    // If cache was a hit, isLoading is already false — fetchCritical runs silently in background.
+    // If cache miss, isLoading is true — .finally() dismisses the skeleton once data arrives.
+    fetchCritical().catch(() => {}).finally(() => setIsLoading(false));
+
+    // Availability is only needed at the date step — defer out of critical path entirely
+    fetchAvailability();
+    fetchAvailableNatIds('hourly');
+
+    // ── Supabase Realtime (instant push when enabled on the project) ──
+    const ch = supabase.channel('booking-page-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'nationalities' }, fetchNats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, fetchSettings)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability' }, fetchAvailability)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, () => fetchAvailableNatIds())
+      .subscribe();
+
+    // Polling fallback when Supabase Realtime isn't enabled for the settings table
+    const poll = setInterval(fetchSettings, 1500);
+
+    // ── Cross-tab invalidation: admin saves → invalidate cache + refetch ──
+    const refetchAfterInvalidation = () => {
+      invalidateBookingCache();
+      fetchCritical();
+      fetchAvailability();
+    };
+
+    const onStorage = (e) => {
+      if (e.key === SETTINGS_SYNC_KEY) refetchAfterInvalidation();
+    };
+    window.addEventListener('storage', onStorage);
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel(SETTINGS_SYNC_CHANNEL);
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'settings_updated') refetchAfterInvalidation();
+      };
+    } catch (_) {}
+
+    // Re-fetch when the booking tab becomes visible (catches offline edits)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSettings();
+        fetchNats();
+        fetchAvailability();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      supabase.removeChannel(ch);
+      clearInterval(poll);
+      window.removeEventListener('storage', onStorage);
+      if (bc) bc.close();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchAvailableNatIds]);
+
+  React.useEffect(() => {
+    if (!liveModes || liveModes.length === 0) return;
+    if (!liveModes.includes(state.mode)) {
+      set({ mode: liveModes[0] });
+    }
+  }, [liveModes]);
+  React.useEffect(() => {
+    if (!liveLimits) return;
+    const min = Number(liveLimits.minHours) || 1;
+    const max = Number(liveLimits.maxHours) || 12;
+    if (!limitsApplied.current) {
+      limitsApplied.current = true;
+      set({ hours: min });
+    } else {
+      if (state.hours < min) set({ hours: min });
+      if (state.hours > max) set({ hours: max });
+    }
+  }, [liveLimits]);
 
   React.useEffect(() => { applyAccent(tweaks.accent); }, [tweaks.accent]);
 
+  // Fetch bookings + available staff whenever the selected date changes
+  React.useEffect(() => {
+    if (!state.date) return;
+    const dateStr = state.date instanceof Date ? localDateStr(state.date) : String(state.date).split('T')[0];
+    setSlotData(p => ({ ...p, loading: true }));
+    (async () => {
+      try {
+        const [{ data: bks }, { data: staff }] = await Promise.all([
+          supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
+          supabase.from('staff').select('id').eq('status', 'Available'),
+        ]);
+        setSlotData({ bookings: bks || [], availableCount: (staff || []).length, loading: false });
+      } catch (e) {
+        console.warn('slot fetch error:', e?.message);
+        setSlotData({ bookings: [], availableCount: 0, loading: false });
+      }
+    })();
+  }, [state.date]);
+
   const set = (patch) => setState(s => ({ ...s, ...patch }));
-  const breakdown = computePrice(state);
+
+  // When nationalities block is ON, only show nationalities that have ≥1 Available maid
+  const filteredNats = React.useMemo(() => {
+    if (!liveNats) return liveNats;
+    if (!liveNatBlockEnabled) return liveNats; // block OFF → show all
+    if (!availableNatIds) return liveNats;     // not loaded yet → show all
+    return liveNats.filter(n => availableNatIds.includes(n.id));
+  }, [liveNats, liveNatBlockEnabled, availableNatIds]);
+
+  // Re-filter available nationalities whenever booking mode changes
+  React.useEffect(() => {
+    fetchAvailableNatIds(state.mode || 'hourly');
+  }, [state.mode, fetchAvailableNatIds]);
+
+  // Re-fetch available skills when nationality or mode changes
+  React.useEffect(() => {
+    fetchAvailableSkills(state.nationality, state.mode);
+  }, [state.nationality, state.mode, fetchAvailableSkills]);
+
+  // Auto-reset selected nationality if it disappears from the available list
+  React.useEffect(() => {
+    if (!filteredNats || filteredNats.length === 0) return;
+    if (!filteredNats.find(n => n.id === state.nationality)) {
+      set({ nationality: filteredNats[0].id });
+    }
+  }, [filteredNats]);
+
+  // Auto-reset selected service if it's been removed/disabled in the admin
+  React.useEffect(() => {
+    if (!liveServices || liveServices.length === 0) return;
+    if (state.mode !== 'hourly') return;
+    if (!liveServices.find(s => s.id === state.serviceType)) {
+      set({ serviceType: liveServices[0].id });
+    }
+  }, [liveServices]);
+
+  const liveData = { services: liveServices, monthly: liveMonthly, stayIn: liveStayIn, materialsRate: liveMaterialsRate, nationalityEnabled: liveNatBlockEnabled };
+  const breakdown = computePrice(state, filteredNats || liveNats || undefined, liveData);
 
   const visibleSteps = (state.mode === "monthly" || state.mode === "stayin")
     ? [STEPS[0], STEPS[3], STEPS[4]]
@@ -160,27 +487,109 @@ function App() {
   const goNext = async () => {
     if (stepKey === "confirm") {
       setSubmitting(true);
-      const id = makeBookingId();
-      await supabase.from('bookings').insert({
-        ref:       id,
-        name:      state.name,
-        phone:     state.phone,
-        service:   breakdown.serviceName,
-        date:      state.date ? state.date.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        time:      state.time || '—',
-        area:      state.zone || '',
-        hours:     breakdown.hours,
-        cleaners:  breakdown.maids,
-        materials: state.materials || false,
-        rate:      breakdown.rate,
-        total:     breakdown.total,
-        address:   state.address || '',
-        notes:     state.notes  || '',
-        status:    'New',
-      });
+
+      // Generate sequential ref; fall back to random if Supabase unreachable
+      let id;
+      try { id = await makeBookingId(); }
+      catch {
+        const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        id = "MP-" + Array.from({length:6}, () => c[Math.floor(Math.random()*c.length)]).join('');
+      }
+
+      // Pick the N least-busy maids filtered by service mode + skill
+      let assigned_staff = [];
+      try {
+        const needed   = breakdown.maids || 1;
+        const mode     = state.mode || 'hourly';
+        // Find the skill ID for the selected service (e.g. "Regular Cleaning" → "regular")
+        const svcId    = (liveServices || []).find(s => s.name === breakdown.serviceName)?.id;
+
+        const { data: availStaff } = await supabase.from('staff')
+          .select('id, skills').eq('status', 'Available');
+
+        if (availStaff && availStaff.length > 0) {
+          // 1. Filter by service mode (@mode entries in skills array)
+          let pool = availStaff.filter(s => {
+            const sk = Array.isArray(s.skills) ? s.skills : [];
+            const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1));
+            return modes.length === 0 || modes.includes(mode);
+          });
+
+          // 2. For hourly: filter by skill (exclude @prefix entries when matching)
+          if (mode === 'hourly' && svcId) {
+            const skilled = pool.filter(s =>
+              (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId)
+            );
+            if (skilled.length > 0) pool = skilled;
+          }
+
+          if (pool.length > 0) {
+            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null);
+            const jobCounts = {};
+            (existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
+            const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0));
+            assigned_staff = sorted.slice(0, needed).map(s => s.id);
+          }
+        }
+      } catch (_) { /* staff table not ready — skip assignment */ }
+
+      const fullRow = {
+        ref:            id,
+        name:           state.name,
+        phone:          state.phone,
+        service:        breakdown.serviceName,
+        mode:           state.mode || 'hourly',
+        date:           state.date ? localDateStr(state.date) : localDateStr(new Date()),
+        time:           state.time || '—',
+        area:           state.zone || '',
+        hours:          breakdown.hours,
+        cleaners:       breakdown.maids,
+        materials:      state.materials || false,
+        rate:           breakdown.rate,
+        total:          breakdown.total,
+        address:        state.address || '',
+        notes:          state.notes  || '',
+        status:         'New',
+        assigned_staff,
+      };
+
+      // Attempt 1 — full row (including assigned_staff)
+      let { error } = await supabase.from('bookings').insert(fullRow);
+
+      // Attempt 2 — strip columns that don't exist in this DB schema yet
+      if (error?.code === 'PGRST204') {
+        const { assigned_staff: _a, area: _b, mode: _c, materials: _d, rate: _e, address: _f, ...coreRow } = fullRow;
+        ({ error } = await supabase.from('bookings').insert(coreRow));
+      }
+
+      // Attempt 3 — duplicate ref (race condition or deletion gap) → random ref + retry
+      if (error?.code === '23505') {
+        const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        fullRow.ref = "MP-" + Array.from({ length: 6 }, () => c[Math.floor(Math.random() * c.length)]).join('');
+        ({ error } = await supabase.from('bookings').insert(fullRow));
+      }
+
+      if (error) {
+        console.error('Booking insert error:', error.message);
+        setBookingError(error.message || 'Booking could not be saved. Please try again.');
+        setSubmitting(false);
+        return;                     // stay on confirm — do NOT show success
+      }
+
+      // Auto-save customer record (upsert by phone-based id)
+      try {
+        const custId = 'c_' + (fullRow.phone || '').replace(/\D/g, '').slice(-10);
+        await supabase.from('customers').upsert(
+          { id: custId, name: fullRow.name, phone: fullRow.phone, address: fullRow.address || '', area: fullRow.area || '' },
+          { onConflict: 'id' }
+        );
+      } catch (_) {}
+
+      setBookingError('');
       setSubmitting(false);
       setBookingId(id);
       setIdx(visibleSteps.length);
+      try { window.dispatchEvent(new Event('refreshBookings')); } catch (_) {}
       return;
     }
     const next = Math.min(idx + 1, visibleSteps.length - 1);
@@ -206,71 +615,104 @@ function App() {
   const isSuccess = idx >= visibleSteps.length;
   const showPrice = tweaks.showPriceCard !== false && !isSuccess;
 
-  return (
-    <div className="min-h-dvh py-6 sm:py-10 px-4 sm:px-6">
-      <div className="max-w-[760px] mx-auto">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-white text-mint-700 grid place-items-center shadow-card">
-              <Icon name="sparkle-fill" className="w-4 h-4" />
+  if (isLoading) {
+    return (
+      <div className="h-screen flex flex-col py-3 px-4" style={{ background: 'oklch(0.46 0.07 168)' }}>
+        <div className="max-w-[700px] w-full mx-auto flex flex-col h-full">
+          {/* Top bar skeleton — same dimensions as the real bar so layout never shifts */}
+          <div className="mb-3 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-white/20 animate-pulse flex-shrink-0" />
+              <div className="w-28 h-[18px] rounded-md bg-white/20 animate-pulse" />
             </div>
-            <div className="font-extrabold tracking-tight text-white text-[18px]">Maid<span className="text-mint-200">Pro</span></div>
+            <div className="w-32 h-[14px] rounded-md bg-white/20 animate-pulse" />
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-[12px] text-white/80">
-            <Icon name="phone" className="w-3.5 h-3.5" />
-            <span className="font-mono">+974 4040 7070</span>
+          {/* Card skeleton */}
+          <div className="bg-white rounded-2xl shadow-float flex-1 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-9 h-9 rounded-full border-[3px] border-ink-100 border-t-mint-500 animate-spin" />
+              <span className="text-[13px] text-ink-400 font-medium">Loading…</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col py-3 px-4"
+      style={{ background: 'oklch(0.46 0.07 168)' }}>
+      <div className="max-w-[700px] w-full mx-auto flex flex-col h-full">
+
+        {/* Top bar */}
+        <div className="mb-3 flex items-center justify-between flex-shrink-0">
+          {/* Logo + company name */}
+          <div className="flex items-center gap-2">
+            {liveBrand?.logo ? (
+              <img src={liveBrand.logo} alt="logo"
+                className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 flex-shrink-0"/>
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-white text-mint-700 grid place-items-center shadow-card flex-shrink-0">
+                <Icon name="sparkle-fill" className="w-4 h-4" />
+              </div>
+            )}
+            <div className="font-extrabold tracking-tight text-white text-[18px]">
+              {liveBrand?.name}
+            </div>
+          </div>
+          {/* Brand badge — right side */}
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white/15 grid place-items-center flex-shrink-0">
+              <SvcIcon name="Sparkles" className="w-3.5 h-3.5 text-white" strokeWidth={1.8} />
+            </div>
+            <span className="font-extrabold tracking-[0.14em] text-white text-[13px]">MAIDPRO</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-float overflow-hidden">
+        {/* Card — fills remaining height */}
+        <div className="bg-white rounded-2xl shadow-float flex flex-col flex-1 min-h-0 overflow-hidden">
+
+          {/* Stepper */}
           {!isSuccess && (
-            <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-2">
+            <div className="px-5 sm:px-7 pt-4 pb-3 border-b border-ink-100 flex-shrink-0">
               <Stepper steps={visibleSteps} idx={idx} onJump={goTo} maxReached={maxReached} />
             </div>
           )}
 
-          <div className="px-5 sm:px-8 py-6 sm:py-8" data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
-            {stepKey === "service" && <StepService  state={state} set={set} />}
-            {stepKey === "date"    && <StepDate     state={state} set={set} />}
-            {stepKey === "time"    && <StepTime     state={state} set={set} />}
+          {/* Step content — scrolls if needed, fills space */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-7 py-4"
+            data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
+            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} />}
+            {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
+            {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}
             {stepKey === "confirm" && <StepConfirm  state={state} set={set} breakdown={breakdown} goTo={goTo} />}
             {isSuccess             && <StepSuccess  state={state} breakdown={breakdown} bookingId={bookingId} onReset={reset} />}
           </div>
 
-          {!isSuccess && showPrice && (
-            <div className="px-5 sm:px-8 pb-6 sm:pb-8">
-              <div className="rounded-2xl bg-ink-50 hairline p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">Live estimate</div>
-                  <Pill tone="mint">{state.mode === "monthly" ? "Monthly" : "Hourly"}</Pill>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="text-[34px] leading-none font-extrabold text-ink-900 tracking-tight">
-                    <Money value={breakdown.total} />
-                  </div>
-                  <div className="text-right text-[12px] font-mono text-ink-500 tabular-nums">
-                    {state.mode === "monthly" ? (
-                      <>{breakdown.rate} QAR × {breakdown.hours} hrs × {breakdown.visits} visits</>
-                    ) : (
-                      <>{breakdown.rate} QAR × {breakdown.hours} hrs × {breakdown.maids} maid{breakdown.maids>1?"s":""}</>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Bottom bar — price + nav */}
           {!isSuccess && (
-            <div className="px-5 sm:px-8 pb-6 sm:pb-8 flex items-center justify-between gap-3 border-t border-ink-200/70 pt-5">
-              <GhostButton onClick={goBack} className={idx === 0 ? "invisible" : ""}>
-                <Icon name="arrow-left" className="w-4 h-4" />
-                Back
-              </GhostButton>
-              <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting} className="px-6">
-                {submitting ? 'Saving…' : (labelMap[stepKey] || "Continue")}
-                {!submitting && <Icon name="arrow-right" className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />}
-              </PrimaryButton>
+            <div className="flex-shrink-0 border-t border-ink-100 px-5 sm:px-7 py-3 flex items-center gap-3">
+
+              {showPrice && (
+                <div className="flex-1 flex items-center min-w-0">
+                  <div className="text-[22px] font-extrabold text-ink-900 tabular-nums"><Money value={breakdown.total} /></div>
+                </div>
+              )}
+
+              {bookingError && (
+                <div className="text-[12px] text-red-600 font-medium truncate flex-1">⚠ {bookingError}</div>
+              )}
+
+              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                <GhostButton onClick={goBack} className={idx === 0 ? "invisible" : ""}>
+                  <Icon name="arrow-left" className="w-4 h-4" />Back
+                </GhostButton>
+                <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting}>
+                  {submitting ? 'Saving…' : (labelMap[stepKey] || "Continue")}
+                  {!submitting && <Icon name="arrow-right" className="w-4 h-4" />}
+                </PrimaryButton>
+              </div>
             </div>
           )}
         </div>
@@ -312,7 +754,7 @@ function App() {
               <button
                 key={s.id}
                 onClick={() => {
-                  if (i === 5) setBookingId(makeBookingId());
+                  if (i === 5) makeBookingId().then(setBookingId);
                   setIdx(i);
                   setMaxReached(m => Math.max(m, i));
                 }}

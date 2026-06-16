@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -463,6 +463,7 @@ body.dark .rep-range-btn.active { background:var(--teal); color:white; }
   .content { padding:16px; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -1577,7 +1578,11 @@ if (sessionStorage.getItem('cp_admin') === '1') {
 }
 
 // ══ API ═══════════════════════════════════════════════════════════════════════
-const API = 'https://web-production-ca616.up.railway.app';
+// Supabase client — replaces Railway API
+const _sb = window.supabase.createClient(
+  'https://krijpvoonlpwxinohthb.supabase.co',
+  'sb_publishable_yasJgNuQhlyPtbS1e3Lsvg_6mLkTHrt'
+);
 
 // ══ DATA CACHE ════════════════════════════════════════════════════════════════
 let _bookings  = [];
@@ -1588,24 +1593,27 @@ function getBookings()  { return _bookings; }
 
 async function _loadBookings() {
   try {
-    const res = await fetch(API + '/api/bookings');
-    const data = await res.json();
-    _bookings = Array.isArray(data) ? data : [];
-  } catch(e) { _bookings = []; }
+    const { data, error } = await _sb.from('bookings').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    _bookings = data || [];
+  } catch(e) { console.error('loadBookings:', e.message); _bookings = []; }
 }
 async function _loadStaff() {
   try {
-    const res = await fetch(API + '/api/staff');
-    const data = await res.json();
-    _staff = Array.isArray(data) ? data : [];
-  } catch(e) { _staff = []; }
+    const { data, error } = await _sb.from('staff').select('*').order('name');
+    if (error) throw error;
+    _staff = (data || []).map(s => ({
+      ...s, joinDate: s.join_date || '', basicSalary: s.basic_salary || '',
+      qid: s.qid || '', skills: Array.isArray(s.skills) ? s.skills : [],
+    }));
+  } catch(e) { console.error('loadStaff:', e.message); _staff = []; }
 }
 async function _loadCustomers() {
   try {
-    const res = await fetch(API + '/api/customers');
-    const data = await res.json();
-    _customers = Array.isArray(data) ? data : [];
-  } catch(e) { _customers = []; }
+    const { data, error } = await _sb.from('customers').select('*').order('name');
+    if (error) throw error;
+    _customers = data || [];
+  } catch(e) { console.error('loadCustomers:', e.message); _customers = []; }
 }
 async function _loadAll() {
   await Promise.all([_loadBookings(), _loadStaff(), _loadCustomers(), _loadServices()]);
@@ -1772,11 +1780,11 @@ let _settings = JSON.parse(localStorage.getItem('cp_settings') || '{}');
 
 async function _loadSettings() {
   try {
-    const res = await fetch(API + '/api/settings');
-    if (!res.ok) return;
-    const data = await res.json();
-    _settings = { ..._settings, ...data };
-    localStorage.setItem('cp_settings', JSON.stringify(_settings));
+    const { data, error } = await _sb.from('settings').select('data').eq('id', 'main').maybeSingle();
+    if (!error && data && data.data) {
+      _settings = { ..._settings, ...data.data };
+      localStorage.setItem('cp_settings', JSON.stringify(_settings));
+    }
   } catch {}
 }
 
@@ -1785,11 +1793,9 @@ function getSettings() { return _settings; }
 function saveSett(obj) {
   _settings = { ..._settings, ...obj };
   localStorage.setItem('cp_settings', JSON.stringify(_settings));
-  fetch(API + '/api/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(_settings),
-  }).catch(() => {});
+  _sb.from('settings').upsert({ id: 'main', data: _settings }).then(({ error }) => {
+    if (error) console.error('saveSett:', error.message);
+  });
 }
 
 function renderSettings() {
@@ -2388,13 +2394,9 @@ async function quickStatus(id, status) {
   const s = _staff.find(x => x.id === id);
   if (!s) return;
   try {
-    const res = await fetch(API + '/api/staff/' + id, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...s, status }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const updated = await res.json();
+    const { data: updated, error: qsErr } = await _sb
+      .from('staff').update({ status }).eq('id', id).select().single();
+    if (qsErr) throw qsErr;
     const idx = _staff.findIndex(x => x.id === id);
     if (idx > -1) _staff[idx] = updated;
     renderStaff();
@@ -2404,8 +2406,8 @@ async function quickStatus(id, status) {
 function deleteStaff(id) {
   confirmAction('Delete this staff member?', 'This cannot be undone.', async () => {
     try {
-      const res = await fetch(API + '/api/staff/' + id, { method: 'DELETE' });
-      if (!res.ok) throw new Error(await res.text());
+      const { error: delStaffErr } = await _sb.from('staff').delete().eq('id', id);
+      if (delStaffErr) throw delStaffErr;
       _staff = _staff.filter(x => x.id !== id);
       renderStaff();
       closeModal('confirm-overlay');
@@ -2476,17 +2478,20 @@ async function saveStaff() {
   };
   try {
     const isNew = !id;
-    const url    = isNew ? API + '/api/staff' : API + '/api/staff/' + id;
-    const method = isNew ? 'POST' : 'PUT';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const saved = await res.json();
-    if (isNew) { _staff.push(saved); }
-    else { const idx = _staff.findIndex(x => x.id === id); if (idx > -1) _staff[idx] = saved; }
+    const dbData = {
+      id: data.id, name: data.name, phone: data.phone || '',
+      nationality: data.nationality || '', status: data.status || 'Available',
+      color: data.color || '#0d9488', notes: data.notes || '',
+      join_date: data.joinDate || null, basic_salary: data.basicSalary || null,
+      qid: data.qid || null,
+    };
+    const { data: saved, error: staffErr } = isNew
+      ? await _sb.from('staff').insert(dbData).select().single()
+      : await _sb.from('staff').update(dbData).eq('id', id).select().single();
+    if (staffErr) throw staffErr;
+    const mapped = { ...saved, joinDate: saved.join_date, basicSalary: saved.basic_salary };
+    if (isNew) { _staff.push(mapped); }
+    else { const idx = _staff.findIndex(x => x.id === id); if (idx > -1) _staff[idx] = mapped; }
     closeModal('staff-modal');
     renderStaff();
   } catch (e) { alert('Save failed: ' + e.message); }
@@ -2798,13 +2803,9 @@ function actionBtns(b) {
 
 async function updateStatus(ref, status) {
   try {
-    const res = await fetch(API + '/api/bookings/' + ref + '/status', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const updated = await res.json();
+    const { data: updated, error: updErr } = await _sb
+      .from('bookings').update({ status }).eq('ref', ref).select().single();
+    if (updErr) throw updErr;
     const idx = _bookings.findIndex(x => x.ref === ref);
     if (idx > -1) _bookings[idx] = updated;
     renderTab(activeTab); renderDashboard(); updateBadge();
@@ -2886,7 +2887,7 @@ async function submitPayment() {
     const earningsParts = maidsArr.length
       ? ' · ' + maidsArr.map(n => `${n} +${body.total} QAR`).join(', ')
       : '';
-    const dueAmt = body.due_amount ?? Math.max(0, body.total - paid);
+    const dueAmt = dueAmount;
     const duePart = dueAmt > 0 ? ` · Due: ${dueAmt} QAR` : ' · Fully paid';
     showToast(`✅ ${body.ref} done · ${_payMethod} · ${paid} QAR${duePart}${earningsParts}`);
   } catch (e) { alert('Payment save failed: ' + e.message); }
@@ -2903,12 +2904,12 @@ function clearAllData() {
     'This will permanently delete all bookings, customers, and payment records. Staff data will be kept. This cannot be undone.',
     async () => {
       try {
-        const [r1, r2] = await Promise.all([
-          fetch(API + '/api/bookings',  { method: 'DELETE' }),
-          fetch(API + '/api/customers', { method: 'DELETE' }),
+        const [{ error: e1 }, { error: e2 }] = await Promise.all([
+          _sb.from('bookings').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          _sb.from('customers').delete().neq('id', ''),
         ]);
-        if (!r1.ok) throw new Error('Bookings delete failed');
-        if (!r2.ok) throw new Error('Customers delete failed');
+        if (e1) throw new Error('Bookings delete failed: ' + e1.message);
+        if (e2) throw new Error('Customers delete failed: ' + e2.message);
         _bookings  = [];
         _customers = [];
         localStorage.removeItem('cp_deleted_phones');
@@ -3202,7 +3203,8 @@ function exportReport() {
   const rows = bks.map(b=>`<tr><td>${b.ref}</td><td>${b.name}</td><td>${b.service}</td><td>${b.date}</td><td>${b.time}</td><td>${b.hours}h</td><td>${b.total} QAR</td><td>${b.status}</td></tr>`).join('');
   const earned = bks.filter(b=>['Confirmed','Completed'].includes(b.status)).reduce((s,b)=>s+b.total,0);
   w.document.write(`<html><head><title>CleanPro Report — ${repRange.label}</title>
-  <style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}.summary{display:flex;gap:24px;margin:16px 0;flex-wrap:wrap}.sbox{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:12px 18px}.sbox-val{font-size:1.4rem;font-weight:700;color:#0d9488}.sbox-lbl{font-size:11px;color:#64748b}</style></head>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}.summary{display:flex;gap:24px;margin:16px 0;flex-wrap:wrap}.sbox{background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:12px 18px}.sbox-val{font-size:1.4rem;font-weight:700;color:#0d9488}.sbox-lbl{font-size:11px;color:#64748b}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
   <body><h1>🧹 CleanPro — Report</h1><p style="color:#64748b">Period: <strong>${repRange.label}</strong> · Generated: ${new Date().toLocaleString()}</p>
   <div class="summary">
     <div class="sbox"><div class="sbox-val">${bks.length}</div><div class="sbox-lbl">Total Bookings</div></div>
@@ -3233,7 +3235,8 @@ function exportCustomersPDF() {
   const w = window.open('','_blank');
   const rows = custs.map(c=>`<tr><td>${c.name}</td><td>${c.phone}</td><td>${c.area||'—'}</td><td>${c.bookingCount}</td><td>${c.lastVisit||'—'}</td><td>${c.totalSpent} QAR</td><td>${c.tag}</td></tr>`).join('');
   w.document.write(`<html><head><title>CleanPro Customers</title>
-  <style>body{font-family:Arial,sans-serif;padding:24px}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}</style></head>
+  <style>body{font-family:Arial,sans-serif;padding:24px}h1{color:#0d9488}table{width:100%;border-collapse:collapse;margin-top:16px}th{background:#0d9488;color:white;padding:8px 12px;text-align:left;font-size:12px}td{padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px}tr:nth-child(even){background:#f8fafc}</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
   <body><h1>🧹 CleanPro — Customers</h1><p style="color:#64748b">Total: ${custs.length} customers · Generated: ${new Date().toLocaleString()}</p>
   <table><thead><tr><th>Name</th><th>Phone</th><th>Area</th><th>Bookings</th><th>Last Visit</th><th>Total Spent</th><th>Tag</th></tr></thead><tbody>${rows}</tbody></table>
   <script>window.print()<\/script></body></html>`);
@@ -3378,10 +3381,10 @@ let _services = [];
 
 async function _loadServices() {
   try {
-    const res = await fetch(API + '/api/services');
-    const data = await res.json();
-    _services = Array.isArray(data) ? data : [];
-  } catch { _services = []; }
+    const { data, error } = await _sb.from('services').select('*').order('name');
+    if (error) throw error;
+    _services = (data || []).map(s => ({ ...s, baseRate: s.base_rate ?? 15, matRate: s.mat_rate ?? 25 }));
+  } catch(e) { console.error('loadServices:', e.message); _services = []; }
 }
 
 function getServices() { return _services; }
@@ -3445,12 +3448,11 @@ async function saveService() {
   const matRate  = parseFloat(el('svc-mat-rate').value)     || 25;
   const payload  = { name, icon, baseRate, matRate };
   try {
-    const res = await fetch(API + '/api/services' + (id ? '/' + id : ''), {
-      method: id ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error((await res.json()).error || 'Save failed');
+    const svcData = { name, icon, base_rate: baseRate, mat_rate: matRate };
+    const { error: svcErr } = id
+      ? await _sb.from('services').update(svcData).eq('id', id)
+      : await _sb.from('services').insert({ ...svcData, id: 'svc_' + Date.now() });
+    if (svcErr) throw svcErr;
     closeModal('service-modal');
     await _loadServices();
     renderServices();
@@ -3465,8 +3467,8 @@ function deleteService(id) {
   if (!s) return;
   confirmAction(`Delete "${s.name}"?`, 'This removes this service type.', async () => {
     try {
-      const res = await fetch(API + '/api/services/' + id, { method: 'DELETE' });
-      if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+      const { error: delSvcErr } = await _sb.from('services').delete().eq('id', id);
+      if (delSvcErr) throw delSvcErr;
       await _loadServices();
       renderServices();
       closeModal('confirm-overlay');
@@ -3525,3 +3527,5 @@ setInterval(async () => {
 </script>
 </body>
 </html>
+
+

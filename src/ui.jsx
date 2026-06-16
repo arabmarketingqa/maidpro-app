@@ -78,19 +78,18 @@ const BigCounter = ({ label, value, onChange, min = 1, max = 99, suffix }) => {
   const dec = () => onChange(Math.max(min, value - 1));
   const inc = () => onChange(Math.min(max, value + 1));
   return (
-    <div className="rounded-2xl bg-white hairline px-3 sm:px-4 py-4">
-      <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 mb-2 text-center">{label}</div>
-      <div className="flex items-center justify-between gap-2">
+    <div className="rounded-xl bg-white hairline px-4 py-3 flex items-center justify-between gap-3">
+      <div className="text-[12px] font-bold uppercase tracking-[0.1em] text-ink-500 min-w-0">{label}</div>
+      <div className="flex items-center gap-2 flex-shrink-0">
         <button onClick={dec} disabled={value <= min}
-          className="w-10 h-10 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
+          className="w-9 h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
           <Icon name="minus" className="w-4 h-4" />
         </button>
-        <div className="flex-1 text-center min-w-0">
-          <div className="text-[30px] sm:text-[34px] leading-none font-bold text-ink-900 tabular-nums">{value}</div>
-          {suffix && <div className="text-[12px] text-ink-500 mt-1 truncate">{suffix}</div>}
+        <div className="w-14 text-center font-mono text-[18px] font-bold text-ink-900 tabular-nums">
+          {value}<span className="text-[11px] text-ink-400 ml-0.5">{suffix}</span>
         </div>
         <button onClick={inc} disabled={value >= max}
-          className="w-10 h-10 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
+          className="w-9 h-9 shrink-0 rounded-lg hairline bg-white text-ink-700 grid place-items-center hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed">
           <Icon name="plus" className="w-4 h-4" />
         </button>
       </div>
@@ -116,7 +115,7 @@ const PrimaryButton = ({ children, onClick, disabled, type = "button", className
     type={type}
     onClick={onClick}
     disabled={disabled}
-    className={`group inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-mint-500 text-ink-900 font-semibold shadow-mint hover:bg-mint-400 active:bg-mint-600 disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed transition-all ${className}`}
+    className={`group inline-flex items-center justify-center gap-2 h-11 px-5 rounded-xl bg-mint-500 text-ink-900 text-[14px] font-semibold shadow-mint hover:bg-mint-400 active:bg-mint-600 disabled:bg-ink-200 disabled:text-ink-500 disabled:shadow-none disabled:cursor-not-allowed transition-all ${className}`}
   >
     {children}
   </button>
@@ -126,24 +125,24 @@ const GhostButton = ({ children, onClick, className = "" }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`inline-flex items-center justify-center gap-2 h-12 px-4 rounded-xl text-ink-700 hover:bg-ink-100 transition-colors ${className}`}
+    className={`inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl text-[14px] text-ink-700 hover:bg-ink-100 transition-colors ${className}`}
   >
     {children}
   </button>
 );
 
 const SectionLabel = ({ title, subtitle }) => (
-  <div className="mb-5">
-    <h2 className="text-[26px] sm:text-[30px] leading-[1.1] font-extrabold text-ink-900 tracking-tight">{title}</h2>
-    {subtitle && <p className="mt-1.5 text-[14px] text-ink-500">{subtitle}</p>}
+  <div className="mb-4">
+    <h2 className="text-[20px] font-bold text-ink-900 tracking-tight">{title}</h2>
+    {subtitle && <p className="text-[13px] text-ink-500 mt-1">{subtitle}</p>}
   </div>
 );
 
-const Field = ({ label, hint, error, children, optional }) => (
-  <label className="block">
+const Field = ({ label, hint, error, children, optional, className = "" }) => (
+  <label className={`block ${className}`}>
     <div className="flex items-baseline justify-between mb-1.5">
-      <span className="text-[13px] font-medium text-ink-800">{label}{optional && <span className="text-ink-400 font-normal ml-1">(optional)</span>}</span>
-      {hint && <span className="text-[12px] text-ink-500">{hint}</span>}
+      <span className="text-[13px] font-semibold text-ink-700">{label}{optional && <span className="text-ink-400 font-normal ml-1">(optional)</span>}</span>
+      {hint && <span className="text-[12px] text-ink-400">{hint}</span>}
     </div>
     {children}
     {error && <div className="mt-1 text-[12px] text-red-600">{error}</div>}
@@ -152,11 +151,11 @@ const Field = ({ label, hint, error, children, optional }) => (
 
 const TextInput = React.forwardRef(({ icon, ...props }, ref) => (
   <div className="relative">
-    {icon && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-500"><Icon name={icon} className="w-4 h-4" /></span>}
+    {icon && <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-400"><Icon name={icon} className="w-4 h-4" /></span>}
     <input
       ref={ref}
       {...props}
-      className={`w-full h-12 ${icon ? 'pl-10' : 'pl-3.5'} pr-3.5 rounded-xl bg-white hairline text-[15px] text-ink-900 placeholder:text-ink-400 focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)] outline-none transition-shadow`}
+      className={`w-full h-11 ${icon ? 'pl-10' : 'pl-4'} pr-4 rounded-xl bg-white hairline text-[14px] text-ink-900 placeholder:text-ink-400 focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)] outline-none transition-shadow`}
     />
   </div>
 ));
