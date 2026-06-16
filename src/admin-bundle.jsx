@@ -2851,7 +2851,7 @@ const RegularsView = () => {
               </div>
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-ink-500 mb-1">Maids</label>
-                <input type="number" min="1" max="4" value={draft.maids}
+                <input type="number" min="1" max={staffList.filter(s => s.status === 'Available').length || 99} value={draft.maids}
                   onChange={e => setDraft(d => ({ ...d, maids: e.target.value }))}
                   className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none"/>
               </div>
@@ -4546,7 +4546,8 @@ const App = () => {
     }
 
     setBookings([]);
-    setStore(initialStore());
+    // Only reset booking-related store state — preserve staff, settings, services, nationalities, etc.
+    setStore(prev => ({ ...prev, assignments: {}, staffHours: {} }));
   };
 
   React.useEffect(() => {

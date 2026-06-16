@@ -682,7 +682,7 @@ function App() {
           {/* Step content — scrolls if needed, fills space */}
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
-            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} />}
+            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} liveAvailableStaff={slotData.availableCount} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
             {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}

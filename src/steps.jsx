@@ -30,7 +30,7 @@ const Flag = ({ code, size = 22 }) => {
 /* ────────────── STEP 1: Service ────────────── */
 const DAY_LETTERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const CustomMonthlyConfig = ({ state, set, discountPct = 10 }) => {
+const CustomMonthlyConfig = ({ state, set, discountPct = 10, maxMaids = 99 }) => {
   const days = state.customDays || 4;
   const maids = state.customMaids || 1;
   const hours = state.customHours || 4;
@@ -63,7 +63,7 @@ const CustomMonthlyConfig = ({ state, set, discountPct = 10 }) => {
         <BigCounter label="Days/wk" value={days} onChange={v => set({ customDays: v })}
           min={1} max={7} suffix={days === 1 ? "day" : "days"} />
         <BigCounter label="Maids" value={maids} onChange={v => set({ customMaids: v })}
-          min={1} max={4} suffix={maids === 1 ? "maid" : "maids"} />
+          min={1} max={maxMaids} suffix={maids === 1 ? "maid" : "maids"} />
         <BigCounter label="Hrs/day" value={hours} onChange={v => set({ customHours: v })}
           min={2} max={10} suffix="hrs" />
       </div>
@@ -172,11 +172,14 @@ const SVC_COLOR_DEFAULT = {
   check:  'text-violet-600',
 };
 
-const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveMonthly, liveStayIn, liveLimits, materialsRate }) => {
+const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveMonthly, liveStayIn, liveLimits, materialsRate, liveAvailableStaff }) => {
   const NATS     = nationalities || NATIONALITIES;
   const minHours = Number(liveLimits?.minHours) || 2;
   const maxHours = Number(liveLimits?.maxHours) || 12;
-  const maxMaids = Number(liveLimits?.maxMaids) || 4;
+  // Dynamic max: capped by available staff count; admin limit is a secondary cap if set
+  const adminCap = Number(liveLimits?.maxMaids) || 99;
+  const staffCap = liveAvailableStaff || 99;
+  const maxMaids = Math.min(adminCap, staffCap);
   const SERVICES = (liveServices && liveServices.length) ? liveServices : SERVICE_TYPES;
   const MONTHLY  = (liveMonthly  && liveMonthly.length)  ? liveMonthly  : MONTHLY_PACKAGES;
   const STAYIN   = (liveStayIn   && liveStayIn.length)   ? liveStayIn   : STAYIN_PACKAGES;
@@ -325,7 +328,7 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
                       : <><div className="font-mono font-bold text-mint-700 text-[15px]">{getRate(p, p.priceMonthly||0).toLocaleString()} QAR</div><div className="text-[11px] text-ink-400">/month</div></>}
                   </div>
                 </button>
-                {isCustom && active && <CustomMonthlyConfig state={state} set={set} discountPct={p.customDiscount ?? 10}/>}
+                {isCustom && active && <CustomMonthlyConfig state={state} set={set} discountPct={p.customDiscount ?? 10} maxMaids={maxMaids}/>}
               </div>
             );
           })}
