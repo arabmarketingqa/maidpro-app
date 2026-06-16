@@ -1837,6 +1837,40 @@ const Sidebar = ({ active, onNav, onClose, mobile, bookingsCount = 0, brand = {}
   );
 };
 
+/* ─── Mobile bottom nav ─── */
+const BottomNav = ({ section, onNav, onMenu }) => {
+  const items = [
+    { id: 'overview',  label: 'Home',     icon: 'home'     },
+    { id: 'bookings',  label: 'Bookings', icon: 'calendar' },
+    { id: 'calendar',  label: 'Calendar', icon: 'clock'    },
+    { id: 'staff',     label: 'Staff',    icon: 'users'    },
+    { id: '__more__',  label: 'More',     icon: 'menu'     },
+  ];
+  return (
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-ink-200"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="flex h-14">
+        {items.map(item => {
+          const isMore   = item.id === '__more__';
+          const isActive = !isMore && section === item.id;
+          return (
+            <button key={item.id}
+              onClick={() => isMore ? onMenu() : onNav(item.id)}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors
+                ${isActive ? 'text-mint-600' : 'text-ink-400'}`}>
+              {isActive && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-mint-500"/>
+              )}
+              <AdminIcon name={item.icon} className="w-5 h-5"/>
+              <span className={`text-[10px] font-semibold ${isActive ? 'text-mint-600' : 'text-ink-400'}`}>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
+
 /* ─── Top bar ─── */
 const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookings = [] }) => {
   const [notifOpen, setNotifOpen] = React.useState(false);
@@ -1877,18 +1911,17 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
   };
   const liveModes = store.modes.filter(m => m.on).length;
   return (
-    <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-ink-200/70">
-      <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
-        <button onClick={onMenu} className="lg:hidden w-10 h-10 -ml-2 grid place-items-center rounded-lg text-ink-700 hover:bg-ink-100">
+    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-ink-200/70">
+      <div className="px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center gap-2 sm:gap-3">
+        <button onClick={onMenu} className="lg:hidden w-10 h-10 -ml-1 grid place-items-center rounded-lg text-ink-700 hover:bg-ink-100 flex-shrink-0">
           <AdminIcon name="menu" className="w-5 h-5"/>
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-500">
-            <span>Admin</span>
-            <span>/</span>
+          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-500">
+            <span>Admin</span><span>/</span>
             <span className="text-ink-700">{titles[section]}</span>
           </div>
-          <h1 className="text-[18px] sm:text-[20px] font-extrabold text-ink-900 tracking-tight truncate">{titles[section]}</h1>
+          <h1 className="text-[16px] sm:text-[20px] font-extrabold text-ink-900 tracking-tight truncate">{titles[section]}</h1>
         </div>
 
         <div className="hidden md:flex items-center gap-2 mr-1">
@@ -1898,16 +1931,16 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
           </div>
         </div>
 
-        <div className="hidden sm:block w-64">
-          <TextField icon="search" value={searchQuery||''} onChange={v => onSearch && onSearch(v)} placeholder="Search bookings, customers..."/>
+        <div className="hidden sm:block w-56 lg:w-64">
+          <TextField icon="search" value={searchQuery||''} onChange={v => onSearch && onSearch(v)} placeholder="Search bookings..."/>
         </div>
 
         <button
           onClick={() => { if (window.confirm('Delete ALL bookings permanently? This cannot be undone.')) onClear(); }}
-          className="h-9 px-3.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[13px] font-semibold transition-colors flex items-center gap-1.5"
+          className="h-9 w-9 sm:w-auto sm:px-3.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
         >
           <AdminIcon name="trash" className="w-4 h-4"/>
-          Clear
+          <span className="hidden sm:inline">Clear</span>
         </button>
 
         <div className="relative">
@@ -5297,8 +5330,8 @@ const App = () => {
   };
 
   return (
-    <div className="flex flex-row min-h-screen bg-ink-50" data-screen-label="01 Admin Dashboard">
-      {/* Desktop sidebar — fixed width column, never shrinks */}
+    <div className="flex flex-row min-h-[100dvh] bg-ink-50" data-screen-label="01 Admin Dashboard">
+      {/* Desktop sidebar */}
       <div className="hidden lg:block w-64 flex-shrink-0">
         <Sidebar active={section} onNav={setSection} bookingsCount={bookings.length} brand={store.brand}/>
       </div>
@@ -5306,15 +5339,18 @@ const App = () => {
       {/* Mobile drawer */}
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div className="absolute inset-0 bg-ink-950/40" onClick={() => setDrawerOpen(false)}></div>
+          <div className="absolute inset-0 bg-ink-950/50" onClick={() => setDrawerOpen(false)}/>
           <div className="relative animate-[fadeUp_.2s_ease]">
             <Sidebar active={section} onNav={setSection} onClose={() => setDrawerOpen(false)} mobile bookingsCount={bookings.length} brand={store.brand}/>
           </div>
         </div>
       )}
 
-      {/* Main content — fills remaining width, never underlaps sidebar */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      {/* Mobile bottom nav */}
+      <BottomNav section={section} onNav={(s) => { setSection(s); }} onMenu={() => setDrawerOpen(true)}/>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-[100dvh]">
         <TopBar section={section} onMenu={() => setDrawerOpen(true)} store={store} onClear={clearAll} searchQuery={globalSearch} onSearch={setGlobalSearch} bookings={bookings}/>
 
         {/* Supabase connection banner */}
@@ -5350,10 +5386,10 @@ const App = () => {
           </div>
         )}
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1480px] w-full mx-auto">
+        <main className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-[1480px] w-full mx-auto pb-20 lg:pb-6">
           {sections[section]}
         </main>
-        <footer className="px-4 sm:px-6 lg:px-8 py-5 text-[11.5px] font-mono uppercase tracking-[0.14em] text-ink-500 flex items-center justify-between border-t border-ink-200/70">
+        <footer className="hidden lg:flex px-4 sm:px-6 lg:px-8 py-5 text-[11.5px] font-mono uppercase tracking-[0.14em] text-ink-500 items-center justify-between border-t border-ink-200/70">
           <span>© Maid Pro Admin · 2026</span>
           <span>v2.4.0 · Build 18a3f</span>
         </footer>

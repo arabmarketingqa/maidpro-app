@@ -709,37 +709,36 @@ function App() {
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col py-2 px-3 sm:py-3 sm:px-4"
+    <div className="h-[100dvh] flex flex-col"
       style={{ background: 'oklch(0.46 0.07 168)' }}>
-      <div className="max-w-[700px] w-full mx-auto flex flex-col h-full">
 
-        {/* Top bar */}
-        <div className="mb-2 sm:mb-3 flex items-center justify-between flex-shrink-0">
-          {/* Logo + company name */}
-          <div className="flex items-center gap-2">
-            {liveBrand?.logo ? (
-              <img src={liveBrand.logo} alt="logo"
-                className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 flex-shrink-0"/>
-            ) : (
-              <div className="w-8 h-8 rounded-lg bg-white text-mint-700 grid place-items-center shadow-card flex-shrink-0">
-                <Icon name="sparkle-fill" className="w-4 h-4" />
-              </div>
-            )}
-            <div className="font-extrabold tracking-tight text-white text-[15px] sm:text-[18px]">
-              {liveBrand?.name}
+      {/* Top brand bar */}
+      <div className="flex-shrink-0 px-3 sm:px-5 pt-3 pb-2 sm:pt-4 sm:pb-3 max-w-[700px] w-full mx-auto flex items-center justify-between"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 12px))' }}>
+        <div className="flex items-center gap-2">
+          {liveBrand?.logo ? (
+            <img src={liveBrand.logo} alt="logo"
+              className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 flex-shrink-0"/>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-white text-mint-700 grid place-items-center shadow-card flex-shrink-0">
+              <SvcIcon name="Sparkles" className="w-4 h-4" strokeWidth={1.8}/>
             </div>
-          </div>
-          {/* Brand badge — right side */}
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-white/15 grid place-items-center flex-shrink-0">
-              <SvcIcon name="Sparkles" className="w-3.5 h-3.5 text-white" strokeWidth={1.8} />
-            </div>
-            <span className="font-extrabold tracking-[0.14em] text-white text-[13px]">MAIDPRO</span>
+          )}
+          <div className="font-extrabold tracking-tight text-white text-[15px] sm:text-[18px]">
+            {liveBrand?.name || 'Maid Pro'}
           </div>
         </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 rounded-md bg-white/15 grid place-items-center flex-shrink-0">
+            <SvcIcon name="Sparkles" className="w-3 h-3 text-white" strokeWidth={1.8}/>
+          </div>
+          <span className="font-extrabold tracking-[0.14em] text-white text-[11px] sm:text-[13px]">MAIDPRO</span>
+        </div>
+      </div>
 
-        {/* Card — fills remaining height */}
-        <div className="bg-white rounded-2xl shadow-float flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Card — fills remaining height */}
+      <div className="flex-1 min-h-0 px-2 sm:px-4 pb-2 sm:pb-4 max-w-[700px] w-full mx-auto flex flex-col">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-float flex flex-col flex-1 min-h-0 overflow-hidden">
 
           {/* Stepper */}
           {!isSuccess && (
@@ -748,8 +747,8 @@ function App() {
             </div>
           )}
 
-          {/* Step content — scrolls if needed, fills space */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-7 py-3 sm:py-4"
+          {/* Step content */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
             {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
@@ -761,27 +760,32 @@ function App() {
 
           {/* Bottom bar — price + nav */}
           {!isSuccess && (
-            <div className="flex-shrink-0 border-t border-ink-100 px-4 sm:px-7 pt-2.5 sm:pt-3 flex items-center gap-2 sm:gap-3"
-              style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))' }}>
+            <div className="flex-shrink-0 border-t border-ink-100 px-4 sm:px-7 py-3 sm:py-3.5 flex items-center gap-2 sm:gap-3"
+              style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}>
 
-              {showPrice && (
-                <div className="flex-1 flex items-center min-w-0">
-                  <div className="text-[18px] sm:text-[22px] font-extrabold text-ink-900 tabular-nums"><Money value={breakdown.total} /></div>
+              {showPrice && !bookingError && (
+                <div className="flex-1 flex flex-col min-w-0">
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-ink-400">Total</div>
+                  <div className="text-[20px] sm:text-[22px] font-extrabold text-ink-900 tabular-nums leading-tight"><Money value={breakdown.total} /></div>
                 </div>
               )}
 
               {bookingError && (
-                <div className="text-[12px] text-red-600 font-medium truncate flex-1">⚠ {bookingError}</div>
+                <div className="text-[12px] text-red-600 font-medium flex-1 leading-snug">⚠ {bookingError}</div>
               )}
 
               <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                <GhostButton onClick={goBack} className={idx === 0 ? "invisible" : ""}>
-                  <Icon name="arrow-left" className="w-4 h-4" />Back
-                </GhostButton>
-                <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting}>
+                {idx > 0 && (
+                  <button onClick={goBack}
+                    className="h-11 w-11 rounded-xl border border-ink-200 grid place-items-center text-ink-600 hover:bg-ink-50 transition-colors">
+                    <Icon name="arrow-left" className="w-4 h-4"/>
+                  </button>
+                )}
+                <PrimaryButton onClick={goNext} disabled={!canAdvance || submitting}
+                  className="h-11 px-5 text-[14px]">
                   {submitting ? 'Saving…' : (
                     <>
-                      <span className="sm:hidden">{stepKey === 'confirm' ? 'Confirm' : 'Continue'}</span>
+                      <span className="sm:hidden">{stepKey === 'confirm' ? 'Confirm' : 'Next'}</span>
                       <span className="hidden sm:inline">{labelMap[stepKey] || 'Continue'}</span>
                     </>
                   )}
