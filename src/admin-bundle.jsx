@@ -4361,6 +4361,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const todayStr = today.toISOString().slice(0,10);
   const [from, setFrom] = React.useState(firstOfMonth);
   const [to,   setTo]   = React.useState(todayStr);
+  const [selectedStaff, setSelectedStaff] = React.useState(null);
 
   const inRange = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
   const confirmed = inRange.filter(b => ['Confirmed','Completed'].includes(b.status));
@@ -4480,69 +4481,150 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         const totalAmount = inRange.reduce((s, b) => s + b.total, 0);
 
         const handlePrint = () => {
-          const brandName = store?.brand?.name || 'Maid Pro';
+          const brand     = store?.brand || {};
+          const brandName = brand.name  || 'Maid Pro';
+          const brandPhone= brand.phone || '';
+          const brandLogo = brand.logo  || '';
+          const printDate = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+          const logoHtml = brandLogo
+            ? `<img src="${brandLogo}" alt="${brandName}" style="height:56px;max-width:160px;object-fit:contain;display:block;"/>`
+            : `<div style="width:48px;height:48px;border-radius:12px;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;letter-spacing:-1px;">${brandName.slice(0,1)}</div>`;
+
           const rows = inRange.map((b, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td>${b._raw?.date || '—'}</td>
+            <tr class="${i % 2 === 1 ? 'even' : ''}">
+              <td class="num">${i + 1}</td>
+              <td class="mono">${b._raw?.date || '—'}</td>
+              <td class="mono">${b._raw?.time || b.time || '—'}</td>
               <td>${getMaids(b)}</td>
-              <td>${b.customer || '—'}</td>
-              <td style="text-align:center">${b.hours ?? '—'}</td>
-              <td style="text-align:right">QAR ${(b.total || 0).toLocaleString()}</td>
+              <td class="bold">${b.customer || '—'}</td>
+              <td class="center">${b.hours ?? '—'}</td>
+              <td class="right mono">QAR ${(b.total || 0).toLocaleString()}</td>
             </tr>`).join('');
 
-          const html = `<!DOCTYPE html><html><head>
-            <meta charset="utf-8"/>
-            <title>Daily Report — ${from} to ${to}</title>
-            <style>
-              *{box-sizing:border-box;margin:0;padding:0}
-              body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:28px 32px}
-              .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #111}
-              .logo{font-size:18px;font-weight:800;letter-spacing:-0.5px}
-              .meta{text-align:right;font-size:11px;color:#555;line-height:1.6}
-              h2{font-size:14px;font-weight:700;margin-bottom:4px}
-              .range{font-size:11px;color:#666;margin-bottom:18px}
-              table{width:100%;border-collapse:collapse}
-              thead tr{background:#f3f4f6}
-              th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:left}
-              th.r{text-align:right} th.c{text-align:center}
-              td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;font-size:11.5px}
-              tbody tr:nth-child(even){background:#fafafa}
-              tfoot td{font-weight:700;font-size:12px;border-top:2px solid #111;border-bottom:none;padding-top:10px}
-              .total-label{text-align:right}
-              @media print{body{padding:16px 20px}}
-            </style>
-          </head><body>
-            <div class="header">
-              <div class="logo">${brandName}</div>
-              <div class="meta">
-                <div><strong>Daily Jobs Report</strong></div>
-                <div>Period: ${from} → ${to}</div>
-                <div>Printed: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
-              </div>
-            </div>
-            <div class="range">${inRange.length} job${inRange.length !== 1 ? 's' : ''} in selected range</div>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:40px">No#</th>
-                  <th style="width:100px">Date</th>
-                  <th>Maid</th>
-                  <th>Customer</th>
-                  <th class="c" style="width:60px">Hours</th>
-                  <th class="r" style="width:110px">Amount</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="4" class="total-label">Total</td>
-                  <td style="text-align:center">${totalHours}</td>
-                  <td style="text-align:right">QAR ${totalAmount.toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </body></html>`;
+          const html = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<title>${brandName} — Daily Jobs Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:820px;margin:0 auto;padding:36px 40px}
+
+  /* ── Header bar ── */
+  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:24px;border-bottom:3px solid #16a34a;margin-bottom:28px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand-text{display:flex;flex-direction:column;gap:2px}
+  .brand-name{font-size:20px;font-weight:800;color:#111;letter-spacing:-0.5px;line-height:1}
+  .brand-phone{font-size:11px;color:#6b7280;margin-top:3px}
+  .report-info{text-align:right}
+  .report-title{font-size:15px;font-weight:700;color:#111;letter-spacing:-0.3px}
+  .report-sub{font-size:11px;color:#6b7280;margin-top:4px;line-height:1.7}
+
+  /* ── Summary pills ── */
+  .summary{display:flex;gap:12px;margin-bottom:24px}
+  .pill{flex:1;border-radius:10px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0}
+  .pill-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#15803d;margin-bottom:4px}
+  .pill-value{font-size:18px;font-weight:800;color:#14532d;letter-spacing:-0.5px}
+  .pill-unit{font-size:10px;font-weight:500;color:#16a34a;margin-left:3px}
+
+  /* ── Table ── */
+  table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb}
+  thead tr{background:#f9fafb}
+  th{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#374151;vertical-align:middle}
+  tr.even td{background:#fafafa}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{color:#9ca3af;font-size:11px;font-weight:500;width:40px}
+  td.mono{font-family:monospace;font-size:11.5px;width:110px}
+  td.bold{font-weight:600;color:#111}
+  td.center{text-align:center;width:70px}
+  td.right{text-align:right;width:120px}
+
+  /* ── Footer row ── */
+  tfoot td{background:#f0fdf4;padding:12px 14px;font-weight:700;font-size:12.5px;color:#14532d;border-top:2px solid #16a34a}
+
+  /* ── Page footer ── */
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af}
+
+  @media print{
+    .page{padding:20px 24px}
+    body{font-size:11px}
+  }
+</style>
+</head><body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      ${logoHtml}
+      <div class="brand-text">
+        <div class="brand-name">${brandName}</div>
+        ${brandPhone ? `<div class="brand-phone">${brandPhone}</div>` : ''}
+      </div>
+    </div>
+    <div class="report-info">
+      <div class="report-title">Daily Jobs Report</div>
+      <div class="report-sub">
+        Period: ${from} → ${to}<br/>
+        Printed: ${printDate}
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary pills -->
+  <div class="summary">
+    <div class="pill">
+      <div class="pill-label">Total Jobs</div>
+      <div class="pill-value">${inRange.length}<span class="pill-unit">jobs</span></div>
+    </div>
+    <div class="pill">
+      <div class="pill-label">Total Hours</div>
+      <div class="pill-value">${totalHours}<span class="pill-unit">hrs</span></div>
+    </div>
+    <div class="pill">
+      <div class="pill-label">Total Amount</div>
+      <div class="pill-value">${totalAmount.toLocaleString()}<span class="pill-unit">QAR</span></div>
+    </div>
+    <div class="pill">
+      <div class="pill-label">Avg per Job</div>
+      <div class="pill-value">${inRange.length ? Math.round(totalAmount / inRange.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div>
+    </div>
+  </div>
+
+  <!-- Jobs table -->
+  <table>
+    <thead>
+      <tr>
+        <th>No#</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Maid</th>
+        <th>Customer Name</th>
+        <th style="text-align:center">Hours</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" style="text-align:right;letter-spacing:.05em;text-transform:uppercase;font-size:10px">Total</td>
+        <td style="text-align:center">${totalHours} hrs</td>
+        <td style="text-align:right">QAR ${totalAmount.toLocaleString()}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>${brandName} · Daily Jobs Report</span>
+    <span>Generated ${printDate}</span>
+  </div>
+
+</div>
+</body></html>`;
 
           const w = window.open('', '_blank', 'width=900,height=700');
           if (!w) return;
@@ -4570,6 +4652,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                   <tr className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 bg-ink-50/60 border-b border-ink-200/70">
                     <th className="px-5 py-3 w-12">No#</th>
                     <th className="px-3 py-3 w-28">Date</th>
+                    <th className="px-3 py-3 w-28">Time</th>
                     <th className="px-3 py-3">Maid</th>
                     <th className="px-3 py-3">Customer</th>
                     <th className="px-3 py-3 text-center w-20">Hours</th>
@@ -4578,11 +4661,12 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 </thead>
                 <tbody>
                   {inRange.length === 0 ? (
-                    <tr><td colSpan={6} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
+                    <tr><td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
                   ) : inRange.map((b, i) => (
                     <tr key={b.ref} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
                       <td className="px-5 py-3 font-mono text-[12px] text-ink-400 tabular-nums">{i + 1}</td>
                       <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.date || '—'}</td>
+                      <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.time || b.time || '—'}</td>
                       <td className="px-3 py-3 text-[13px] text-ink-700">{getMaids(b)}</td>
                       <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
                       <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{b.hours ?? '—'}</td>
@@ -4595,7 +4679,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 {inRange.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-ink-200 bg-ink-50/60">
-                      <td colSpan={4} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
+                      <td colSpan={5} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
                       <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900 tabular-nums">{totalHours}</td>
                       <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900 tabular-nums">QAR {totalAmount.toLocaleString()}</td>
                     </tr>
@@ -4607,13 +4691,255 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         );
       })()}
 
-      {reportType === 'staff' && (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-ink-400">
-          <AdminIcon name="contact" className="w-10 h-10 opacity-30"/>
-          <p className="text-[14px] font-medium">Staff Report — coming soon.</p>
-          <p className="text-[12.5px]">Tell us what data you'd like to see here.</p>
-        </div>
-      )}
+      {reportType === 'staff' && (() => {
+        const allStaff = (store?.staff || []).filter(s => s.active !== false);
+
+        // Per-staff bookings in range
+        const staffBookings = (s) =>
+          inRange.filter(b => (b._raw?.assigned_staff || []).includes(s.id));
+
+        // Parse "9:00 AM" → 9, "2:30 PM" → 14.5
+        const parseHour = (t) => {
+          if (!t || t === '—') return NaN;
+          const [timePart, ampm] = t.trim().split(' ');
+          const [hStr, mStr] = timePart.split(':');
+          let h = parseInt(hStr, 10);
+          const m = parseInt(mStr || '0', 10);
+          if (ampm === 'PM' && h !== 12) h += 12;
+          if (ampm === 'AM' && h === 12) h = 0;
+          return h + m / 60;
+        };
+
+        const fmtFinish = (b) => {
+          const t = b._raw?.time || b.time || '';
+          const h = parseHour(t);
+          const hrs = Number(b.hours) || 0;
+          if (isNaN(h) || !hrs) return '—';
+          const finish = h + hrs;
+          const fh = Math.floor(finish) % 24;
+          const fm = Math.round((finish % 1) * 60);
+          const ampm = fh >= 12 ? 'PM' : 'AM';
+          const disp = fh % 12 === 0 ? 12 : fh % 12;
+          return `${disp}:${String(fm).padStart(2,'0')} ${ampm}`;
+        };
+
+        const COLORS = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#db2777','#ca8a04','#65a30d'];
+
+        const selected = selectedStaff ? allStaff.find(s => s.id === selectedStaff) : null;
+        const selectedBks = selected ? staffBookings(selected) : [];
+
+        const totalHoursStaff = selectedBks.reduce((s, b) => s + (Number(b.hours) || 0), 0);
+        const totalAmtStaff   = selectedBks.reduce((s, b) => s + (b.total || 0), 0);
+
+        const handlePrintStaff = () => {
+          if (!selected) return;
+          const brand      = store?.brand || {};
+          const brandName  = brand.name  || 'Maid Pro';
+          const brandPhone = brand.phone || '';
+          const brandLogo  = brand.logo  || '';
+          const printDate  = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+          const logoHtml = brandLogo
+            ? `<img src="${brandLogo}" alt="${brandName}" style="height:56px;max-width:160px;object-fit:contain;display:block;"/>`
+            : `<div style="width:48px;height:48px;border-radius:12px;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;">${brandName.slice(0,1)}</div>`;
+
+          const rows = selectedBks.map((b, i) => `
+            <tr class="${i % 2 === 1 ? 'even' : ''}">
+              <td class="num">${i + 1}</td>
+              <td class="mono">${b._raw?.date || '—'}</td>
+              <td class="mono">${b._raw?.time || b.time || '—'}</td>
+              <td class="mono">${fmtFinish(b)}</td>
+              <td class="bold">${b.customer || '—'}</td>
+              <td class="center">${b.hours ?? '—'}</td>
+              <td class="right mono">QAR ${(b.total || 0).toLocaleString()}</td>
+            </tr>`).join('');
+
+          const html = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<title>${selected.name} — Staff Report</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Arial,sans-serif;font-size:12px;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:860px;margin:0 auto;padding:36px 40px}
+  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:24px;border-bottom:3px solid #16a34a;margin-bottom:28px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand-name{font-size:20px;font-weight:800;color:#111;letter-spacing:-0.5px;line-height:1}
+  .brand-phone{font-size:11px;color:#6b7280;margin-top:3px}
+  .report-info{text-align:right}
+  .report-title{font-size:15px;font-weight:700;color:#111}
+  .report-sub{font-size:11px;color:#6b7280;margin-top:4px;line-height:1.7}
+  .staff-badge{display:inline-flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 16px;margin-bottom:24px}
+  .staff-avatar{width:36px;height:36px;border-radius:50%;background:#16a34a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0}
+  .staff-name{font-size:14px;font-weight:700;color:#14532d}
+  .summary{display:flex;gap:12px;margin-bottom:24px}
+  .pill{flex:1;border-radius:10px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0}
+  .pill-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#15803d;margin-bottom:4px}
+  .pill-value{font-size:18px;font-weight:800;color:#14532d}
+  .pill-unit{font-size:10px;font-weight:500;color:#16a34a;margin-left:3px}
+  table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb}
+  thead tr{background:#f9fafb}
+  th{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
+  td{padding:10px 14px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#374151;vertical-align:middle}
+  tr.even td{background:#fafafa}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{color:#9ca3af;font-size:11px;width:40px}
+  td.mono{font-family:monospace;font-size:11.5px}
+  td.bold{font-weight:600;color:#111}
+  td.center{text-align:center;width:70px}
+  td.right{text-align:right;width:120px}
+  tfoot td{background:#f0fdf4;padding:12px 14px;font-weight:700;font-size:12.5px;color:#14532d;border-top:2px solid #16a34a}
+  .footer{margin-top:28px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af}
+  @media print{.page{padding:20px 24px}}
+</style></head><body>
+<div class="page">
+  <div class="header">
+    <div class="brand">
+      ${logoHtml}
+      <div>
+        <div class="brand-name">${brandName}</div>
+        ${brandPhone ? `<div class="brand-phone">${brandPhone}</div>` : ''}
+      </div>
+    </div>
+    <div class="report-info">
+      <div class="report-title">Staff Performance Report</div>
+      <div class="report-sub">Period: ${from} → ${to}<br/>Printed: ${printDate}</div>
+    </div>
+  </div>
+  <div class="staff-badge">
+    <div class="staff-avatar">${selected.name.slice(0,1).toUpperCase()}</div>
+    <div class="staff-name">${selected.name}</div>
+  </div>
+  <div class="summary">
+    <div class="pill"><div class="pill-label">Total Jobs</div><div class="pill-value">${selectedBks.length}<span class="pill-unit">jobs</span></div></div>
+    <div class="pill"><div class="pill-label">Total Hours</div><div class="pill-value">${totalHoursStaff}<span class="pill-unit">hrs</span></div></div>
+    <div class="pill"><div class="pill-label">Total Amount</div><div class="pill-value">${totalAmtStaff.toLocaleString()}<span class="pill-unit">QAR</span></div></div>
+    <div class="pill"><div class="pill-label">Avg per Job</div><div class="pill-value">${selectedBks.length ? Math.round(totalAmtStaff/selectedBks.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>No#</th><th>Date</th><th>Start Time</th><th>Finish Time</th><th>Customer</th>
+      <th style="text-align:center">Hours</th><th style="text-align:right">Amount</th>
+    </tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
+    <tfoot><tr>
+      <td colspan="5" style="text-align:right;text-transform:uppercase;font-size:10px;letter-spacing:.05em">Total</td>
+      <td style="text-align:center">${totalHoursStaff} hrs</td>
+      <td style="text-align:right">QAR ${totalAmtStaff.toLocaleString()}</td>
+    </tr></tfoot>
+  </table>
+  <div class="footer"><span>${brandName} · Staff Report · ${selected.name}</span><span>Generated ${printDate}</span></div>
+</div></body></html>`;
+
+          const w = window.open('', '_blank', 'width=920,height=720');
+          if (!w) return;
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          setTimeout(() => { w.print(); }, 300);
+        };
+
+        return (
+          <div className="space-y-5 fade-up">
+
+            {/* Staff grid */}
+            <Card title="Select Staff Member" subtitle="Click a card to view their job report for the selected date range.">
+              {allStaff.length === 0 ? (
+                <div className="py-10 text-center text-[13px] text-ink-400">No active staff found.</div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-1">
+                  {allStaff.map((s, idx) => {
+                    const bks  = staffBookings(s);
+                    const rev  = bks.filter(b => ['Confirmed','Completed'].includes(b.status)).reduce((a, b) => a + b.total, 0);
+                    const hrs  = bks.reduce((a, b) => a + (Number(b.hours) || 0), 0);
+                    const col  = COLORS[idx % COLORS.length];
+                    const isSel = selectedStaff === s.id;
+                    return (
+                      <button key={s.id} onClick={() => setSelectedStaff(isSel ? null : s.id)}
+                        className={`text-left rounded-2xl p-4 border-2 transition-all ${isSel ? 'border-[#16a34a] bg-[#f0fdf4] shadow-md' : 'border-ink-200 bg-white hover:border-ink-300 hover:shadow-sm'}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0"
+                            style={{ background: col }}>
+                            {s.name.slice(0,1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13.5px] text-ink-900 truncate">{s.name}</div>
+                            <div className="text-[11px] text-ink-400 mt-0.5">{bks.length} job{bks.length !== 1 ? 's' : ''}</div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-[11.5px]">
+                          <span className="text-ink-500">{hrs} hrs</span>
+                          <span className="font-semibold text-ink-700">QAR {rev.toLocaleString()}</span>
+                        </div>
+                        {isSel && (
+                          <div className="mt-2 text-[10.5px] font-semibold text-[#16a34a] uppercase tracking-wide">Selected ✓</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Detailed table for selected staff */}
+            {selected && (
+              <Card
+                title={`Jobs — ${selected.name}`}
+                subtitle={`${selectedBks.length} job${selectedBks.length !== 1 ? 's' : ''} · ${from} → ${to}`}
+                action={
+                  <button onClick={handlePrintStaff}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-lg hairline text-[12px] font-semibold text-ink-700 hover:bg-ink-100 transition-colors">
+                    <AdminIcon name="print" className="w-4 h-4"/><span>Print</span>
+                  </button>
+                }>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 bg-ink-50/60 border-b border-ink-200/70">
+                        <th className="px-5 py-3 w-10">No#</th>
+                        <th className="px-3 py-3 w-28">Date</th>
+                        <th className="px-3 py-3 w-28">Start Time</th>
+                        <th className="px-3 py-3 w-28">Finish Time</th>
+                        <th className="px-3 py-3">Customer</th>
+                        <th className="px-3 py-3 text-center w-20">Hours</th>
+                        <th className="px-5 py-3 text-right w-32">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedBks.length === 0 ? (
+                        <tr><td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
+                      ) : selectedBks.map((b, i) => (
+                        <tr key={b.ref || i} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-[12px] text-ink-400">{i + 1}</td>
+                          <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.date || '—'}</td>
+                          <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.time || b.time || '—'}</td>
+                          <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{fmtFinish(b)}</td>
+                          <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer || '—'}</td>
+                          <td className="px-3 py-3 text-center font-mono text-[13px] text-ink-700">{b.hours ?? '—'}</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold text-[13px] text-ink-900">
+                            QAR {(b.total || 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {selectedBks.length > 0 && (
+                      <tfoot>
+                        <tr className="border-t-2 border-ink-200 bg-ink-50/60">
+                          <td colSpan={5} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
+                          <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900">{totalHoursStaff}</td>
+                          <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900">QAR {totalAmtStaff.toLocaleString()}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </Card>
+            )}
+
+          </div>
+        );
+      })()}
     </div>
   );
 };
