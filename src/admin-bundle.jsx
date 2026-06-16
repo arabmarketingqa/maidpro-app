@@ -3582,7 +3582,9 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
   const isOffDay = (s) => {
     if (dateDow === null) return false;
     const days = s.working_days;
-    return Array.isArray(days) && days.length > 0 && !days.includes(dateDow);
+    if (!Array.isArray(days)) return false;  // column not in DB → assume working
+    if (days.length === 0) return true;      // all days explicitly off → always off today
+    return !days.includes(dateDow);
   };
 
   // On-hold staff are hidden from the calendar entirely
