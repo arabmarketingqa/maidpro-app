@@ -2444,12 +2444,17 @@ const RegularsView = () => {
     // Resolve staff: prefer saved preference, otherwise auto-pick by working_days
     let staffToUse = (schedule.assigned_staff || []).filter(Boolean);
     if (!staffToUse.length) {
-      const { data: avail } = await supabase.from('staff').select('id, skills, working_days');
+      let staffPick = await supabase.from('staff').select('id, skills, working_days');
+      let avail = staffPick.data;
+      if (staffPick.error || !avail) {
+        // working_days column not yet in DB — fall back to id+skills, treat all days as working
+        const fb = await supabase.from('staff').select('id, skills');
+        avail = (fb.data || []).map(s => ({ ...s, working_days: null }));
+      }
+      const scheduleDate = schedule.date || new Date().toISOString().split('T')[0];
       if (avail?.length) {
-        // For the schedule date, pick staff whose working_days includes that DOW
-        const scheduleDow = schedule.date ? new Date(schedule.date + 'T00:00:00').getDay() : new Date().getDay();
         staffToUse = avail
-          .filter(s => isWorkingDay(s, schedule.date || new Date().toISOString().split('T')[0]))
+          .filter(s => isWorkingDay(s, scheduleDate))   // skip staff whose day off falls on this date
           .filter(s => { const sk = Array.isArray(s.skills) ? s.skills : []; return !sk.some(x => x.startsWith('@')) || sk.some(x => x === '@hourly'); })
           .slice(0, Math.max(1, Number(schedule.maids) || 1)).map(s => s.id);
       }
