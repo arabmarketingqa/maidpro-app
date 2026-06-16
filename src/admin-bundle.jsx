@@ -4692,7 +4692,13 @@ const App = () => {
     if (bkRow?.assigned_staff?.length > 0) return;
 
     // Get all staff — availability is determined solely by working_days, not status
-    const { data: availableStaff } = await supabase.from('staff').select('id, skills, working_days');
+    let staffRes = await supabase.from('staff').select('id, skills, working_days');
+    let availableStaff = staffRes.data;
+    if (staffRes.error || !availableStaff) {
+      // working_days column not yet in DB — fall back to id+skills only
+      const fb = await supabase.from('staff').select('id, skills');
+      availableStaff = (fb.data || []).map(s => ({ ...s, working_days: null }));
+    }
     if (!availableStaff || availableStaff.length === 0) return;
 
     // Filter by booking mode (look for @mode prefix in skills array)

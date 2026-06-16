@@ -519,8 +519,13 @@ function App() {
         const svcId    = (liveServices || []).find(s => s.name === breakdown.serviceName)?.id;
 
         const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
-        const { data: availStaff } = await supabase.from('staff')
-          .select('id, skills, working_days');
+        let staffRes = await supabase.from('staff').select('id, skills, working_days');
+        let availStaff = staffRes.data;
+        if (staffRes.error || !availStaff) {
+          // working_days column not yet in DB — fall back to id+skills only
+          const fb = await supabase.from('staff').select('id, skills');
+          availStaff = (fb.data || []).map(s => ({ ...s, working_days: null }));
+        }
 
         if (availStaff && availStaff.length > 0) {
           // 1. Filter by service mode (@mode entries in skills array)
