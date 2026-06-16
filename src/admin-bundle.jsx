@@ -3282,7 +3282,7 @@ const StaffSection = ({ store, set, bookings }) => {
         </span>
         <div className="flex-1">
           <div className="text-[13px] font-bold text-ink-900">Capacity is linked to live staff</div>
-          <div className="text-[12px] text-ink-600">Customer bookings are capped at <span className="font-mono font-semibold">{Math.min(activeMaids, store.limits.maxMaids)}</span> maids per slot — the lower of available staff ({activeMaids}) and admin max ({store.limits.maxMaids}).</div>
+          <div className="text-[12px] text-ink-600">Customer bookings are capped at <span className="font-mono font-semibold">{Math.min(workingToday, store.limits.maxMaids)}</span> maids per slot — the lower of staff working today ({workingToday}) and admin max ({store.limits.maxMaids}).</div>
         </div>
       </div>
 
