@@ -1669,14 +1669,14 @@ const initialStore = () => ({
     "2026-05-27": { blocked: true,  morning: false, afternoon: false },
   },
   staff: [
-    { id: "s1", name: "Maria Santos",   nationality: "philippines", color: "mint",   skills: ["regular","deep","movein"],        serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s2", name: "Anjali Sharma",  nationality: "indian",      color: "sky",    skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
-    { id: "s3", name: "Wendy Cruz",     nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s4", name: "Amy Thapa",      nationality: "nepal",       color: "amber",  skills: ["regular","movein"],               serviceTypes: ["hourly","stayin"],           working_days: [0,1,2,3,4,5,6] },
-    { id: "s5", name: "Michael Okafor", nationality: "nigeria",     color: "violet", skills: ["regular","post"],                 serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s6", name: "John Reyes",     nationality: "philippines", color: "sky",    skills: ["regular","deep","movein","post"], serviceTypes: ["hourly","monthly","stayin"], working_days: [0,1,2,3,4,5,6] },
-    { id: "s7", name: "Priya Gurung",   nationality: "nepal",       color: "mint",   skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
-    { id: "s8", name: "Roselle Tan",    nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
+    { id: "s1", name: "Maria Santos",   nationality: "philippines", color: "mint",   skills: ["regular","deep","movein"],        serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s2", name: "Anjali Sharma",  nationality: "indian",      color: "sky",    skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s3", name: "Wendy Cruz",     nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s4", name: "Amy Thapa",      nationality: "nepal",       color: "amber",  skills: ["regular","movein"],               serviceTypes: ["hourly","stayin"],           working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s5", name: "Michael Okafor", nationality: "nigeria",     color: "violet", skills: ["regular","post"],                 serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s6", name: "John Reyes",     nationality: "philippines", color: "sky",    skills: ["regular","deep","movein","post"], serviceTypes: ["hourly","monthly","stayin"], working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s7", name: "Priya Gurung",   nationality: "nepal",       color: "mint",   skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6], active: true },
+    { id: "s8", name: "Roselle Tan",    nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6], active: true },
   ],
   assignments: {
     "MP-2034": ["s1","s3"],
@@ -2444,16 +2444,16 @@ const RegularsView = () => {
     // Resolve staff: prefer saved preference, otherwise auto-pick by working_days
     let staffToUse = (schedule.assigned_staff || []).filter(Boolean);
     if (!staffToUse.length) {
-      let staffPick = await supabase.from('staff').select('id, skills, working_days');
+      let staffPick = await supabase.from('staff').select('id, skills, working_days, active');
       let avail = staffPick.data;
       if (staffPick.error || !avail) {
-        // working_days column not yet in DB — fall back to id+skills, treat all days as working
         const fb = await supabase.from('staff').select('id, skills');
-        avail = (fb.data || []).map(s => ({ ...s, working_days: null }));
+        avail = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
       }
       const scheduleDate = schedule.date || new Date().toISOString().split('T')[0];
       if (avail?.length) {
         staffToUse = avail
+          .filter(s => s.active !== false)              // skip on-hold staff
           .filter(s => isWorkingDay(s, scheduleDate))   // skip staff whose day off falls on this date
           .filter(s => { const sk = Array.isArray(s.skills) ? s.skills : []; return !sk.some(x => x.startsWith('@')) || sk.some(x => x === '@hourly'); })
           .slice(0, Math.max(1, Number(schedule.maids) || 1)).map(s => s.id);
@@ -3185,6 +3185,15 @@ const StaffSection = ({ store, set, bookings }) => {
     await supabase.from('staff').update(patch).eq('id', id);
   };
 
+  // Active/On-Hold toggle — optimistic update, reverts if DB write fails
+  const toggleActive = async (id) => {
+    const s = store.staff.find(x => x.id === id); if (!s) return;
+    const next = s.active !== false ? false : true;
+    set(prev => ({ staff: prev.staff.map(x => x.id === id ? { ...x, active: next } : x) }));
+    const { error } = await supabase.from('staff').update({ active: next }).eq('id', id);
+    if (error) set(prev => ({ staff: prev.staff.map(x => x.id === id ? { ...x, active: !next } : x) }));
+  };
+
   const toggleSkill = (sid, sk) => {
     const s = store.staff.find(x => x.id === sid); if (!s) return;
     const current = s.skills || [];
@@ -3209,14 +3218,21 @@ const StaffSection = ({ store, set, bookings }) => {
       const dbPatch = {
         skills: encodeSkills(s.skills || [], s.serviceTypes || []),
         working_days: s.working_days ?? [0,1,2,3,4,5,6],
+        active: s.active !== false,
       };
       try {
         const { error } = await supabase.from('staff').update(dbPatch).eq('id', s.id);
         if (error) {
           if (error.code === 'PGRST204') {
-            // working_days column not yet added — save without it
-            const { error: e2 } = await supabase.from('staff').update({ skills: dbPatch.skills }).eq('id', s.id);
-            if (e2) throw e2;
+            // active or working_days column not yet in DB — try without active
+            const { error: e2 } = await supabase.from('staff').update({ skills: dbPatch.skills, working_days: dbPatch.working_days }).eq('id', s.id);
+            if (e2) {
+              if (e2.code === 'PGRST204') {
+                // working_days also missing — just save skills
+                const { error: e3 } = await supabase.from('staff').update({ skills: dbPatch.skills }).eq('id', s.id);
+                if (e3) throw e3;
+              } else throw e2;
+            }
           } else throw error;
         }
       } catch(e) { failed.push(s.name + ': ' + (e.message || 'network error')); }
@@ -3228,7 +3244,7 @@ const StaffSection = ({ store, set, bookings }) => {
     setSaving(false);
   };
 
-  const blankDraft = () => ({ name: '', nationality: store.nationalities.find(n => n.on !== false)?.id || '', color: 'mint', skills: [], serviceTypes: [], working_days: [0,1,2,3,4,5,6] });
+  const blankDraft = () => ({ name: '', nationality: store.nationalities.find(n => n.on !== false)?.id || '', color: 'mint', skills: [], serviceTypes: [], working_days: [0,1,2,3,4,5,6], active: true });
   const [modalOpen, setModalOpen] = React.useState(false);
   const [draft, setDraft] = React.useState(blankDraft);
   const toggleDraftSkill = (sk) => setDraft(d => ({ ...d, skills: d.skills.includes(sk) ? d.skills.filter(x => x !== sk) : [...d.skills, sk] }));
@@ -3295,15 +3311,15 @@ const StaffSection = ({ store, set, bookings }) => {
             </button>
           </div>
         } padded={false}>
-        <div className="hidden md:grid grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_100px_60px] gap-3 px-6 py-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 border-b border-ink-200/70 bg-ink-50/50">
-          <div></div><div>Name</div><div>Nationality</div><div>Working Days</div><div>Services</div><div>Skills</div><div>Active jobs</div><div></div>
+        <div className="hidden md:grid grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_120px_60px] gap-3 px-6 py-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 border-b border-ink-200/70 bg-ink-50/50">
+          <div></div><div>Name</div><div>Nationality</div><div>Working Days</div><div>Services</div><div>Skills</div><div>Status</div><div></div>
         </div>
         <ul>
           {store.staff.map((s, i) => {
             const jobs = Object.values(store.assignments || {}).filter(arr => arr.includes(s.id)).length;
             return (
-              <li key={s.id} className={`px-4 sm:px-6 py-3 ${i ? "border-t border-ink-200/70" : ""}`}>
-                <div className="grid grid-cols-[48px_1fr] md:grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_100px_60px] gap-3 items-center">
+              <li key={s.id} className={`px-4 sm:px-6 py-3 transition-colors ${i ? "border-t border-ink-200/70" : ""} ${s.active === false ? 'bg-ink-50/70' : ''}`}>
+                <div className="grid grid-cols-[48px_1fr] md:grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_120px_60px] gap-3 items-center">
                   <StaffAvatar s={s} size={40}/>
                   <div className="md:contents space-y-2 md:space-y-0">
                     <TextField value={s.name} onChange={v => updateImmediate(s.id, { name: v })} />
@@ -3377,9 +3393,17 @@ const StaffSection = ({ store, set, bookings }) => {
                         });
                       })()}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[12.5px] text-ink-700">
-                      <span className="font-mono tabular-nums">{jobs}</span>
-                      <span className="text-ink-500">jobs</span>
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        onClick={() => toggleActive(s.id)}
+                        title={s.active !== false ? 'Active — click to put on hold' : 'On Hold — click to activate'}
+                        className={`h-6 px-2.5 rounded-full text-[10.5px] font-bold transition-colors ${s.active !== false ? 'bg-mint-100 text-mint-800 hover:bg-mint-200' : 'bg-amber-100 text-amber-800 hover:bg-amber-200'}`}>
+                        {s.active !== false ? 'Active' : 'On Hold'}
+                      </button>
+                      <div className="flex items-center gap-1 text-[11px] text-ink-500">
+                        <span className="font-mono tabular-nums">{jobs}</span>
+                        <span>jobs</span>
+                      </div>
                     </div>
                     <div className="flex items-center justify-end gap-1">
                       <IconBtn icon="trash" tone="danger" onClick={() => remove(s.id)}/>
@@ -3560,8 +3584,9 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
     return Array.isArray(days) && days.length > 0 && !days.includes(dateDow);
   };
 
+  // On-hold staff are hidden from the calendar entirely
   // Working staff first, off-day staff last, alphabetical within each group
-  const staff = [...store.staff].sort((a, b) => {
+  const staff = [...store.staff].filter(s => s.active !== false).sort((a, b) => {
     const aOff = isOffDay(a) ? 1 : 0;
     const bOff = isOffDay(b) ? 1 : 0;
     if (aOff !== bOff) return aOff - bOff;
@@ -4696,19 +4721,18 @@ const App = () => {
     const { data: bkRow } = await supabase.from('bookings').select('assigned_staff').eq('id', newRow.id).maybeSingle();
     if (bkRow?.assigned_staff?.length > 0) return;
 
-    // Get all staff — availability is determined solely by working_days, not status
-    let staffRes = await supabase.from('staff').select('id, skills, working_days');
+    // Get all staff — exclude on-hold, then filter by working_days and mode
+    let staffRes = await supabase.from('staff').select('id, skills, working_days, active');
     let availableStaff = staffRes.data;
     if (staffRes.error || !availableStaff) {
-      // working_days column not yet in DB — fall back to id+skills only
       const fb = await supabase.from('staff').select('id, skills');
-      availableStaff = (fb.data || []).map(s => ({ ...s, working_days: null }));
+      availableStaff = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
     }
     if (!availableStaff || availableStaff.length === 0) return;
 
     // Filter by booking mode (look for @mode prefix in skills array)
     const mode = newRow.mode || 'hourly';
-    let pool = availableStaff.filter(s => {
+    let pool = availableStaff.filter(s => s.active !== false).filter(s => {
       const sk = Array.isArray(s.skills) ? s.skills : [];
       const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1));
       return modes.length === 0 || modes.includes(mode);
@@ -4795,6 +4819,7 @@ const App = () => {
         phone: s.phone || '',
         notes: s.notes || '',
         working_days: Array.isArray(s.working_days) ? s.working_days : [0,1,2,3,4,5,6],
+        active: s.active !== false,
       })) }));
     }
   }, []);

@@ -177,8 +177,14 @@ function App() {
   // Fetch total staff count once on mount and keep in sync via realtime
   React.useEffect(() => {
     const fetch = async () => {
-      const { data } = await supabase.from('staff').select('id');
-      if (data) setTotalStaffCount(data.length);
+      const { data, error } = await supabase.from('staff').select('id, active');
+      if (data) {
+        setTotalStaffCount(data.filter(s => s.active !== false).length);
+      } else if (error) {
+        // active column not yet in DB — count all staff
+        const { data: fb } = await supabase.from('staff').select('id');
+        if (fb) setTotalStaffCount(fb.length);
+      }
     };
     fetch();
     const ch = supabase.channel('staff-count-sync')
@@ -432,19 +438,18 @@ function App() {
       try {
         const [{ data: bks }, staffRes] = await Promise.all([
           supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
-          supabase.from('staff').select('id, working_days'),
+          supabase.from('staff').select('id, working_days, active'),
         ]);
         const dow = new Date(dateStr + 'T00:00:00').getDay();
 
-        // If working_days column doesn't exist yet, fall back to id-only query
-        // so staff are still counted (all treated as working every day until migration runs)
         let staffList = staffRes.data;
         if (staffRes.error || !staffList) {
           const { data: fallback } = await supabase.from('staff').select('id');
-          staffList = (fallback || []).map(s => ({ id: s.id, working_days: null }));
+          staffList = (fallback || []).map(s => ({ id: s.id, working_days: null, active: true }));
         }
 
         const workingStaff = staffList.filter(s => {
+          if (s.active === false) return false;       // on-hold staff don't count
           const days = s.working_days;
           return !Array.isArray(days) || days.length === 0 || days.includes(dow);
         });
@@ -533,17 +538,16 @@ function App() {
         const svcId    = (liveServices || []).find(s => s.name === breakdown.serviceName)?.id;
 
         const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
-        let staffRes = await supabase.from('staff').select('id, skills, working_days');
+        let staffRes = await supabase.from('staff').select('id, skills, working_days, active');
         let availStaff = staffRes.data;
         if (staffRes.error || !availStaff) {
-          // working_days column not yet in DB — fall back to id+skills only
           const fb = await supabase.from('staff').select('id, skills');
-          availStaff = (fb.data || []).map(s => ({ ...s, working_days: null }));
+          availStaff = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
         }
 
         if (availStaff && availStaff.length > 0) {
-          // 1. Filter by service mode (@mode entries in skills array)
-          let pool = availStaff.filter(s => {
+          // 1. Exclude on-hold staff, then filter by service mode
+          let pool = availStaff.filter(s => s.active !== false).filter(s => {
             const sk = Array.isArray(s.skills) ? s.skills : [];
             const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1));
             return modes.length === 0 || modes.includes(mode);
