@@ -569,9 +569,10 @@ function App() {
       // Attempt 1 — full row (including assigned_staff)
       let { error } = await supabase.from('bookings').insert(fullRow);
 
-      // Attempt 2 — strip columns that don't exist in this DB schema yet
+      // Attempt 2 — strip optional newer columns that may not exist in this DB schema yet
+      // Keep assigned_staff — it's a core column and must not be lost
       if (error?.code === 'PGRST204') {
-        const { assigned_staff: _a, area: _b, mode: _c, materials: _d, rate: _e, address: _f, ...coreRow } = fullRow;
+        const { area: _b, mode: _c, materials: _d, rate: _e, address: _f, ...coreRow } = fullRow;
         ({ error } = await supabase.from('bookings').insert(coreRow));
       }
 

@@ -1134,24 +1134,21 @@ const AssignStaff = ({ booking, store, set }) => {
           <div className="px-2 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">Assign maids</div>
           {(store?.staff || []).map(s => {
             const on = assigned.includes(s.id);
-            const onLeave = s.status === "On-Leave";
-            // Blocked = on-leave AND not currently assigned (can't add, but can remove)
-            const blocked = onLeave && !on;
+            const wdays = s.working_days;
+            const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+            const workDays = Array.isArray(wdays) && wdays.length > 0
+              ? wdays.map(d => dayNames[d]).join(' · ')
+              : 'All days';
             return (
-              <button key={s.id} onClick={() => !blocked && toggle(s.id)} disabled={blocked}
-                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-[12.5px]
-                  ${blocked ? "opacity-40 cursor-not-allowed" : "hover:bg-ink-50 cursor-pointer"}
-                  ${on && !onLeave ? "bg-mint-50" : ""}
-                  ${on && onLeave ? "bg-red-50" : ""}`}>
+              <button key={s.id} onClick={() => toggle(s.id)}
+                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-[12.5px] hover:bg-ink-50 cursor-pointer
+                  ${on ? "bg-mint-50" : ""}`}>
                 <StaffAvatar s={s} size={26}/>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-ink-900 truncate">{s.name}</div>
-                  <div className="flex items-center gap-1 text-[10.5px] text-ink-500"><StatusDot status={s.status}/>{s.status}</div>
+                  <div className="text-[10.5px] text-ink-500">{workDays}</div>
                 </div>
-                {on && !onLeave && <AdminIcon name="check" className="w-4 h-4 text-mint-700"/>}
-                {on && onLeave && (
-                  <span className="text-[10px] font-semibold text-red-500 whitespace-nowrap">Remove</span>
-                )}
+                {on && <AdminIcon name="check" className="w-4 h-4 text-mint-700"/>}
               </button>
             );
           })}
@@ -1672,14 +1669,14 @@ const initialStore = () => ({
     "2026-05-27": { blocked: true,  morning: false, afternoon: false },
   },
   staff: [
-    { id: "s1", name: "Maria Santos",    nationality: "philippines", status: "Available", color: "mint",   skills: ["regular","deep","movein"],            serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s2", name: "Anjali Sharma",   nationality: "indian",      status: "Busy",      color: "sky",    skills: ["regular","deep"],                    serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
-    { id: "s3", name: "Wendy Cruz",      nationality: "philippines", status: "Available", color: "pink",   skills: ["regular","deep","post"],              serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s4", name: "Amy Thapa",       nationality: "nepal",       status: "Available", color: "amber",  skills: ["regular","movein"],                  serviceTypes: ["hourly","stayin"],           working_days: [0,1,2,3,4,5,6] },
-    { id: "s5", name: "Michael Okafor",  nationality: "nigeria",     status: "On-Leave",  color: "violet", skills: ["regular","post"],                    serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
-    { id: "s6", name: "John Reyes",      nationality: "philippines", status: "Available", color: "sky",    skills: ["regular","deep","movein","post"],     serviceTypes: ["hourly","monthly","stayin"], working_days: [0,1,2,3,4,5,6] },
-    { id: "s7", name: "Priya Gurung",    nationality: "nepal",       status: "Busy",      color: "mint",   skills: ["regular","deep"],                    serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
-    { id: "s8", name: "Roselle Tan",     nationality: "philippines", status: "Available", color: "pink",   skills: ["regular","deep","post"],              serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
+    { id: "s1", name: "Maria Santos",   nationality: "philippines", color: "mint",   skills: ["regular","deep","movein"],        serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
+    { id: "s2", name: "Anjali Sharma",  nationality: "indian",      color: "sky",    skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
+    { id: "s3", name: "Wendy Cruz",     nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
+    { id: "s4", name: "Amy Thapa",      nationality: "nepal",       color: "amber",  skills: ["regular","movein"],               serviceTypes: ["hourly","stayin"],           working_days: [0,1,2,3,4,5,6] },
+    { id: "s5", name: "Michael Okafor", nationality: "nigeria",     color: "violet", skills: ["regular","post"],                 serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
+    { id: "s6", name: "John Reyes",     nationality: "philippines", color: "sky",    skills: ["regular","deep","movein","post"], serviceTypes: ["hourly","monthly","stayin"], working_days: [0,1,2,3,4,5,6] },
+    { id: "s7", name: "Priya Gurung",   nationality: "nepal",       color: "mint",   skills: ["regular","deep"],                 serviceTypes: ["hourly","monthly"],          working_days: [0,1,2,3,4,5,6] },
+    { id: "s8", name: "Roselle Tan",    nationality: "philippines", color: "pink",   skills: ["regular","deep","post"],          serviceTypes: ["hourly"],                    working_days: [0,1,2,3,4,5,6] },
   ],
   assignments: {
     "MP-2034": ["s1","s3"],
@@ -2325,7 +2322,6 @@ const STAFF_COLORS = {
   amber:  { bg: "bg-amber-100",  text: "text-amber-800",  block: "bg-amber-50 ring-amber-300 text-amber-900" },
   violet: { bg: "bg-violet-100", text: "text-violet-800", block: "bg-violet-50 ring-violet-300 text-violet-900" },
 };
-const STAFF_STATUSES = ["Available", "Busy", "On-Leave"];
 const initials = (name) => name.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
 
 const StaffAvatar = ({ s, size = 40 }) => {
@@ -2336,10 +2332,6 @@ const StaffAvatar = ({ s, size = 40 }) => {
       {initials(s.name)}
     </div>
   );
-};
-const StatusDot = ({ status }) => {
-  const map = { Available: "bg-mint-500", Busy: "bg-amber-500", "On-Leave": "bg-ink-400" };
-  return <span className={`w-2 h-2 rounded-full ${map[status] || "bg-ink-300"}`}></span>;
 };
 
 /* ─── Customer Management ─── */
@@ -2377,7 +2369,7 @@ const RegularsView = () => {
     setLoading(true);
     const [{ data: scheds, error: schErr }, { data: staff }] = await Promise.all([
       supabase.from('regular_schedules').select('*').order('created_at', { ascending: false }),
-      supabase.from('staff').select('id, name, color, status'),
+      supabase.from('staff').select('id, name, color, working_days'),
     ]);
     if (schErr) {
       setTableError(
@@ -2867,13 +2859,13 @@ const RegularsView = () => {
               </div>
             </div>
 
-            {staffList.filter(s => s.status !== 'On-Leave').length > 0 && (
+            {staffList.length > 0 && (
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-ink-500 mb-1.5">
                   Preferred Staff <span className="font-normal normal-case text-ink-400">(auto-assigned if empty)</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {staffList.filter(s => s.status !== 'On-Leave').map(s => {
+                  {staffList.map(s => {
                     const on = (draft.assigned_staff || []).includes(s.id);
                     const c  = STAFF_COLORS[s.color] || STAFF_COLORS.mint;
                     return (
@@ -3210,7 +3202,6 @@ const StaffSection = ({ store, set, bookings }) => {
     const failed = [];
     for (const s of store.staff) {
       const dbPatch = {
-        status: s.status,
         skills: encodeSkills(s.skills || [], s.serviceTypes || []),
         working_days: s.working_days ?? [0,1,2,3,4,5,6],
       };
@@ -3219,7 +3210,7 @@ const StaffSection = ({ store, set, bookings }) => {
         if (error) {
           if (error.code === 'PGRST204') {
             // working_days column not yet added — save without it
-            const { error: e2 } = await supabase.from('staff').update({ status: dbPatch.status, skills: dbPatch.skills }).eq('id', s.id);
+            const { error: e2 } = await supabase.from('staff').update({ skills: dbPatch.skills }).eq('id', s.id);
             if (e2) throw e2;
           } else throw error;
         }
@@ -3232,7 +3223,7 @@ const StaffSection = ({ store, set, bookings }) => {
     setSaving(false);
   };
 
-  const blankDraft = () => ({ name: '', nationality: store.nationalities.find(n => n.on !== false)?.id || '', status: 'Available', color: 'mint', skills: [], serviceTypes: [] });
+  const blankDraft = () => ({ name: '', nationality: store.nationalities.find(n => n.on !== false)?.id || '', color: 'mint', skills: [], serviceTypes: [], working_days: [0,1,2,3,4,5,6] });
   const [modalOpen, setModalOpen] = React.useState(false);
   const [draft, setDraft] = React.useState(blankDraft);
   const toggleDraftSkill = (sk) => setDraft(d => ({ ...d, skills: d.skills.includes(sk) ? d.skills.filter(x => x !== sk) : [...d.skills, sk] }));
@@ -3299,15 +3290,15 @@ const StaffSection = ({ store, set, bookings }) => {
             </button>
           </div>
         } padded={false}>
-        <div className="hidden md:grid grid-cols-[56px_1.2fr_1fr_1fr_1.2fr_1.4fr_100px_60px] gap-3 px-6 py-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 border-b border-ink-200/70 bg-ink-50/50">
-          <div></div><div>Name</div><div>Nationality</div><div>Status</div><div>Services</div><div>Skills</div><div>Active jobs</div><div></div>
+        <div className="hidden md:grid grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_100px_60px] gap-3 px-6 py-3 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 border-b border-ink-200/70 bg-ink-50/50">
+          <div></div><div>Name</div><div>Nationality</div><div>Working Days</div><div>Services</div><div>Skills</div><div>Active jobs</div><div></div>
         </div>
         <ul>
           {store.staff.map((s, i) => {
             const jobs = Object.values(store.assignments || {}).filter(arr => arr.includes(s.id)).length;
             return (
               <li key={s.id} className={`px-4 sm:px-6 py-3 ${i ? "border-t border-ink-200/70" : ""}`}>
-                <div className="grid grid-cols-[48px_1fr] md:grid-cols-[56px_1.2fr_1fr_1fr_1.2fr_1.4fr_100px_60px] gap-3 items-center">
+                <div className="grid grid-cols-[48px_1fr] md:grid-cols-[56px_1.2fr_1fr_1.8fr_1.2fr_1.4fr_100px_60px] gap-3 items-center">
                   <StaffAvatar s={s} size={40}/>
                   <div className="md:contents space-y-2 md:space-y-0">
                     <TextField value={s.name} onChange={v => updateImmediate(s.id, { name: v })} />
@@ -3321,12 +3312,24 @@ const StaffSection = ({ store, set, bookings }) => {
                         <option disabled>No nationalities — add in Nationalities page</option>
                       )}
                     </select>
-                    <select
-                      value={pendingChanges[s.id]?.status ?? s.status}
-                      onChange={e => markPending(s.id, { status: e.target.value })}
-                      className={`w-full h-10 px-3 rounded-lg hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)] transition-colors ${pendingChanges[s.id] ? "bg-mint-50 ring-1 ring-mint-400" : "bg-white"}`}>
-                      {STAFF_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
-                    </select>
+                    {/* Working Days — toggles in the "Working Days" column */}
+                    <div className="flex flex-wrap gap-1">
+                      {[['Su',0],['Mo',1],['Tu',2],['We',3],['Th',4],['Fr',5],['Sa',6]].map(([lbl, i]) => {
+                        const wdays = pendingChanges[s.id]?.working_days ?? s.working_days ?? [0,1,2,3,4,5,6];
+                        const on = wdays.includes(i);
+                        return (
+                          <button key={i} onClick={() => {
+                            const cur = pendingChanges[s.id]?.working_days ?? s.working_days ?? [0,1,2,3,4,5,6];
+                            const next = on ? cur.filter(d => d !== i) : [...cur, i].sort((a,b) => a-b);
+                            markPending(s.id, { working_days: next });
+                          }}
+                            className={`w-8 h-6 rounded text-[10.5px] font-bold transition-colors
+                              ${on ? 'bg-mint-500 text-ink-900' : 'bg-white hairline text-ink-400 hover:bg-ink-50'}`}>
+                            {lbl}
+                          </button>
+                        );
+                      })}
+                    </div>
                     {/* Service types — Hourly / Monthly / Stay-In */}
                     <div className="flex flex-wrap gap-1.5">
                       {[
@@ -3369,27 +3372,7 @@ const StaffSection = ({ store, set, bookings }) => {
                         });
                       })()}
                     </div>
-                    {/* Working days toggle — Su Mo Tu We Th Fr Sa */}
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-400 mr-0.5">Days:</span>
-                      {[['Su',0],['Mo',1],['Tu',2],['We',3],['Th',4],['Fr',5],['Sa',6]].map(([lbl, i]) => {
-                        const wdays = pendingChanges[s.id]?.working_days ?? s.working_days ?? [0,1,2,3,4,5,6];
-                        const on = wdays.includes(i);
-                        return (
-                          <button key={i} onClick={() => {
-                            const cur = pendingChanges[s.id]?.working_days ?? s.working_days ?? [0,1,2,3,4,5,6];
-                            const next = on ? cur.filter(d => d !== i) : [...cur, i].sort((a,b) => a-b);
-                            markPending(s.id, { working_days: next });
-                          }}
-                            className={`w-8 h-6 rounded text-[10.5px] font-bold transition-colors
-                              ${on ? 'bg-mint-500 text-ink-900' : 'bg-white hairline text-ink-400 hover:bg-ink-50'}`}>
-                            {lbl}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center gap-2 text-[12.5px] text-ink-700">
-                      <StatusDot status={s.status}/>
+                    <div className="flex items-center gap-1.5 text-[12.5px] text-ink-700">
                       <span className="font-mono tabular-nums">{jobs}</span>
                       <span className="text-ink-500">jobs</span>
                     </div>
@@ -3448,11 +3431,23 @@ const StaffSection = ({ store, set, bookings }) => {
                   </select>
                 </div>
                 <div>
-                  <Label>Status</Label>
-                  <select value={draft.status} onChange={e => setDraft(d => ({...d, status: e.target.value}))}
-                    className="mt-1.5 w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]">
-                    {STAFF_STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
-                  </select>
+                  <Label>Working Days</Label>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {[['Su',0],['Mo',1],['Tu',2],['We',3],['Th',4],['Fr',5],['Sa',6]].map(([lbl, i]) => {
+                      const wdays = draft.working_days ?? [0,1,2,3,4,5,6];
+                      const on = wdays.includes(i);
+                      return (
+                        <button key={i} type="button" onClick={() => {
+                          const next = on ? wdays.filter(d => d !== i) : [...wdays, i].sort((a,b) => a-b);
+                          setDraft(d => ({ ...d, working_days: next }));
+                        }}
+                          className={`w-10 h-8 rounded-lg text-[11.5px] font-bold transition-colors
+                            ${on ? 'bg-mint-500 text-ink-900' : 'bg-white hairline text-ink-400 hover:bg-ink-50'}`}>
+                          {lbl}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <div>
@@ -3553,15 +3548,20 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
   const SCHEDULE_HOURS = makeScheduleHours(bhOpen, bhClose);
   const todays = bookings.filter(b => bookingDateKey(b) === dateKey && b.status !== "Cancelled");
   const cellH = 56;
-  const order = { Available: 0, Busy: 1, "On-Leave": 2 };
-  const staff = [...store.staff].sort((a,b) => order[a.status] - order[b.status]);
-
   const dateDow = dateKey ? new Date(dateKey + 'T00:00:00').getDay() : null;
   const isOffDay = (s) => {
     if (dateDow === null) return false;
     const days = s.working_days;
     return Array.isArray(days) && days.length > 0 && !days.includes(dateDow);
   };
+
+  // Working staff first, off-day staff last, alphabetical within each group
+  const staff = [...store.staff].sort((a, b) => {
+    const aOff = isOffDay(a) ? 1 : 0;
+    const bOff = isOffDay(b) ? 1 : 0;
+    if (aOff !== bOff) return aOff - bOff;
+    return a.name.localeCompare(b.name);
+  });
 
   return (
     <Card padded={false} title="Daily Staff Schedule"
@@ -4777,7 +4777,6 @@ const App = () => {
       setStore(prev => ({ ...prev, staff: data.map(s => ({
         id: s.id, name: s.name || '',
         nationality: s.nationality || 'philippines',
-        status: s.status || 'Available',
         color: s.color || 'mint',
         // Service modes are stored as "@hourly","@monthly","@stayin" inside the skills array
         skills:        (Array.isArray(s.skills) ? s.skills : []).filter(sk => !sk.startsWith('@')),
