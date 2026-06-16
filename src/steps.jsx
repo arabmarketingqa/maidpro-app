@@ -216,7 +216,7 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
           return (
             <button key={t.id} onClick={() => set({ mode: t.id })}
               className={`h-10 sm:h-11 rounded-xl text-[13px] sm:text-[14px] font-bold inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-all
-                ${active ? "bg-ink-900 text-white shadow-card" : "bg-ink-50 text-ink-600 hover:bg-ink-100"}`}>
+                ${active ? "bg-mint-500 text-white shadow-mint" : "bg-mint-50 text-mint-700 hover:bg-mint-100"}`}>
               <SvcIcon name={icon} className="w-4 h-4" strokeWidth={1.75} />{t.label}
             </button>
           );
