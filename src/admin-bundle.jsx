@@ -1606,7 +1606,15 @@ const NAV = [
   { id: "calendar",      label: "Calendar View",    icon: "calendar" },
   { id: "customers",     label: "Customers",        icon: "contact" },
   { id: "staff",         label: "Staff Management", icon: "users" },
-  { id: "reports",       label: "Reports",          icon: "trend" },
+  {
+    id: "reports-group",
+    label: "Reports",
+    icon: "trend",
+    children: [
+      { id: "daily-report", label: "Daily Report", icon: "trend"  },
+      { id: "staff-report", label: "Staff Report", icon: "users"  },
+    ],
+  },
   {
     id: "services-group",
     label: "Services",
@@ -1709,9 +1717,13 @@ const initialStore = () => ({
 
 /* ─── Sidebar ─── */
 const SERVICE_CHILD_IDS = ['hourly', 'monthly', 'stayin'];
+const REPORT_CHILD_IDS  = ['daily-report', 'staff-report'];
 
 const Sidebar = ({ active, onNav, onClose, mobile, bookingsCount = 0, brand = {} }) => {
-  const [servicesOpen, setServicesOpen] = React.useState(() => SERVICE_CHILD_IDS.includes(active));
+  const [openGroups, setOpenGroups] = React.useState(() => ({
+    'services-group': SERVICE_CHILD_IDS.includes(active),
+    'reports-group':  REPORT_CHILD_IDS.includes(active),
+  }));
   const [syncTime, setSyncTime] = React.useState(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   React.useEffect(() => {
     const t = setInterval(() => setSyncTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 60000);
@@ -1719,7 +1731,8 @@ const Sidebar = ({ active, onNav, onClose, mobile, bookingsCount = 0, brand = {}
   }, []);
 
   React.useEffect(() => {
-    if (SERVICE_CHILD_IDS.includes(active)) setServicesOpen(true);
+    if (SERVICE_CHILD_IDS.includes(active)) setOpenGroups(prev => ({ ...prev, 'services-group': true }));
+    if (REPORT_CHILD_IDS.includes(active))  setOpenGroups(prev => ({ ...prev, 'reports-group':  true }));
   }, [active]);
 
   return (
@@ -1749,20 +1762,21 @@ const Sidebar = ({ active, onNav, onClose, mobile, bookingsCount = 0, brand = {}
       <nav className="px-3 mt-2 space-y-0.5">
         {NAV.map(n => {
           if (n.children) {
-            const groupActive = SERVICE_CHILD_IDS.includes(active);
+            const groupOpen   = openGroups[n.id] || false;
+            const groupActive = n.children.some(c => c.id === active);
             return (
               <div key={n.id}>
                 <button
-                  onClick={() => setServicesOpen(o => !o)}
+                  onClick={() => setOpenGroups(prev => ({ ...prev, [n.id]: !prev[n.id] }))}
                   className={`relative w-full flex items-center gap-3 h-10 px-3 rounded-lg text-[13.5px] font-medium transition-colors
                     ${groupActive ? "bg-white/10 text-white" : "text-ink-300 hover:bg-white/5 hover:text-white"}`}>
                   <AdminIcon name={n.icon} className="w-4 h-4"/>
                   <span className="flex-1 text-left">{n.label}</span>
                   <AdminIcon name="chevron"
-                    className={`w-4 h-4 transition-transform duration-200 ${servicesOpen ? "rotate-180" : ""}`}/>
+                    className={`w-4 h-4 transition-transform duration-200 ${groupOpen ? "rotate-180" : ""}`}/>
                 </button>
                 <div className={`overflow-hidden transition-all duration-200 ease-in-out
-                  ${servicesOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}>
+                  ${groupOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}>
                   <div className="pl-3 pt-0.5 pb-0.5 space-y-0.5">
                     {n.children.map(c => {
                       const isActive = active === c.id;
@@ -1840,7 +1854,8 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
     customers: "Customers",
     staff: "Staff Management",
     settings: "Settings",
-    reports: "Reports",
+    'daily-report': "Daily Report",
+    'staff-report': "Staff Report",
   };
   const subtitles = {
     overview: "Snapshot of today's operations.",
@@ -1856,7 +1871,8 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
     customers: "All customers who have made a booking.",
     staff: "Maids, skills, status and availability.",
     settings: "General configuration.",
-    reports: "Revenue, bookings and performance analytics.",
+    'daily-report': "Revenue, bookings and performance analytics.",
+    'staff-report': "Booking count, revenue and workload per staff member.",
   };
   const liveModes = store.modes.filter(m => m.on).length;
   return (
@@ -4338,11 +4354,10 @@ const NewBookingModal = ({ store, onClose }) => {
   )
 }
 /* ─── Reports Section ─── */
-const ReportsSection = ({ bookings, store }) => {
+const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
   const todayStr = today.toISOString().slice(0,10);
-  const [reportType, setReportType] = React.useState('daily');
   const [from, setFrom] = React.useState(firstOfMonth);
   const [to,   setTo]   = React.useState(todayStr);
 
@@ -4418,18 +4433,6 @@ const ReportsSection = ({ bookings, store }) => {
 
   return (
     <div className="space-y-5 fade-up">
-
-      {/* ── Report type selector ── */}
-      <div className="flex items-center gap-3">
-        <label className="text-[11.5px] font-bold uppercase tracking-[0.12em] text-ink-500 flex-shrink-0">Report Type</label>
-        <select
-          value={reportType}
-          onChange={e => setReportType(e.target.value)}
-          className="h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)] min-w-[200px]">
-          <option value="daily">Daily Report</option>
-          <option value="staff">Staff Report</option>
-        </select>
-      </div>
 
       {/* ── Date range ── */}
       <Card title="Date Range" subtitle="All metrics below update with this filter.">
@@ -5036,7 +5039,8 @@ const App = () => {
     customers:     <CustomerSection />,
     staff:         <StaffSection store={store} set={set} bookings={bookings}/>,
     settings:      <SettingsSection store={store} set={set}/>,
-    reports:       <ReportsSection bookings={bookings} store={store}/>
+    'daily-report': <ReportsSection bookings={bookings} store={store} reportType="daily"/>,
+    'staff-report': <ReportsSection bookings={bookings} store={store} reportType="staff"/>,
   };
 
   return (
