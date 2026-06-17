@@ -3832,7 +3832,6 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
           </div>
         </div>
       </div>
-      </div>{/* end hidden lg:block */}
     </Card>
   );
 };
