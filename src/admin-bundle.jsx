@@ -4019,6 +4019,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const [saving, setSaving] = React.useState(false)
   const [saveError, setSaveError] = React.useState('')
   const [confirmCancel, setConfirmCancel] = React.useState(false)
+  const [cancelReason, setCancelReason] = React.useState('')
   const [cancelling, setCancelling] = React.useState(false)
   const total = Number(booking.total) || 0
   const paidNum = parseFloat(paidAmount) || 0
@@ -4077,9 +4078,11 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   }
 
   const cancelBooking = async () => {
-    if (!booking._raw?.id) return
+    if (!booking._raw?.id || !cancelReason.trim()) return
     setCancelling(true)
-    await supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', booking._raw.id)
+    const existingNotes = notes.trim()
+    const updatedNotes = `[Cancellation reason: ${cancelReason.trim()}]${existingNotes ? '\n\n' + existingNotes : ''}`
+    await supabase.from('bookings').update({ status: 'Cancelled', notes: updatedNotes }).eq('id', booking._raw.id)
     setCancelling(false)
     onClose(true)
   }
@@ -4208,28 +4211,37 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
         {saveError && (
           <div className="px-3 py-2 rounded-lg bg-red-50 text-[12.5px] text-red-700 font-medium">{saveError}</div>
         )}
+        {/* Cancel confirmation panel */}
+        {booking.status !== 'Cancelled' && confirmCancel && (
+          <div className="rounded-xl bg-red-50 ring-1 ring-red-200 p-4 space-y-3">
+            <div className="text-[13.5px] font-bold text-red-700">Cancel this booking?</div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-red-600 mb-1.5">Reason for cancellation *</label>
+              <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)}
+                placeholder="e.g. Customer requested to cancel, schedule conflict, double booking…"
+                rows={2}
+                className="w-full p-2.5 rounded-lg bg-white ring-1 ring-red-200 text-[13px] text-ink-900 placeholder:text-ink-400 outline-none resize-none focus:ring-2 focus:ring-red-400"/>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={cancelBooking} disabled={cancelling || !cancelReason.trim()}
+                className="h-9 px-4 rounded-lg bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                {cancelling ? '…' : 'Yes, cancel booking'}
+              </button>
+              <button onClick={() => { setConfirmCancel(false); setCancelReason('') }}
+                className="h-9 px-3 rounded-lg hairline text-[13px] font-semibold text-ink-700 hover:bg-ink-100 transition-colors">
+                Keep booking
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 pt-2 border-t border-ink-200"
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
-          {/* Cancel booking — left side */}
-          {booking.status !== 'Cancelled' && (
-            confirmCancel ? (
-              <div className="mr-auto flex items-center gap-2">
-                <span className="text-[12.5px] text-red-600 font-semibold">Cancel this booking?</span>
-                <button onClick={cancelBooking} disabled={cancelling}
-                  className="h-8 px-3 rounded-lg bg-red-500 text-white text-[12.5px] font-semibold hover:bg-red-600 transition-colors">
-                  {cancelling ? '…' : 'Yes, cancel'}
-                </button>
-                <button onClick={() => setConfirmCancel(false)}
-                  className="h-8 px-3 rounded-lg hairline text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
-                  Keep
-                </button>
-              </div>
-            ) : (
-              <button onClick={() => setConfirmCancel(true)}
-                className="mr-auto flex items-center gap-1.5 text-[13px] font-semibold text-red-500 hover:text-red-600 transition-colors">
-                <AdminIcon name="x" className="w-4 h-4"/>Cancel Booking
-              </button>
-            )
+          {booking.status !== 'Cancelled' && !confirmCancel && (
+            <button onClick={() => setConfirmCancel(true)}
+              className="mr-auto flex items-center gap-1.5 text-[13px] font-semibold text-red-500 hover:text-red-600 transition-colors">
+              <AdminIcon name="x" className="w-4 h-4"/>Cancel Booking
+            </button>
           )}
           <GhostBtn onClick={() => onClose(false)}>Close</GhostBtn>
           <PrimaryBtn onClick={save} disabled={saving}><AdminIcon name="check" className="w-4 h-4"/>{saving ? 'Saving...' : 'Save changes'}</PrimaryBtn>
