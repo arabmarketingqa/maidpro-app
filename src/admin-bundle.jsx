@@ -243,6 +243,14 @@ const StatusPill = ({ status }) => {
 };
 
 const PaymentBadge = ({ booking }) => {
+  if (booking.status === 'Cancelled') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-semibold bg-ink-100 text-ink-500">
+        <span className="w-1.5 h-1.5 rounded-full bg-ink-400"></span>
+        Cancelled
+      </span>
+    );
+  }
   const isPaid = booking.payment_status === 'Paid';
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11.5px] font-semibold
@@ -4021,6 +4029,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const [confirmCancel, setConfirmCancel] = React.useState(false)
   const [cancelReason, setCancelReason] = React.useState('')
   const [cancelling, setCancelling] = React.useState(false)
+  const isCancelled = booking.status === 'Cancelled'
   const total = Number(booking.total) || 0
   const paidNum = parseFloat(paidAmount) || 0
   const due = Math.max(0, total - paidNum)
@@ -4116,6 +4125,21 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
         {booking._raw && booking._raw.address && (
           <div className="p-3 rounded-xl bg-ink-50"><div className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500 mb-0.5">Address</div><div className="text-[13px] text-ink-900">{booking._raw.address}</div></div>
         )}
+
+        {/* Cancelled banner */}
+        {isCancelled && (
+          <div className="flex items-center gap-3 rounded-xl bg-ink-100 px-4 py-3">
+            <span className="w-8 h-8 rounded-full bg-ink-300 grid place-items-center flex-shrink-0">
+              <AdminIcon name="x" className="w-4 h-4 text-ink-600"/>
+            </span>
+            <div>
+              <div className="text-[13.5px] font-bold text-ink-700">Booking Cancelled</div>
+              <div className="text-[12px] text-ink-500">This booking has been cancelled. No changes can be made.</div>
+            </div>
+          </div>
+        )}
+
+        {!isCancelled && (<>
         <div><Label className="mb-1.5">Status</Label><select value={status} onChange={e => setStatus(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">{BOOKING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
 
         {/* Reschedule */}
@@ -4169,9 +4193,18 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
 
         <div><Label className="mb-1.5">Notes</Label><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Notes..." className="w-full p-3 rounded-xl bg-white hairline text-[13px] text-ink-900 placeholder:text-ink-400 outline-none resize-none"/></div>
         <div><Label className="mb-1.5">Assign staff</Label><AssignStaff booking={booking} store={store} set={set}/></div>
+        </>)}{/* end !isCancelled */}
+
+        {/* Read-only notes when cancelled (shows cancellation reason) */}
+        {isCancelled && notes && (
+          <div className="p-3 rounded-xl bg-ink-50">
+            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500 mb-1">Notes</div>
+            <div className="text-[13px] text-ink-700 whitespace-pre-wrap">{notes}</div>
+          </div>
+        )}
 
         {/* ── Staff Hours Editor ── */}
-        {assignedIds.length > 0 && (
+        {!isCancelled && assignedIds.length > 0 && (
           <div className="rounded-xl bg-ink-50 p-4 space-y-2.5">
             <div className="flex items-center justify-between">
               <Label>Staff Work Hours <span className="text-[11px] font-normal text-ink-400 ml-1">(all maids work simultaneously)</span></Label>
@@ -4212,7 +4245,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
           <div className="px-3 py-2 rounded-lg bg-red-50 text-[12.5px] text-red-700 font-medium">{saveError}</div>
         )}
         {/* Cancel confirmation panel */}
-        {booking.status !== 'Cancelled' && confirmCancel && (
+        {!isCancelled && confirmCancel && (
           <div className="rounded-xl bg-red-50 ring-1 ring-red-200 p-4 space-y-3">
             <div className="text-[13.5px] font-bold text-red-700">Cancel this booking?</div>
             <div>
@@ -4237,14 +4270,16 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
 
         <div className="flex items-center gap-2 pt-2 border-t border-ink-200"
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
-          {booking.status !== 'Cancelled' && !confirmCancel && (
+          {!isCancelled && !confirmCancel && (
             <button onClick={() => setConfirmCancel(true)}
               className="mr-auto flex items-center gap-1.5 text-[13px] font-semibold text-red-500 hover:text-red-600 transition-colors">
               <AdminIcon name="x" className="w-4 h-4"/>Cancel Booking
             </button>
           )}
           <GhostBtn onClick={() => onClose(false)}>Close</GhostBtn>
-          <PrimaryBtn onClick={save} disabled={saving}><AdminIcon name="check" className="w-4 h-4"/>{saving ? 'Saving...' : 'Save changes'}</PrimaryBtn>
+          {!isCancelled && (
+            <PrimaryBtn onClick={save} disabled={saving}><AdminIcon name="check" className="w-4 h-4"/>{saving ? 'Saving...' : 'Save changes'}</PrimaryBtn>
+          )}
         </div>
         </div>{/* end px-5 padding wrapper */}
       </div>
