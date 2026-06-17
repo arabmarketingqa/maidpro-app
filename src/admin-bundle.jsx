@@ -1249,7 +1249,11 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
   const filtered = bookings.filter(b => {
     if (filter !== "All" && b.status !== filter) return false;
     if (effectivePayFilter !== "All" && b.payment_status !== effectivePayFilter) return false;
-    if (effectiveQuery && !b.customer.toLowerCase().includes(effectiveQuery.toLowerCase()) && !b.ref.toLowerCase().includes(effectiveQuery.toLowerCase())) return false;
+    if (effectiveQuery) {
+      const q = effectiveQuery.toLowerCase();
+      const hit = b.customer?.toLowerCase().includes(q) || b.ref?.toLowerCase().includes(q) || (b.phone && b.phone.replace(/\s/g,'').includes(q.replace(/\s/g,'')));
+      if (!hit) return false;
+    }
     const raw = b._raw?.date || '';
     if (dateFrom && raw < dateFrom) return false;
     if (dateTo   && raw > dateTo)   return false;
@@ -4765,8 +4769,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
           return ids.map(id => (staffList.find(s => s.id === id)?.name || '—')).join(', ');
         };
 
-        const totalHours  = inRange.reduce((s, b) => s + (b.hours || 0), 0);
-        const totalAmount = inRange.reduce((s, b) => s + b.total, 0);
+        const totalHours  = inRange.filter(b => b.status !== 'Cancelled').reduce((s, b) => s + (b.hours || 0), 0);
+        const totalAmount = inRange.filter(b => b.status !== 'Cancelled').reduce((s, b) => s + b.total, 0);
 
         const handlePrint = () => {
           const brand     = store?.brand || {};
@@ -4779,16 +4783,20 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
             ? `<img src="${brandLogo}" alt="${brandName}" style="height:56px;max-width:160px;object-fit:contain;display:block;"/>`
             : `<div style="width:48px;height:48px;border-radius:12px;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;letter-spacing:-1px;">${brandName.slice(0,1)}</div>`;
 
-          const rows = inRange.map((b, i) => `
-            <tr class="${i % 2 === 1 ? 'even' : ''}">
+          const rows = inRange.map((b, i) => {
+            const isCancelled = b.status === 'Cancelled';
+            return `
+            <tr class="${i % 2 === 1 ? 'even' : ''}${isCancelled ? ' cancelled-row' : ''}">
               <td class="num">${i + 1}</td>
+              <td class="mono" style="font-size:10px;color:#9ca3af">${b.ref || '—'}</td>
               <td class="mono">${b._raw?.date || '—'}</td>
               <td class="mono">${b._raw?.time || b.time || '—'}</td>
               <td>${getMaids(b)}</td>
               <td class="bold">${b.customer || '—'}</td>
-              <td class="center">${b.hours ?? '—'}</td>
-              <td class="right mono">QAR ${(b.total || 0).toLocaleString()}</td>
-            </tr>`).join('');
+              <td class="center">${isCancelled ? '—' : (b.hours ?? '—')}</td>
+              <td class="right mono">${isCancelled ? '<span style="background:#f3f4f6;color:#9ca3af;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.05em">CANCELLED</span>' : 'QAR ' + (b.total || 0).toLocaleString()}</td>
+            </tr>`;
+          }).join('');
 
           const html = `<!DOCTYPE html>
 <html lang="en"><head>
@@ -4822,6 +4830,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   thead tr{background:#f9fafb}
   th{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:left;white-space:nowrap}
   td{padding:10px 14px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#374151;vertical-align:middle}
+  .cancelled-row td{opacity:.5}
   tr.even td{background:#fafafa}
   tbody tr:last-child td{border-bottom:none}
   td.num{color:#9ca3af;font-size:11px;font-weight:500;width:40px}
@@ -4886,7 +4895,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   <table>
     <thead>
       <tr>
-        <th>No#</th>
+        <th>No.</th>
+        <th>Ref ID</th>
         <th>Date</th>
         <th>Time</th>
         <th>Maid</th>
@@ -4895,10 +4905,10 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         <th style="text-align:right">Amount</th>
       </tr>
     </thead>
-    <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
+    <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
     <tfoot>
       <tr>
-        <td colspan="5" style="text-align:right;letter-spacing:.05em;text-transform:uppercase;font-size:10px">Total</td>
+        <td colspan="6" style="text-align:right;letter-spacing:.05em;text-transform:uppercase;font-size:10px">Total</td>
         <td style="text-align:center">${totalHours} hrs</td>
         <td style="text-align:right">QAR ${totalAmount.toLocaleString()}</td>
       </tr>
@@ -4938,7 +4948,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500 bg-ink-50/60 border-b border-ink-200/70">
-                    <th className="px-5 py-3 w-12">No#</th>
+                    <th className="px-5 py-3 w-12">No.</th>
+                    <th className="px-3 py-3 w-28">Ref ID</th>
                     <th className="px-3 py-3 w-28">Date</th>
                     <th className="px-3 py-3 w-28">Time</th>
                     <th className="px-3 py-3">Maid</th>
@@ -4949,25 +4960,31 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 </thead>
                 <tbody>
                   {inRange.length === 0 ? (
-                    <tr><td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
-                  ) : inRange.map((b, i) => (
-                    <tr key={b.ref} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
+                    <tr><td colSpan={8} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
+                  ) : inRange.map((b, i) => {
+                    const isCancelled = b.status === 'Cancelled';
+                    return (
+                    <tr key={b.ref} className={`border-t border-ink-100 transition-colors ${isCancelled ? 'bg-ink-50/40 opacity-60' : 'hover:bg-ink-50/50'}`}>
                       <td className="px-5 py-3 font-mono text-[12px] text-ink-400 tabular-nums">{i + 1}</td>
+                      <td className="px-3 py-3 font-mono text-[12px] text-ink-500">{b.ref || '—'}</td>
                       <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.date || '—'}</td>
                       <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.time || b.time || '—'}</td>
                       <td className="px-3 py-3 text-[13px] text-ink-700">{getMaids(b)}</td>
                       <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
-                      <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{b.hours ?? '—'}</td>
-                      <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold text-ink-900">
-                        QAR {(b.total || 0).toLocaleString()}
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{isCancelled ? '—' : (b.hours ?? '—')}</td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold">
+                        {isCancelled
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ink-100 text-ink-500 text-[11px] font-semibold">Cancelled</span>
+                          : <span className="text-ink-900">QAR {(b.total || 0).toLocaleString()}</span>}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 {inRange.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-ink-200 bg-ink-50/60">
-                      <td colSpan={5} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
+                      <td colSpan={6} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
                       <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900 tabular-nums">{totalHours}</td>
                       <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900 tabular-nums">QAR {totalAmount.toLocaleString()}</td>
                     </tr>
@@ -5546,7 +5563,7 @@ const App = () => {
   }, [fetchNationalities, fetchStaff]);
 
   const todayISO  = new Date().toISOString().split('T')[0];
-  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO);
+  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO && b.status !== 'Cancelled');
   // Active maids: staff who are active and scheduled to work today (not day off)
   const activeMaids = (store.staff || []).filter(s => s.active !== false && isWorkingDay(s, todayISO)).length;
   // Today revenue: sum of paid_amount on today's bookings
