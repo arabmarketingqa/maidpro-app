@@ -3701,87 +3701,35 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
     return a.name.localeCompare(b.name);
   });
 
+  const colW = `minmax(72px, 1fr)`;
+  const timeColW = '44px';
+
   return (
     <Card padded={false} title="Daily Staff Schedule"
       subtitle={dateKey ? `Jobs and availability for ${new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}.` : "Pick a date above."}>
-
-      {/* ── Mobile: card list view ── */}
-      <div className="lg:hidden px-3 pb-4 pt-2 space-y-2.5">
-        {staff.length === 0 && (
-          <div className="text-[13px] text-ink-400 text-center py-6">No active staff found.</div>
-        )}
-        {staff.map(s => {
-          const off = isOffDay(s);
-          const staffBks = todays.filter(b => {
-            const ids = (b._raw?.assigned_staff?.length > 0) ? b._raw.assigned_staff : (store.assignments?.[b.ref] || []);
-            return ids.includes(s.id);
-          });
-          const c = STAFF_COLORS[s.color] || STAFF_COLORS.mint;
-          return (
-            <div key={s.id} className="rounded-xl border border-ink-200 bg-white overflow-hidden">
-              <div className={`flex items-center gap-3 px-3 py-2.5 ${off ? 'opacity-60' : ''}`}>
-                <StaffAvatar s={s} size={36}/>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-bold text-ink-900 truncate">{s.name}</div>
-                  <div className={`text-[10.5px] font-mono uppercase tracking-wide ${off ? 'text-ink-400' : staffBks.length > 0 ? 'text-mint-700' : 'text-ink-500'}`}>
-                    {off ? 'Off Today' : staffBks.length > 0 ? `${staffBks.length} job${staffBks.length !== 1 ? 's' : ''} · Working` : 'Working · Free'}
-                  </div>
-                </div>
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${off ? 'bg-ink-200' : staffBks.length > 0 ? 'bg-mint-500' : 'bg-ink-300'}`}/>
-              </div>
-              {staffBks.length > 0 && (
-                <div className="border-t border-ink-100 px-3 pb-3 pt-2 space-y-2">
-                  {staffBks.map(b => {
-                    const startH = parseHour(b.time);
-                    const hoursMap = (b._raw?.staff_hours && Object.keys(b._raw.staff_hours).length > 0) ? b._raw.staff_hours : (store.staffHours?.[b.ref] || {});
-                    const myHours = Number(hoursMap[s.id] ?? b.hours);
-                    const endH = startH != null ? startH + myHours : null;
-                    return (
-                      <div key={`${b.ref}-${s.id}`} className={`rounded-lg ring-1 px-2.5 py-2 ${c.block}`}>
-                        <div className="text-[10.5px] font-mono opacity-80">
-                          {startH != null
-                            ? `${fmt12(Math.floor(startH), Math.round((startH % 1) * 60))} — ${fmt12(Math.floor(endH), Math.round((endH % 1) * 60))}`
-                            : b.time}
-                          {' · '}{myHours}h
-                        </div>
-                        <div className="text-[12.5px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
-                        <div className="text-[11px] opacity-80 truncate">{b.service}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Desktop: horizontal timeline ── */}
-      <div className="hidden lg:block overflow-x-auto">
-        <div className="min-w-[720px]">
+      <div className="overflow-x-auto">
+        <div style={{ minWidth: `calc(${timeColW} + ${staff.length} * 72px)` }}>
           <div className="grid sticky top-0 z-10 bg-white border-b border-ink-200/70"
-               style={{ gridTemplateColumns: `64px repeat(${staff.length}, minmax(132px, 1fr))` }}>
+               style={{ gridTemplateColumns: `${timeColW} repeat(${staff.length}, ${colW})` }}>
             <div></div>
             {staff.map(s => {
               const off = isOffDay(s);
               return (
-                <div key={s.id} className={`flex flex-col items-center gap-1.5 py-3 px-2 ${off ? 'opacity-50' : ''}`}>
-                  <StaffAvatar s={s} size={44}/>
-                  <div className="text-[12.5px] font-bold text-ink-900 truncate max-w-full">{s.name.split(" ")[0]}</div>
-                  <div className={`flex items-center gap-1 text-[10.5px] font-mono uppercase tracking-[0.12em] ${off ? 'text-ink-400' : 'text-mint-700 font-semibold'}`}>
-                    {off
-                      ? <span className="inline-block w-2 h-2 rounded-full bg-ink-300"/>
-                      : <span className="inline-block w-2 h-2 rounded-full bg-mint-500"/>}
-                    {off ? 'Off Today' : 'Working'}
+                <div key={s.id} className={`flex flex-col items-center gap-1 py-2 px-1 ${off ? 'opacity-50' : ''}`}>
+                  <StaffAvatar s={s} size={32}/>
+                  <div className="text-[11px] font-bold text-ink-900 truncate max-w-full text-center leading-tight">{s.name.split(" ")[0]}</div>
+                  <div className={`flex items-center gap-0.5 text-[9px] font-mono uppercase tracking-[0.08em] ${off ? 'text-ink-400' : 'text-mint-700 font-semibold'}`}>
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${off ? 'bg-ink-300' : 'bg-mint-500'}`}/>
+                    {off ? 'Off' : 'On'}
                   </div>
                 </div>
               );
             })}
           </div>
           <div className="relative grid"
-               style={{ gridTemplateColumns: `64px repeat(${staff.length}, minmax(132px, 1fr))`, gridAutoRows: `${cellH}px` }}>
+               style={{ gridTemplateColumns: `${timeColW} repeat(${staff.length}, ${colW})`, gridAutoRows: `${cellH}px` }}>
             {SCHEDULE_HOURS.map((h, hi) => (
-              <div key={`h${h}`} className="border-b border-r border-ink-200/70 text-[10.5px] font-mono text-ink-500 px-2 pt-1"
+              <div key={`h${h}`} className="border-b border-r border-ink-200/70 text-[9px] font-mono text-ink-500 px-1 pt-1"
                    style={{ gridColumn: 1, gridRow: hi+1 }}>
                 {fmt12(h)}
               </div>
@@ -3797,14 +3745,12 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
                   );
                 })}
                 {todays.filter(b => {
-                  // Use the DB-sourced assigned_staff from the raw row first — most reliable
                   const ids = (b._raw?.assigned_staff?.length > 0)
                     ? b._raw.assigned_staff
                     : (store.assignments?.[b.ref] || []);
                   return ids.includes(s.id);
                 }).map(b => {
                   const bookingStart = parseHour(b.time); if (bookingStart == null) return null;
-                  // All maids work simultaneously — each starts at bookingStart for their full hours
                   const hoursMap = (b._raw?.staff_hours && Object.keys(b._raw.staff_hours).length > 0)
                     ? b._raw.staff_hours
                     : (store.staffHours?.[b.ref] || {});
@@ -3817,13 +3763,13 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
                   const endT = start + myHours;
                   return (
                     <div key={`${b.ref}-${s.id}`}
-                      className={`relative m-1 rounded-lg ring-1 px-2.5 py-1.5 text-left overflow-hidden ${c.block}`}
+                      className={`relative m-0.5 rounded-md ring-1 px-1.5 py-1 text-left overflow-hidden ${c.block}`}
                       style={{ gridColumn: sIdx + 2, gridRow: `${startIdx + 1} / span ${Math.max(1, Math.ceil(span))}` }}>
-                      <div className="text-[10.5px] font-mono opacity-80">
-                        {fmt12(Math.floor(start), Math.round((start % 1) * 60))} — {fmt12(Math.floor(endT), Math.round((endT % 1) * 60))}
+                      <div className="text-[8.5px] font-mono opacity-80 leading-tight">
+                        {fmt12(Math.floor(start), Math.round((start % 1) * 60))}–{fmt12(Math.floor(endT), Math.round((endT % 1) * 60))}
                       </div>
-                      <div className="text-[12.5px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
-                      <div className="text-[11px] opacity-80 truncate">{b.service}</div>
+                      <div className="text-[10px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
+                      <div className="text-[9px] opacity-80 truncate">{b.service}</div>
                     </div>
                   );
                 })}
