@@ -1457,7 +1457,6 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
               <th className="px-3 py-3">Date</th>
               <th className="px-3 py-3">Maids</th>
               <th className="px-3 py-3">Assigned to</th>
-              <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3">Payment</th>
               <th className="px-3 py-3 text-right">Total</th>
               <th className="px-6 py-3 w-12"></th>
@@ -1487,7 +1486,6 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
                 <td className="px-3 py-3.5 text-[13px] text-ink-700">{b.date}<div className="text-[11.5px] text-ink-500">{b.time}</div></td>
                 <td className="px-3 py-3.5 text-[13px] font-mono tabular-nums text-ink-700">{b.maids} × {b.hours}h</td>
                 <td className="px-3 py-3.5"><AssignStaff booking={b} store={store} set={set}/></td>
-                <td className="px-3 py-3.5"><StatusPill status={b.status}/></td>
                 <td className="px-3 py-3.5"><PaymentBadge booking={b}/></td>
                 <td className="px-3 py-3.5 text-right">
                   <div className="font-mono tabular-nums text-[13.5px] font-semibold text-ink-900">
@@ -5443,20 +5441,17 @@ const App = () => {
   }, [fetchNationalities, fetchStaff]);
 
   const todayISO  = new Date().toISOString().split('T')[0];
-  const thisMonth = new Date().toISOString().slice(0, 7);
   const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO);
-  const mtdRev    = bookings.filter(b => ['Confirmed','Completed'].includes(b.status) && (b._raw && b._raw.created_at || '').startsWith(thisMonth)).reduce((s, b) => s + b.total, 0);
-  const activeMaids = todayBks.filter(b => b.status === 'Confirmed').reduce((s, b) => s + b.maids, 0);
-  const doneCount = bookings.filter(b => b.status === 'Completed').length;
-  const doneOf    = bookings.filter(b => ['Confirmed','Completed','Cancelled'].includes(b.status)).length;
-  const compRate  = doneOf > 0 ? ((doneCount / doneOf) * 100).toFixed(1) : "0";
+  // Active maids: staff who are active and scheduled to work today (not day off)
+  const activeMaids = (store.staff || []).filter(s => s.active !== false && isWorkingDay(s, todayISO)).length;
+  // Today revenue: sum of paid_amount on today's bookings
+  const todayRev  = todayBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
   const pendingPayBks   = bookings.filter(b => b.payment_status === 'Pending' && b.status !== 'Cancelled');
   const pendingPayTotal = pendingPayBks.reduce((s, b) => s + Math.max(0, b.total - b.paid_amount), 0);
   const dynamicKpis = [
-    { label: "Bookings Today",    value: String(todayBks.length),       unit: "jobs", delta: 0, icon: "calendar", tone: "mint" },
-    { label: "Active Maids",      value: String(activeMaids || 0),      unit: "live", delta: 0, icon: "users",    tone: "ink"  },
-    { label: "Revenue (MTD)",     value: mtdRev.toLocaleString(),        unit: "QAR",  delta: 0, icon: "money",    tone: "mint" },
-    { label: "Completion Rate",   value: compRate,                       unit: "%",    delta: 0, icon: "trend",    tone: "ink"  },
+    { label: "Bookings Today",  value: String(todayBks.length),    unit: "jobs",     icon: "calendar", tone: "mint" },
+    { label: "Active Maids",    value: String(activeMaids),        unit: "working",  icon: "users",    tone: "ink"  },
+    { label: "Today Revenue",   value: todayRev.toLocaleString(),  unit: "QAR",      icon: "money",    tone: "mint" },
     {
       label: "Pending Payments",
       value: String(pendingPayBks.length),
