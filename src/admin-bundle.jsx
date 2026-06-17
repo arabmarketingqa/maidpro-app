@@ -1136,18 +1136,30 @@ const AssignStaff = ({ booking, store, set }) => {
           <div className="px-2 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">Assign maids</div>
           {(store?.staff || []).map(s => {
             const on = assigned.includes(s.id);
+            const bookingDate = booking._raw?.date || '';
+            const dayOff = bookingDate ? !isWorkingDay(s, bookingDate) : false;
             const wdays = s.working_days;
             const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
             const workDays = Array.isArray(wdays) && wdays.length > 0
               ? wdays.map(d => dayNames[d]).join(' · ')
               : 'All days';
             return (
-              <button key={s.id} onClick={() => toggle(s.id)}
-                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-[12.5px] hover:bg-ink-50 cursor-pointer
-                  ${on ? "bg-mint-50" : ""}`}>
+              <button key={s.id}
+                onClick={() => { if (!dayOff) toggle(s.id); }}
+                disabled={dayOff && !on}
+                className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left text-[12.5px]
+                  ${dayOff && !on ? 'opacity-50 cursor-not-allowed' : 'hover:bg-ink-50 cursor-pointer'}
+                  ${on ? 'bg-mint-50' : ''}`}>
                 <StaffAvatar s={s} size={26}/>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-ink-900 truncate">{s.name}</div>
+                  <div className="font-semibold text-ink-900 truncate flex items-center gap-1.5">
+                    {dayOff && (
+                      <span className="inline-flex items-center text-[9.5px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full leading-none flex-shrink-0">
+                        Day Off
+                      </span>
+                    )}
+                    {s.name}
+                  </div>
                   <div className="text-[10.5px] text-ink-500">{workDays}</div>
                 </div>
                 {on && <AdminIcon name="check" className="w-4 h-4 text-mint-700"/>}
