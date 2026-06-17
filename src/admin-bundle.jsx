@@ -3044,6 +3044,7 @@ const CustomerSection = () => {
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [editingId, setEditingId] = React.useState(null); // null = add new, string = editing existing
   const [draft, setDraft] = React.useState({ name: '', phone: '', area: '', address: '', tag: 'new' });
   const [saving, setSaving] = React.useState(false);
   const [formErr, setFormErr] = React.useState('');
@@ -3080,21 +3081,35 @@ const CustomerSection = () => {
   };
 
   const openModal = () => {
+    setEditingId(null);
     setDraft({ name: '', phone: '', area: '', address: '', tag: 'new' });
     setFormErr('');
     setModalOpen(true);
   };
 
-  const saveNew = async () => {
+  const openEdit = (c) => {
+    setEditingId(c.id);
+    setDraft({ name: c.name || '', phone: c.phone || '', area: c.area || '', address: c.address || '', tag: c.tag || 'new' });
+    setFormErr('');
+    setModalOpen(true);
+  };
+
+  const saveCustomer = async () => {
     if (!draft.name.trim()) { setFormErr('Name is required.'); return; }
     if (!draft.phone.trim()) { setFormErr('Phone is required.'); return; }
     setFormErr('');
     setSaving(true);
-    const custId = 'c_' + draft.phone.replace(/\D/g, '').slice(-10) + '_' + Date.now();
-    const newCust = { id: custId, name: draft.name.trim(), phone: draft.phone.trim(), area: draft.area.trim(), address: draft.address.trim(), tag: draft.tag };
-    const { error } = await supabase.from('customers').insert(newCust);
-    if (error) { setFormErr(error.message); setSaving(false); return; }
-    setCustomers(cs => [{ ...newCust, created_at: new Date().toISOString() }, ...cs]);
+    const payload = { name: draft.name.trim(), phone: draft.phone.trim(), area: draft.area.trim(), address: draft.address.trim(), tag: draft.tag };
+    if (editingId) {
+      const { error } = await supabase.from('customers').update(payload).eq('id', editingId);
+      if (error) { setFormErr(error.message); setSaving(false); return; }
+      setCustomers(cs => cs.map(c => c.id === editingId ? { ...c, ...payload } : c));
+    } else {
+      const custId = 'c_' + draft.phone.replace(/\D/g, '').slice(-10) + '_' + Date.now();
+      const { error } = await supabase.from('customers').insert({ id: custId, ...payload });
+      if (error) { setFormErr(error.message); setSaving(false); return; }
+      setCustomers(cs => [{ id: custId, ...payload, created_at: new Date().toISOString() }, ...cs]);
+    }
     setSaving(false);
     setModalOpen(false);
   };
@@ -3185,7 +3200,8 @@ const CustomerSection = () => {
                           {TAGS.map(t => <option key={t} value={t}>{TAG_META[t].label}</option>)}
                         </select>
                       </div>
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-1">
+                        <IconBtn icon="edit" onClick={() => openEdit(c)} title="Edit customer"/>
                         <IconBtn icon="trash" tone="danger" onClick={() => remove(c.id)}/>
                       </div>
                     </div>
@@ -3206,11 +3222,11 @@ const CustomerSection = () => {
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl ring-1 ring-ink-200 p-5 sm:p-6 space-y-4 fade-up">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-mint-500 grid place-items-center text-ink-900 flex-shrink-0">
-                <AdminIcon name="contact" className="w-5 h-5" strokeWidth={2.2}/>
+                <AdminIcon name={editingId ? "edit" : "contact"} className="w-5 h-5" strokeWidth={2.2}/>
               </div>
               <div className="flex-1">
-                <h3 className="text-[16px] font-bold text-ink-900">Add New Customer</h3>
-                <p className="text-[12.5px] text-ink-500 mt-0.5">Fill in the customer details below.</p>
+                <h3 className="text-[16px] font-bold text-ink-900">{editingId ? 'Edit Customer' : 'Add New Customer'}</h3>
+                <p className="text-[12.5px] text-ink-500 mt-0.5">{editingId ? 'Update the customer details below.' : 'Fill in the customer details below.'}</p>
               </div>
               <button onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-lg hover:bg-ink-100 grid place-items-center text-ink-500">
                 <AdminIcon name="x" className="w-4 h-4"/>
@@ -3259,8 +3275,8 @@ const CustomerSection = () => {
                 className="flex-1 h-10 rounded-lg hairline text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
                 Cancel
               </button>
-              <PrimaryBtn onClick={saveNew} disabled={saving} className="flex-1">
-                {saving ? 'Saving…' : 'Save Customer'}
+              <PrimaryBtn onClick={saveCustomer} disabled={saving} className="flex-1">
+                {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Save Customer'}
               </PrimaryBtn>
             </div>
           </div>
