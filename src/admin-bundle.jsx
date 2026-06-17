@@ -2220,37 +2220,43 @@ const CalendarSection = ({ store, set, bookings }) => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 sm:gap-5">
         {/* Calendar */}
         <Card padded={false}>
-          <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center gap-3 border-b border-ink-200/70 flex-wrap">
-            <div>
-              <h3 className="text-[15px] font-bold text-ink-900 tracking-tight">{MONTHS_FULL[view.getMonth()]} {view.getFullYear()}</h3>
-              <p className="mt-0.5 text-[12.5px] text-ink-500">Tap a date to inspect or block. Long-press / right side opens slot editor.</p>
+          <div className="px-3 sm:px-6 pt-4 sm:pt-5 pb-3 flex items-center gap-2 border-b border-ink-200/70">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[14px] sm:text-[15px] font-bold text-ink-900 tracking-tight">{MONTHS_FULL[view.getMonth()]} {view.getFullYear()}</h3>
+              <p className="mt-0.5 text-[11.5px] text-ink-500 hidden sm:block">Tap a date to inspect or block.</p>
             </div>
-            <div className="ml-auto flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
               <IconBtn icon="arrow-left" onClick={() => navMonth(-1)} title="Previous month"/>
               <button onClick={() => { setView(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedKey(ymd(today)); }}
-                className="h-9 px-3 rounded-lg text-[12.5px] font-semibold text-ink-700 hover:bg-ink-100">Today</button>
+                className="h-8 sm:h-9 px-2 sm:px-3 rounded-lg text-[12px] sm:text-[12.5px] font-semibold text-ink-700 hover:bg-ink-100">Today</button>
               <IconBtn icon="arrow-right" onClick={() => navMonth(1)} title="Next month"/>
             </div>
           </div>
 
           {/* Legend */}
-          <div className="px-4 sm:px-6 py-3 border-b border-ink-200/70 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11.5px] text-ink-600">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-mint-100 ring-1 ring-mint-300"></span>Available</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-amber-100 ring-1 ring-amber-300"></span>Partial</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-md bg-red-50 ring-1 ring-red-300"></span>Blocked</span>
-            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-mint-600"></span>Has bookings</span>
+          <div className="px-3 sm:px-6 py-2 sm:py-3 border-b border-ink-200/70 flex flex-wrap items-center gap-x-3 sm:gap-x-5 gap-y-1.5 text-[10.5px] sm:text-[11.5px] text-ink-600">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-md bg-mint-100 ring-1 ring-mint-300"></span>Available</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-md bg-amber-100 ring-1 ring-amber-300"></span>Partial</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-md bg-red-50 ring-1 ring-red-300"></span>Blocked</span>
+            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-mint-600"></span>Bookings</span>
           </div>
 
           {/* Weekday header */}
-          <div className="px-4 sm:px-6 pt-3 grid grid-cols-7 gap-1.5 text-center text-[10.5px] font-bold uppercase tracking-[0.12em] text-ink-500">
-            {WEEKDAYS_SHORT.map(d => <div key={d} className="py-1">{d}</div>)}
+          <div className="px-3 sm:px-6 pt-2.5 sm:pt-3 grid grid-cols-7 gap-1 sm:gap-1.5 text-center font-bold uppercase text-ink-500"
+               style={{ fontSize: 'clamp(9px, 2.2vw, 10.5px)', letterSpacing: '0.08em' }}>
+            {WEEKDAYS_SHORT.map(d => (
+              <div key={d} className="py-0.5 sm:py-1">
+                <span className="sm:hidden">{d[0]}</span>
+                <span className="hidden sm:inline">{d}</span>
+              </div>
+            ))}
           </div>
 
           {/* Date grid */}
-          <div className="px-4 sm:px-6 pb-5 pt-1 grid grid-cols-7 gap-1.5">
+          <div className="px-3 sm:px-6 pb-4 sm:pb-5 pt-1 grid grid-cols-7 gap-1 sm:gap-1.5">
             {cells.map((d, i) => {
               if (!d) return <div key={`e${i}`} className="aspect-square sm:h-20"/>;
               const k = ymd(d);
@@ -2272,11 +2278,12 @@ const CalendarSection = ({ store, set, bookings }) => {
                   key={k}
                   onClick={() => setSelectedKey(k)}
                   onDoubleClick={() => toggleBlock(k)}
-                  className={`relative rounded-lg aspect-square sm:aspect-auto sm:h-20 p-1.5 sm:p-2 text-left transition-all ${cls}`}
+                  className={`relative rounded-md sm:rounded-lg aspect-square sm:aspect-auto sm:h-20 p-1 sm:p-2 text-left transition-all ${cls}`}
                   aria-label={`${d.toDateString()} — ${entry.blocked ? "blocked" : partial ? "partial availability" : "available"}`}
                 >
                   <div className="flex items-start justify-between">
-                    <span className={`text-[12.5px] sm:text-[13px] font-bold tabular-nums ${isToday ? "px-1.5 rounded-full bg-ink-900 text-white" : ""}`}>
+                    <span className={`font-bold tabular-nums leading-none ${isToday ? "px-1 sm:px-1.5 rounded-full bg-ink-900 text-white" : ""}`}
+                          style={{ fontSize: 'clamp(10px, 2.8vw, 13px)' }}>
                       {d.getDate()}
                     </span>
                     {todays.length > 0 && (
@@ -2290,13 +2297,14 @@ const CalendarSection = ({ store, set, bookings }) => {
                     <span className={`flex-1 h-1.5 rounded-full ${entry.blocked || !entry.morning ? "bg-ink-200" : "bg-mint-500"}`}></span>
                     <span className={`flex-1 h-1.5 rounded-full ${entry.blocked || !entry.afternoon ? "bg-ink-200" : "bg-mint-600"}`}></span>
                   </div>
-                  {/* Booking dot — mobile */}
-                  {todays.length > 0 && (
-                    <span className="sm:hidden absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-mint-600"></span>
-                  )}
+                  {/* Slot dots — mobile */}
+                  <div className="sm:hidden absolute bottom-0.5 left-0 right-0 flex justify-center gap-0.5">
+                    {todays.length > 0 && <span className="w-1 h-1 rounded-full bg-mint-600"></span>}
+                    {partial && !entry.blocked && <span className="w-1 h-1 rounded-full bg-amber-400"></span>}
+                  </div>
                   {entry.blocked && (
-                    <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 text-red-500">
-                      <AdminIcon name="x" className="w-3 h-3" strokeWidth={2.4}/>
+                    <span className="absolute top-0.5 right-0.5 sm:top-1.5 sm:right-1.5 text-red-500">
+                      <AdminIcon name="x" className="w-2.5 h-2.5 sm:w-3 sm:h-3" strokeWidth={2.4}/>
                     </span>
                   )}
                 </button>
@@ -3696,7 +3704,60 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
   return (
     <Card padded={false} title="Daily Staff Schedule"
       subtitle={dateKey ? `Jobs and availability for ${new Date(dateKey + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}.` : "Pick a date above."}>
-      <div className="overflow-x-auto">
+
+      {/* ── Mobile: card list view ── */}
+      <div className="lg:hidden px-3 pb-4 pt-2 space-y-2.5">
+        {staff.length === 0 && (
+          <div className="text-[13px] text-ink-400 text-center py-6">No active staff found.</div>
+        )}
+        {staff.map(s => {
+          const off = isOffDay(s);
+          const staffBks = todays.filter(b => {
+            const ids = (b._raw?.assigned_staff?.length > 0) ? b._raw.assigned_staff : (store.assignments?.[b.ref] || []);
+            return ids.includes(s.id);
+          });
+          const c = STAFF_COLORS[s.color] || STAFF_COLORS.mint;
+          return (
+            <div key={s.id} className="rounded-xl border border-ink-200 bg-white overflow-hidden">
+              <div className={`flex items-center gap-3 px-3 py-2.5 ${off ? 'opacity-60' : ''}`}>
+                <StaffAvatar s={s} size={36}/>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-bold text-ink-900 truncate">{s.name}</div>
+                  <div className={`text-[10.5px] font-mono uppercase tracking-wide ${off ? 'text-ink-400' : staffBks.length > 0 ? 'text-mint-700' : 'text-ink-500'}`}>
+                    {off ? 'Off Today' : staffBks.length > 0 ? `${staffBks.length} job${staffBks.length !== 1 ? 's' : ''} · Working` : 'Working · Free'}
+                  </div>
+                </div>
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${off ? 'bg-ink-200' : staffBks.length > 0 ? 'bg-mint-500' : 'bg-ink-300'}`}/>
+              </div>
+              {staffBks.length > 0 && (
+                <div className="border-t border-ink-100 px-3 pb-3 pt-2 space-y-2">
+                  {staffBks.map(b => {
+                    const startH = parseHour(b.time);
+                    const hoursMap = (b._raw?.staff_hours && Object.keys(b._raw.staff_hours).length > 0) ? b._raw.staff_hours : (store.staffHours?.[b.ref] || {});
+                    const myHours = Number(hoursMap[s.id] ?? b.hours);
+                    const endH = startH != null ? startH + myHours : null;
+                    return (
+                      <div key={`${b.ref}-${s.id}`} className={`rounded-lg ring-1 px-2.5 py-2 ${c.block}`}>
+                        <div className="text-[10.5px] font-mono opacity-80">
+                          {startH != null
+                            ? `${fmt12(Math.floor(startH), Math.round((startH % 1) * 60))} — ${fmt12(Math.floor(endH), Math.round((endH % 1) * 60))}`
+                            : b.time}
+                          {' · '}{myHours}h
+                        </div>
+                        <div className="text-[12.5px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
+                        <div className="text-[11px] opacity-80 truncate">{b.service}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desktop: horizontal timeline ── */}
+      <div className="hidden lg:block overflow-x-auto">
         <div className="min-w-[720px]">
           <div className="grid sticky top-0 z-10 bg-white border-b border-ink-200/70"
                style={{ gridTemplateColumns: `64px repeat(${staff.length}, minmax(132px, 1fr))` }}>
@@ -3771,6 +3832,7 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
           </div>
         </div>
       </div>
+      </div>{/* end hidden lg:block */}
     </Card>
   );
 };
@@ -4169,7 +4231,7 @@ const NewBookingModal = ({ store, onClose }) => {
   }, [])
   const defSvc = svcs[0]?.name || 'Regular Cleaning'
   const defDate = (() => { const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; })()
-  const [f, setF] = React.useState({ name:'', phone:'', service:defSvc, date:defDate, time:'9:00 AM', hours:3, cleaners:1, rate:15, total:45, address:'', notes:'', status:'New' })
+  const [f, setF] = React.useState({ name:'', phone:'', service:defSvc, date:defDate, time:'9:00 AM', hours:3, cleaners:1, rate:15, total:45, address:'', notes:'', status:'New', manualStaff:[] })
   const upd = p => setF(prev => ({ ...prev, ...p }))
   const [saving, setSaving] = React.useState(false)
   const [err, setErr] = React.useState('')
@@ -4280,36 +4342,35 @@ const NewBookingModal = ({ store, onClose }) => {
     if (free < Number(f.cleaners)) { setErr(`Not enough free maids for this slot — only ${free} available (${Number(f.cleaners)} needed). Choose a different time or reduce maid count.`); return }
     setSaving(true); setErr('')
 
-    // Auto-assign maids filtered by service mode + skill
-    let assigned_staff = []
-    try {
-      const needed = Number(f.cleaners) || 1
-      const mode   = 'hourly' // NewBookingModal always books hourly-style
-      const { data: availStaff } = await supabase.from('staff').select('id, skills, working_days')
-      if (availStaff && availStaff.length > 0) {
-        // Filter by service mode — modes stored as "@hourly","@monthly","@stayin" inside skills
-        let pool = availStaff.filter(s => {
-          const sk = Array.isArray(s.skills) ? s.skills : []
-          const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1))
-          return modes.length === 0 || modes.includes(mode)
-        })
-        // Filter by working day for the booking date
-        if (f.date) pool = pool.filter(s => isWorkingDay(s, f.date))
-        // Filter by skill if service matches a known skill ID
-        const svcId = (store.services || []).find(s => s.name === f.service)?.id
-        if (svcId) {
-          const skilled = pool.filter(s => (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId))
-          if (skilled.length > 0) pool = skilled
+    // Use manually selected maids if provided, otherwise auto-assign
+    let assigned_staff = f.manualStaff.length > 0 ? [...f.manualStaff] : []
+    if (assigned_staff.length === 0) {
+      try {
+        const needed = Number(f.cleaners) || 1
+        const mode   = 'hourly'
+        const { data: availStaff } = await supabase.from('staff').select('id, skills, working_days')
+        if (availStaff && availStaff.length > 0) {
+          let pool = availStaff.filter(s => {
+            const sk = Array.isArray(s.skills) ? s.skills : []
+            const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1))
+            return modes.length === 0 || modes.includes(mode)
+          })
+          if (f.date) pool = pool.filter(s => isWorkingDay(s, f.date))
+          const svcId = (store.services || []).find(s => s.name === f.service)?.id
+          if (svcId) {
+            const skilled = pool.filter(s => (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId))
+            if (skilled.length > 0) pool = skilled
+          }
+          if (pool.length > 0) {
+            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null)
+            const jobCounts = {}
+            ;(existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1 }))
+            const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0))
+            assigned_staff = sorted.slice(0, needed).map(s => s.id)
+          }
         }
-        if (pool.length > 0) {
-          const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null)
-          const jobCounts = {}
-          ;(existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1 }))
-          const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0))
-          assigned_staff = sorted.slice(0, needed).map(s => s.id)
-        }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     const ref = await mkRef()
     const { error } = await supabase.from('bookings').insert({ ref, name:f.name, phone:f.phone, service:f.service, date:f.date, time:f.time, hours:Number(f.hours), cleaners:Number(f.cleaners), rate:Number(f.rate), total:Number(f.total), address:f.address, notes:f.notes, status:f.status, materials:false, assigned_staff })
@@ -4433,7 +4494,57 @@ const NewBookingModal = ({ store, onClose }) => {
             </div>
           )}
           <div><Label className="mb-1.5">Hours</Label><TextField type="number" value={f.hours} onChange={v=>upd({hours:v})} suffix="hrs"/></div>
-          <div><Label className="mb-1.5">Maids</Label><TextField type="number" value={f.cleaners} onChange={v=>upd({cleaners:v})} suffix="maids"/></div>
+          <div>
+            <Label className="mb-1.5">Maids</Label>
+            <select
+              value={f.cleaners}
+              onChange={e => { const n = Number(e.target.value); upd({ cleaners: n, manualStaff: f.manualStaff.slice(0, n) }) }}
+              className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none"
+            >
+              {Array.from({ length: Math.min(store.limits?.maxMaids || 8, Math.max(1, (store.staff||[]).length || 8)) }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>{n} maid{n > 1 ? 's' : ''}</option>
+              ))}
+            </select>
+          </div>
+          {(store.staff||[]).filter(s => s.active !== false).length > 0 && (
+            <div className="col-span-2">
+              <Label className="mb-1.5">
+                Assign Specific Maids
+                <span className="text-ink-400 font-normal normal-case tracking-normal ml-1.5">(optional · select up to {f.cleaners})</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(store.staff||[]).filter(s => s.active !== false).map(s => {
+                  const isSelected = f.manualStaff.includes(s.id)
+                  const isDisabled = !isSelected && f.manualStaff.length >= Number(f.cleaners)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => {
+                        if (isSelected) upd({ manualStaff: f.manualStaff.filter(id => id !== s.id) })
+                        else if (f.manualStaff.length < Number(f.cleaners)) upd({ manualStaff: [...f.manualStaff, s.id] })
+                      }}
+                      className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-colors
+                        ${isSelected ? 'border-mint-400 bg-mint-50' : isDisabled ? 'border-ink-100 bg-ink-50 cursor-not-allowed opacity-50' : 'border-ink-200 bg-white hover:border-mint-300 hover:bg-mint-50'}`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold
+                        ${isSelected ? 'bg-mint-500 text-white' : 'bg-ink-100 text-ink-600'}`}>
+                        {isSelected ? <AdminIcon name="check" className="w-3.5 h-3.5"/> : (s.name||'?')[0].toUpperCase()}
+                      </div>
+                      <span className={`text-[12.5px] font-medium truncate ${isSelected ? 'text-ink-900' : isDisabled ? 'text-ink-400' : 'text-ink-700'}`}>{s.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {f.manualStaff.length > 0 && (
+                <div className="mt-2 flex items-center justify-between text-[12px]">
+                  <span className="text-mint-700 font-medium">{f.manualStaff.length} of {f.cleaners} maid{Number(f.cleaners) > 1 ? 's' : ''} selected</span>
+                  <button type="button" onClick={() => upd({ manualStaff: [] })} className="text-ink-400 hover:text-ink-700 underline">Clear</button>
+                </div>
+              )}
+            </div>
+          )}
           <div><Label className="mb-1.5">Rate QAR/hr</Label><TextField type="number" value={f.rate} onChange={v=>upd({rate:v})} suffix="QAR"/></div>
           <div><Label className="mb-1.5">Total</Label><TextField type="number" value={f.total} onChange={v=>upd({total:v})} suffix="QAR"/></div>
           <div className="col-span-2"><Label className="mb-1.5">Status</Label><select value={f.status} onChange={e=>upd({status:e.target.value})} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">{['New','Confirmed','Pending'].map(s=><option key={s}>{s}</option>)}</select></div>
