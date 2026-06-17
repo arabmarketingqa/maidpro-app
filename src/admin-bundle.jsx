@@ -3715,10 +3715,10 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
             {staff.map(s => {
               const off = isOffDay(s);
               return (
-                <div key={s.id} className={`flex flex-col items-center gap-1 py-2 px-1 ${off ? 'opacity-50' : ''}`}>
+                <div key={s.id} className={`flex flex-col items-center gap-1 py-2 px-1 lg:py-3 lg:px-2 ${off ? 'opacity-50' : ''}`}>
                   <StaffAvatar s={s} size={32}/>
-                  <div className="text-[11px] font-bold text-ink-900 truncate max-w-full text-center leading-tight">{s.name.split(" ")[0]}</div>
-                  <div className={`flex items-center gap-0.5 text-[9px] font-mono uppercase tracking-[0.08em] ${off ? 'text-ink-400' : 'text-mint-700 font-semibold'}`}>
+                  <div className="text-[11px] lg:text-[13px] font-bold text-ink-900 truncate max-w-full text-center leading-tight">{s.name.split(" ")[0]}</div>
+                  <div className={`flex items-center gap-0.5 text-[9px] lg:text-[10.5px] font-mono uppercase tracking-[0.08em] ${off ? 'text-ink-400' : 'text-mint-700 font-semibold'}`}>
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${off ? 'bg-ink-300' : 'bg-mint-500'}`}/>
                     {off ? 'Off' : 'On'}
                   </div>
@@ -3729,7 +3729,7 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
           <div className="relative grid"
                style={{ gridTemplateColumns: `${timeColW} repeat(${staff.length}, ${colW})`, gridAutoRows: `${cellH}px` }}>
             {SCHEDULE_HOURS.map((h, hi) => (
-              <div key={`h${h}`} className="border-b border-r border-ink-200/70 text-[9px] font-mono text-ink-500 px-1 pt-1"
+              <div key={`h${h}`} className="border-b border-r border-ink-200/70 text-[9px] lg:text-[10.5px] font-mono text-ink-500 px-1 lg:px-2 pt-1"
                    style={{ gridColumn: 1, gridRow: hi+1 }}>
                 {fmt12(h)}
               </div>
@@ -3763,13 +3763,13 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
                   const endT = start + myHours;
                   return (
                     <div key={`${b.ref}-${s.id}`}
-                      className={`relative m-0.5 rounded-md ring-1 px-1.5 py-1 text-left overflow-hidden ${c.block}`}
+                      className={`relative m-0.5 rounded-md ring-1 px-1.5 py-1 lg:m-1 lg:rounded-lg lg:px-2.5 lg:py-1.5 text-left overflow-hidden ${c.block}`}
                       style={{ gridColumn: sIdx + 2, gridRow: `${startIdx + 1} / span ${Math.max(1, Math.ceil(span))}` }}>
-                      <div className="text-[8.5px] font-mono opacity-80 leading-tight">
+                      <div className="text-[8.5px] lg:text-[10.5px] font-mono opacity-80 leading-tight">
                         {fmt12(Math.floor(start), Math.round((start % 1) * 60))}–{fmt12(Math.floor(endT), Math.round((endT % 1) * 60))}
                       </div>
-                      <div className="text-[10px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
-                      <div className="text-[9px] opacity-80 truncate">{b.service}</div>
+                      <div className="text-[10px] lg:text-[12.5px] font-bold leading-tight mt-0.5 truncate">{b.customer}</div>
+                      <div className="text-[9px] lg:text-[11px] opacity-80 truncate">{b.service}</div>
                     </div>
                   );
                 })}
