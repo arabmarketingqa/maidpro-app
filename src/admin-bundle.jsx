@@ -2,6 +2,31 @@
 import { supabase, fmtBooking, broadcastSettingsUpdate } from './supabase'
 import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
 
+/* ── Booking notification chime (Web Audio API — no file needed) ── */
+const playBookingChime = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const master = ctx.createGain();
+    master.gain.value = 0.55;
+    master.connect(ctx.destination);
+    const tone = (freq, start, dur) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(master);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(1, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.start(start); osc.stop(start + dur);
+    };
+    const t = ctx.currentTime;
+    tone(1046.50, t,        0.55); // C6
+    tone(1318.51, t + 0.14, 0.55); // E6
+    tone(1567.98, t + 0.28, 0.80); // G6
+  } catch (_) {}
+};
+
 // Normalise any flag value (emoji or ISO code) → lowercase 2-letter ISO code ("in", "np", "ph"…)
 const toISO = (s) => {
   if (!s) return '';
@@ -3953,6 +3978,20 @@ const SettingsSection = ({ store, set }) => {
         </div>
       </Card>
 
+      <Card title="Notifications" subtitle="Control which sounds and alerts the admin panel plays.">
+        <div className={`flex items-start sm:items-center justify-between gap-4 rounded-xl px-4 py-4 transition-all
+          ${rules.bookingSound !== false ? 'bg-mint-50 ring-1 ring-mint-300' : 'bg-ink-50 hairline'}`}>
+          <div className="flex items-center gap-3">
+            <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 text-[20px] ${rules.bookingSound !== false ? 'bg-mint-100' : 'bg-ink-100'}`}>🔔</span>
+            <div>
+              <div className="text-[13.5px] font-semibold text-ink-900">Booking notification sound</div>
+              <div className="text-[12px] text-ink-500 mt-0.5">Play a chime when a new booking is received in real-time.</div>
+            </div>
+          </div>
+          <Switch on={rules.bookingSound !== false} onChange={v => setR({ bookingSound: v })} ariaLabel="Booking notification sound"/>
+        </div>
+      </Card>
+
       <div className="flex items-center justify-end gap-3 border-t border-ink-200 mt-4 pt-4">
         {saved && <span className="flex items-center gap-1.5 text-[13px] font-semibold text-mint-700"><AdminIcon name="check" className="w-4 h-4"/>Saved!</span>}
         <PrimaryBtn onClick={save}><AdminIcon name="check" className="w-4 h-4"/>Save Changes</PrimaryBtn>
@@ -5327,6 +5366,11 @@ const App = () => {
   const [globalSearch, setGlobalSearch] = React.useState('');
   const [dbStatus, setDbStatus] = React.useState('checking'); // 'checking' | 'ok' | 'error'
   const [dbError, setDbError] = React.useState('');
+  // Ref so the realtime handler always reads the latest setting without stale closure
+  const notifSoundRef = React.useRef(true);
+  React.useEffect(() => {
+    notifSoundRef.current = store.bookingRules?.bookingSound !== false;
+  }, [store.bookingRules?.bookingSound]);
 
   if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
   const set = (p) => setStore(prev => { const patch = typeof p === 'function' ? p(prev) : p; return { ...prev, ...patch }; });
@@ -5521,7 +5565,10 @@ const App = () => {
     const ch = supabase.channel('admin-bookings-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
         fetchBookings();
-        if (payload.eventType === 'INSERT') handleAutoAssign(payload.new);
+        if (payload.eventType === 'INSERT') {
+          handleAutoAssign(payload.new);
+          if (notifSoundRef.current) playBookingChime();
+        }
       })
       .subscribe();
 
