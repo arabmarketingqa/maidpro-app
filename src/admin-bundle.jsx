@@ -4014,8 +4014,12 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const [payMethod, setPayMethod] = React.useState(
     booking._raw?.payment_method || 'Cash'
   )
+  const [editDate, setEditDate] = React.useState(booking._raw?.date || '')
+  const [editTime, setEditTime] = React.useState(booking._raw?.time || booking.time || '')
   const [saving, setSaving] = React.useState(false)
   const [saveError, setSaveError] = React.useState('')
+  const [confirmCancel, setConfirmCancel] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
   const total = Number(booking.total) || 0
   const paidNum = parseFloat(paidAmount) || 0
   const due = Math.max(0, total - paidNum)
@@ -4057,6 +4061,8 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     const { error } = await supabase.from('bookings').update({
       status,
       notes,
+      date:           editDate,
+      time:           editTime,
       paid_amount:    paidNum,
       payment_method: payMethod,
       staff_hours:    store.staffHours?.[booking.ref] || {},
@@ -4069,6 +4075,15 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
       setSaveError(error.message || 'Failed to save. Check Supabase columns exist.')
     }
   }
+
+  const cancelBooking = async () => {
+    if (!booking._raw?.id) return
+    setCancelling(true)
+    await supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', booking._raw.id)
+    setCancelling(false)
+    onClose(true)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col sm:items-center sm:justify-center sm:p-4">
       <div className="absolute inset-0 bg-ink-950/50" onClick={() => onClose(false)}/>
@@ -4099,6 +4114,22 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
           <div className="p-3 rounded-xl bg-ink-50"><div className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-500 mb-0.5">Address</div><div className="text-[13px] text-ink-900">{booking._raw.address}</div></div>
         )}
         <div><Label className="mb-1.5">Status</Label><select value={status} onChange={e => setStatus(e.target.value)} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">{BOOKING_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+
+        {/* Reschedule */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="mb-1.5">Date</Label>
+            <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+          </div>
+          <div>
+            <Label className="mb-1.5">Time</Label>
+            <select value={editTime} onChange={e => setEditTime(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]">
+              {HOUR_OPTIONS.map(o => <option key={o.value} value={o.label}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
 
         {/* Payment section */}
         <div className="rounded-xl bg-ink-50 p-4 space-y-3">
@@ -4177,9 +4208,30 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
         {saveError && (
           <div className="px-3 py-2 rounded-lg bg-red-50 text-[12.5px] text-red-700 font-medium">{saveError}</div>
         )}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-ink-200"
+        <div className="flex items-center gap-2 pt-2 border-t border-ink-200"
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
-          <GhostBtn onClick={() => onClose(false)}>Cancel</GhostBtn>
+          {/* Cancel booking — left side */}
+          {booking.status !== 'Cancelled' && (
+            confirmCancel ? (
+              <div className="mr-auto flex items-center gap-2">
+                <span className="text-[12.5px] text-red-600 font-semibold">Cancel this booking?</span>
+                <button onClick={cancelBooking} disabled={cancelling}
+                  className="h-8 px-3 rounded-lg bg-red-500 text-white text-[12.5px] font-semibold hover:bg-red-600 transition-colors">
+                  {cancelling ? '…' : 'Yes, cancel'}
+                </button>
+                <button onClick={() => setConfirmCancel(false)}
+                  className="h-8 px-3 rounded-lg hairline text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                  Keep
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmCancel(true)}
+                className="mr-auto flex items-center gap-1.5 text-[13px] font-semibold text-red-500 hover:text-red-600 transition-colors">
+                <AdminIcon name="x" className="w-4 h-4"/>Cancel Booking
+              </button>
+            )
+          )}
+          <GhostBtn onClick={() => onClose(false)}>Close</GhostBtn>
           <PrimaryBtn onClick={save} disabled={saving}><AdminIcon name="check" className="w-4 h-4"/>{saving ? 'Saving...' : 'Save changes'}</PrimaryBtn>
         </div>
         </div>{/* end px-5 padding wrapper */}
