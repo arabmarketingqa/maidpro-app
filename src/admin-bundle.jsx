@@ -1617,13 +1617,7 @@ const OverviewSection = ({ store, set, kpis, bookings }) => (
             <span className="text-[26px] sm:text-[30px] leading-none font-bold tracking-tight text-ink-900 tabular-nums">{k.value}</span>
             {k.unit && <span className="text-[12px] font-mono text-ink-500">{k.unit}</span>}
           </div>
-          {k.sub
-            ? <div className="mt-2 text-[11.5px] font-semibold text-amber-600">{k.sub}</div>
-            : <div className={`mt-2 text-[11.5px] font-medium flex items-center gap-1 ${k.delta >= 0 ? "text-mint-700" : "text-red-600"}`}>
-                <AdminIcon name={k.delta >= 0 ? "arrow-up" : "arrow-down"} className="w-3 h-3" strokeWidth={2.2}/>
-                {Math.abs(k.delta)}% vs last week
-              </div>
-          }
+          {k.sub && <div className="mt-2 text-[11.5px] font-semibold text-amber-600">{k.sub}</div>}
         </div>
       ))}
     </div>
@@ -3866,7 +3860,6 @@ const SettingsSection = ({ store, set }) => {
       setSaved(true); setTimeout(()=>setSaved(false),3000)
     } catch(e) { alert('Save failed: ' + (e.message || 'Network error — check your connection.')) }
   }
-  const RULES = [['autoConfirm','Auto-confirm bookings'],['smsReminders','Send SMS reminders'],['guestCheckout','Allow guest checkout'],['idVerification','Require ID verification'],['noShowFee','Charge no-show fee'],['maidPhotos','Show maid photos']]
   return (
     <div className="space-y-5 fade-up">
       <Card title="Brand Identity" subtitle="Company name, logo and contact details — shown in the sidebar and booking page.">
@@ -3904,17 +3897,6 @@ const SettingsSection = ({ store, set }) => {
           <div><Label>Time zone</Label><TextField value={brand.timezone} onChange={v=>setB({timezone:v})} className="mt-2"/></div>
         </div>
       </Card>
-      <Card title="Booking Rules">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {RULES.map(([key,label]) => (
-            <div key={key} className="flex items-center justify-between rounded-lg hairline bg-white px-3 py-2.5">
-              <span className="text-[13px] text-ink-800 font-medium">{label}</span>
-              <Switch on={!!rules[key]} onChange={v => setR({ [key]: v })} ariaLabel={label}/>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       <Card title="Auto Assign" subtitle="Automatically route each new booking to the right maid — no manual picking needed.">
         <div className={`flex items-start sm:items-center justify-between gap-4 rounded-xl px-4 py-4 transition-all
           ${rules.autoAssign ? "bg-mint-50 ring-1 ring-mint-300" : "bg-ink-50 hairline"}`}>
