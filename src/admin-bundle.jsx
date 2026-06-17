@@ -1499,7 +1499,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
                   <div className="font-mono tabular-nums text-[13.5px] font-semibold text-ink-900">
                     <span className="text-ink-500 mr-1 text-[10px]">QAR</span>{b.total.toLocaleString()}
                   </div>
-                  {b.payment_status === 'Pending' && b.total > 0 && (
+                  {b.payment_status === 'Pending' && b.total > 0 && b.status !== 'Cancelled' && (
                     <div className="text-[11px] font-mono text-amber-600">
                       Due: QAR {Math.max(0, b.total - b.paid_amount).toLocaleString()}
                     </div>
@@ -4272,7 +4272,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
           style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))' }}>
           {!isCancelled && !confirmCancel && (
             <button onClick={() => setConfirmCancel(true)}
-              className="mr-auto flex items-center gap-1.5 text-[13px] font-semibold text-red-500 hover:text-red-600 transition-colors">
+              className="mr-auto flex items-center gap-1.5 h-9 px-4 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[13px] font-semibold transition-colors">
               <AdminIcon name="x" className="w-4 h-4"/>Cancel Booking
             </button>
           )}
