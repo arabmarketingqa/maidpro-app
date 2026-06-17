@@ -3359,12 +3359,38 @@ const StaffSection = ({ store, set, bookings }) => {
     return { ...d, serviceTypes: types.includes(m) ? types.filter(x => x !== m) : [...types, m] };
   });
   const openModal = () => { setDraft(blankDraft()); setModalOpen(true); };
-  const saveNew = () => {
+  const [modalSaving, setModalSaving] = React.useState(false);
+  const [modalErr,    setModalErr]    = React.useState('');
+  const saveNew = async () => {
     if (!draft.name.trim()) return;
+    setModalSaving(true);
+    setModalErr('');
     const encodedSkills = encodeSkills(draft.skills, draft.serviceTypes);
-    const newStaff = { id: 's_' + Date.now(), ...draft, skills: encodedSkills };
-    set({ staff: [...store.staff, newStaff] });
-    supabase.from('staff').insert({ ...newStaff, serviceTypes: undefined });
+    const { data, error } = await supabase.from('staff').insert({
+      name:         draft.name.trim(),
+      nationality:  draft.nationality || '',
+      color:        draft.color || 'mint',
+      working_days: draft.working_days ?? [0,1,2,3,4,5,6],
+      active:       draft.active !== false,
+      phone:        draft.phone  || '',
+      notes:        draft.notes  || '',
+      skills:       encodedSkills,
+    }).select().single();
+    setModalSaving(false);
+    if (error) { setModalErr('Could not save: ' + error.message); return; }
+    // Update local state with the real DB record (realtime will also sync)
+    set(prev => ({ staff: [...prev.staff, {
+      id:           data.id,
+      name:         data.name         || '',
+      nationality:  data.nationality  || '',
+      color:        data.color        || 'mint',
+      skills:       (Array.isArray(data.skills) ? data.skills : []).filter(sk => !sk.startsWith('@')),
+      serviceTypes: (Array.isArray(data.skills) ? data.skills : []).filter(sk => sk.startsWith('@')).map(sk => sk.slice(1)),
+      phone:        data.phone        || '',
+      notes:        data.notes        || '',
+      working_days: Array.isArray(data.working_days) ? data.working_days : [0,1,2,3,4,5,6],
+      active:       data.active !== false,
+    }] }));
     setModalOpen(false);
   };
   const totalMaids = store.staff.length;
@@ -3639,10 +3665,11 @@ const StaffSection = ({ store, set, bookings }) => {
               </div>
             </div>
 
+            {modalErr && <div className="text-[12px] text-red-600 bg-red-50 rounded-lg px-3 py-2">{modalErr}</div>}
             <div className="flex items-center justify-end gap-2 pt-1">
               <GhostBtn size="sm" onClick={() => setModalOpen(false)}>Cancel</GhostBtn>
-              <PrimaryBtn size="sm" onClick={saveNew} disabled={!draft.name.trim()}>
-                <AdminIcon name="check" className="w-4 h-4"/>Save maid
+              <PrimaryBtn size="sm" onClick={saveNew} disabled={!draft.name.trim() || modalSaving}>
+                <AdminIcon name="check" className="w-4 h-4"/>{modalSaving ? 'Saving…' : 'Save maid'}
               </PrimaryBtn>
             </div>
           </div>
