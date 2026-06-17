@@ -5,26 +5,33 @@ import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
 /* ── Booking notification chime (Web Audio API — no file needed) ── */
 const playBookingChime = () => {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const master = ctx.createGain();
-    master.gain.value = 0.55;
-    master.connect(ctx.destination);
-    const tone = (freq, start, dur) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(master);
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(1, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
-      osc.start(start); osc.stop(start + dur);
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const play = () => {
+      const master = ctx.createGain();
+      master.gain.value = 0.75;
+      master.connect(ctx.destination);
+      const t = ctx.currentTime;
+      // Ascending C6 → E6 → G6 major chord chime
+      [[1046.50, 0, 0.65], [1318.51, 0.16, 0.65], [1567.98, 0.32, 0.90]].forEach(([freq, delay, dur]) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(master);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, t + delay);
+        gain.gain.linearRampToValueAtTime(0.9, t + delay + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + delay + dur);
+        osc.start(t + delay);
+        osc.stop(t + delay + dur + 0.05);
+      });
     };
-    const t = ctx.currentTime;
-    tone(1046.50, t,        0.55); // C6
-    tone(1318.51, t + 0.14, 0.55); // E6
-    tone(1567.98, t + 0.28, 0.80); // G6
-  } catch (_) {}
+    // AudioContext starts suspended on many browsers until a user gesture
+    if (ctx.state === 'suspended') ctx.resume().then(play); else play();
+  } catch (e) {
+    console.warn('Booking chime failed:', e);
+  }
 };
 
 // Normalise any flag value (emoji or ISO code) → lowercase 2-letter ISO code ("in", "np", "ph"…)
@@ -3979,16 +3986,27 @@ const SettingsSection = ({ store, set }) => {
       </Card>
 
       <Card title="Notifications" subtitle="Control which sounds and alerts the admin panel plays.">
-        <div className={`flex items-start sm:items-center justify-between gap-4 rounded-xl px-4 py-4 transition-all
+        <div className={`rounded-xl px-4 py-4 transition-all space-y-3
           ${rules.bookingSound !== false ? 'bg-mint-50 ring-1 ring-mint-300' : 'bg-ink-50 hairline'}`}>
-          <div className="flex items-center gap-3">
-            <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 text-[20px] ${rules.bookingSound !== false ? 'bg-mint-100' : 'bg-ink-100'}`}>🔔</span>
-            <div>
-              <div className="text-[13.5px] font-semibold text-ink-900">Booking notification sound</div>
-              <div className="text-[12px] text-ink-500 mt-0.5">Play a chime when a new booking is received in real-time.</div>
+          <div className="flex items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 text-[20px] ${rules.bookingSound !== false ? 'bg-mint-100' : 'bg-ink-100'}`}>🔔</span>
+              <div>
+                <div className="text-[13.5px] font-semibold text-ink-900">Booking notification sound</div>
+                <div className="text-[12px] text-ink-500 mt-0.5">Play a chime when a new booking is received in real-time.</div>
+              </div>
             </div>
+            <Switch on={rules.bookingSound !== false} onChange={v => { setR({ bookingSound: v }); if (v) playBookingChime(); }} ariaLabel="Booking notification sound"/>
           </div>
-          <Switch on={rules.bookingSound !== false} onChange={v => setR({ bookingSound: v })} ariaLabel="Booking notification sound"/>
+          {rules.bookingSound !== false && (
+            <div className="flex items-center gap-3 pt-1 border-t border-mint-200">
+              <button onClick={playBookingChime}
+                className="flex items-center gap-2 h-8 px-4 rounded-lg bg-white ring-1 ring-mint-300 text-[12.5px] font-semibold text-mint-700 hover:bg-mint-50 transition-colors">
+                🔔 Test sound
+              </button>
+              <span className="text-[12px] text-ink-500">Click to preview the notification chime.</span>
+            </div>
+          )}
         </div>
       </Card>
 
