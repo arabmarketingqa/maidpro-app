@@ -3,6 +3,50 @@ import { Icon, Counter, BigCounter, Pill, PrimaryButton, GhostButton, SectionLab
 import { SERVICE_TYPES, MONTHLY_PACKAGES, STAYIN_PACKAGES, NATIONALITIES, MATERIALS_PER_HOUR, natRate, Money } from './pricing'
 import { SvcIcon, SVC_ICONS } from './serviceIcons'
 
+/* ── Confetti blast — shown on booking success ── */
+const CONFETTI_COLORS = ['#16a34a','#34d399','#3b82f6','#f59e0b','#ec4899','#8b5cf6','#f97316','#06b6d4'];
+const ConfettiBlast = () => {
+  const pieces = React.useMemo(() => Array.from({ length: 72 }, (_, i) => ({
+    id: i,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    left: Math.random() * 100,
+    size: 6 + Math.random() * 7,
+    delay: Math.random() * 0.9,
+    duration: 2.2 + Math.random() * 1.6,
+    drift: (Math.random() - 0.5) * 120,
+    spin: (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 360),
+    isRect: Math.random() > 0.45,
+  })), []);
+
+  return (
+    <>
+      <style>{`
+        @keyframes confetti-drop {
+          0%   { transform: translateY(-24px) translateX(0) rotate(0deg); opacity: 1; }
+          80%  { opacity: 1; }
+          100% { transform: translateY(100vh) translateX(var(--drift)) rotate(var(--spin)); opacity: 0; }
+        }
+      `}</style>
+      <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:9999, overflow:'hidden' }}>
+        {pieces.map(p => (
+          <div key={p.id} style={{
+            position: 'absolute',
+            left: `${p.left}%`,
+            top: 0,
+            width:  p.isRect ? `${p.size * 0.55}px` : `${p.size}px`,
+            height: `${p.size}px`,
+            backgroundColor: p.color,
+            borderRadius: p.isRect ? '2px' : '50%',
+            '--drift': `${p.drift}px`,
+            '--spin': `${p.spin}deg`,
+            animation: `confetti-drop ${p.duration}s ${p.delay}s cubic-bezier(.25,.46,.45,.94) forwards`,
+          }}/>
+        ))}
+      </div>
+    </>
+  );
+};
+
 const toISO = (s) => {
   if (!s) return '';
   const t = s.trim();
@@ -760,6 +804,7 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
 
   return (
     <div className="fade-up text-center max-w-md mx-auto py-4">
+      <ConfettiBlast />
       <div className="w-20 h-20 rounded-full bg-mint-500 text-white grid place-items-center mx-auto shadow-mint mb-4">
         <Icon name="check" className="w-10 h-10" strokeWidth={2.5} />
       </div>

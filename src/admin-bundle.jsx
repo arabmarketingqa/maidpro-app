@@ -5485,10 +5485,18 @@ const App = () => {
   /* Live bookings from Supabase */
   const [bookings, setBookings] = React.useState([]);
   const [bLoading, setBLoading] = React.useState(true);
+  // Track known booking IDs so any fetch path (realtime or poll) can detect new arrivals
+  const knownBookingIds = React.useRef(null); // null = first load, don't chime
 
   const fetchBookings = React.useCallback(async () => {
     const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false }).limit(500);
     if (!error && data) {
+      // Detect genuinely new bookings (skip on first load)
+      if (knownBookingIds.current !== null) {
+        const newOnes = data.filter(b => !knownBookingIds.current.has(b.id));
+        if (newOnes.length > 0 && notifSoundRef.current) playBookingChime();
+      }
+      knownBookingIds.current = new Set(data.map(b => b.id));
       setBookings(data.map(fmtBooking));
       // Sync assigned_staff and staff_hours from DB into store
       const assignMap = {};
@@ -5582,11 +5590,8 @@ const App = () => {
     // Realtime — instant when Supabase Realtime is enabled for the bookings table
     const ch = supabase.channel('admin-bookings-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
-        fetchBookings();
-        if (payload.eventType === 'INSERT') {
-          handleAutoAssign(payload.new);
-          if (notifSoundRef.current) playBookingChime();
-        }
+        fetchBookings(); // chime is handled inside fetchBookings via knownBookingIds
+        if (payload.eventType === 'INSERT') handleAutoAssign(payload.new);
       })
       .subscribe();
 
