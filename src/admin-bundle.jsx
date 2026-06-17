@@ -4338,7 +4338,10 @@ const NewBookingModal = ({ store, onClose }) => {
           if (f.date) pool = pool.filter(s => isWorkingDay(s, f.date))
           const svcId = (store.services || []).find(s => s.name === f.service)?.id
           if (svcId) {
-            const skilled = pool.filter(s => (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId))
+            const skilled = pool.filter(s => {
+              const realSkills = (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@'))
+              return realSkills.length === 0 || realSkills.includes(svcId) // empty skills = can do all services
+            })
             if (skilled.length > 0) pool = skilled
           }
           if (pool.length > 0) {
@@ -5354,7 +5357,10 @@ const App = () => {
       const { data: svcSettings } = await supabase.from('settings').select('value').eq('key','services').maybeSingle();
       const svcId = (svcSettings?.value || []).find(s => s.name === newRow.service)?.id;
       if (svcId) {
-        const skilled = pool.filter(s => (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId));
+        const skilled = pool.filter(s => {
+          const realSkills = (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@'));
+          return realSkills.length === 0 || realSkills.includes(svcId); // empty skills = can do all services
+        });
         if (skilled.length > 0) pool = skilled;
       }
     }

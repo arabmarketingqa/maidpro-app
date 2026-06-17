@@ -585,9 +585,10 @@ function App() {
 
           // 3. For hourly: filter by skill (exclude @prefix entries when matching)
           if (mode === 'hourly' && svcId) {
-            const skilled = pool.filter(s =>
-              (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@')).includes(svcId)
-            );
+            const skilled = pool.filter(s => {
+              const realSkills = (Array.isArray(s.skills) ? s.skills : []).filter(x => !x.startsWith('@'));
+              return realSkills.length === 0 || realSkills.includes(svcId); // empty skills = can do all services
+            });
             if (skilled.length > 0) pool = skilled;
           }
 
