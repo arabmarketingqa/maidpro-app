@@ -592,7 +592,7 @@ function App() {
           }
 
           if (pool.length > 0) {
-            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null);
+            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled');
             const jobCounts = {};
             (existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
             const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0));
