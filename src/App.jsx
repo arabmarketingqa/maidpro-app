@@ -211,6 +211,7 @@ function App() {
   /* Fetch all live settings from Supabase and subscribe to realtime */
   const [availableNatIds, setAvailableNatIds] = React.useState(null);
   const [availableSkillIds, setAvailableSkillIds] = React.useState(null); // skill IDs available for selected nat+mode
+  const [staffSkillIds, setStaffSkillIds] = React.useState(null);         // global: all skill IDs any hourly staff can do
 
   const fetchAvailableSkills = React.useCallback(async (nationality, mode) => {
     if (mode !== 'hourly' || !nationality) { setAvailableSkillIds(null); return; }
@@ -234,6 +235,21 @@ function App() {
 
     // Has mode config: return skills found (may be empty array if @hourly but no skills)
     setAvailableSkillIds([...skillSet]);
+  }, []);
+
+  // Global staff skill index — which skill IDs can ANY hourly staff member do?
+  // Used to hide fixed services that have no staff assigned.
+  const fetchStaffSkillIds = React.useCallback(async () => {
+    const { data } = await supabase.from('staff').select('skills');
+    if (!data) return;
+    const ids = new Set();
+    let anyMode = false;
+    data.forEach(s => {
+      const sk = Array.isArray(s.skills) ? s.skills : [];
+      if (sk.some(x => x.startsWith('@'))) anyMode = true;
+      if (sk.some(x => x === '@hourly')) sk.filter(x => !x.startsWith('@')).forEach(id => ids.add(id));
+    });
+    setStaffSkillIds(anyMode ? [...ids] : null); // null = no filter (no mode config at all)
   }, []);
 
   // Only show nationalities that have ≥1 available maid configured for the given mode
@@ -392,6 +408,7 @@ function App() {
       invalidateBookingCache();
       fetchCritical();
       fetchAvailability();
+      fetchStaffSkillIds();
     };
 
     const onStorage = (e) => {
@@ -500,6 +517,9 @@ function App() {
   React.useEffect(() => {
     fetchAvailableSkills(state.nationality, state.mode);
   }, [state.nationality, state.mode, fetchAvailableSkills]);
+
+  // Fetch global staff skill index once on mount (refreshed on admin settings broadcast)
+  React.useEffect(() => { fetchStaffSkillIds(); }, [fetchStaffSkillIds]);
 
   // Auto-reset selected nationality if it disappears from the available list
   React.useEffect(() => {
@@ -760,7 +780,7 @@ function App() {
           {/* Step content */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
-            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveFixedServices={liveFixedServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} />}
+            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveFixedServices={liveFixedServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} staffSkillIds={staffSkillIds} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
             {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}

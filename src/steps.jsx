@@ -216,7 +216,7 @@ const SVC_COLOR_DEFAULT = {
   check:  'text-violet-600',
 };
 
-const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveFixedServices, liveMonthly, liveStayIn, liveLimits, materialsRate, totalStaff }) => {
+const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveFixedServices, liveMonthly, liveStayIn, liveLimits, materialsRate, totalStaff, staffSkillIds }) => {
   const NATS     = nationalities || NATIONALITIES;
   const minHours = Number(liveLimits?.minHours) || 2;
   const maxHours = Number(liveLimits?.maxHours) || 12;
@@ -225,7 +225,10 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
   const adminCap = Number(liveLimits?.maxMaids) || 99;
   const maxMaids = totalStaff ? Math.min(adminCap, totalStaff) : adminCap;
   const SERVICES       = (liveServices      && liveServices.length)      ? liveServices      : SERVICE_TYPES;
-  const FIXED_SERVICES = (liveFixedServices && liveFixedServices.length) ? liveFixedServices : [];
+  // Only show fixed services that have at least one hourly staff member assigned (staffSkillIds null = no filter)
+  const FIXED_SERVICES = (liveFixedServices && liveFixedServices.length)
+    ? liveFixedServices.filter(s => !staffSkillIds || staffSkillIds.includes(s.id))
+    : [];
   const MONTHLY        = (liveMonthly       && liveMonthly.length)       ? liveMonthly       : MONTHLY_PACKAGES;
   const STAYIN         = (liveStayIn        && liveStayIn.length)        ? liveStayIn        : STAYIN_PACKAGES;
   const modeEnabled = (id) => !enabledModes || enabledModes.includes(id);
