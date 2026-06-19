@@ -164,6 +164,7 @@ function App() {
   const [liveModesData, setLiveModesData] = React.useState(() => _cache?.modesData ?? null);
   const [liveNatBlockEnabled, setLiveNatBlockEnabled] = React.useState(() => _cache?.natBlockEnabled ?? true);
   const [liveServices, setLiveServices] = React.useState(() => _cache?.services ?? null);
+  const [liveFixedServices, setLiveFixedServices] = React.useState(() => _cache?.fixedServices ?? null);
   const [liveMonthly, setLiveMonthly] = React.useState(() => _cache?.monthly ?? null);
   const [liveStayIn, setLiveStayIn] = React.useState(() => _cache?.stayIn ?? null);
   const [liveLimits, setLiveLimits] = React.useState(() => _cache?.limits ?? null);
@@ -299,6 +300,11 @@ function App() {
         services = m.services.filter(s => s.on !== false);
         setLiveServices(services);
       }
+      let fixedServices = null;
+      if (m.fixedServices && Array.isArray(m.fixedServices) && m.fixedServices.length) {
+        fixedServices = m.fixedServices.filter(s => s.on !== false);
+        setLiveFixedServices(fixedServices);
+      }
       if (m.monthly && Array.isArray(m.monthly) && m.monthly.length) {
         const msCfg = m.monthlySettings || {};
         const customEnabled = msCfg.customEnabled !== false;
@@ -330,7 +336,7 @@ function App() {
         brand = m.brand;
         setLiveBrand(m.brand);
       }
-      return { modes, modesData, natBlockEnabled, services, monthly, stayIn, limits, materialsRate, businessHours, brand };
+      return { modes, modesData, natBlockEnabled, services, fixedServices, monthly, stayIn, limits, materialsRate, businessHours, brand };
     };
 
     // ── Fetchers used by realtime/polling (update state, no cache write) ──
@@ -341,7 +347,7 @@ function App() {
 
     const fetchSettings = async () => {
       const { data, error } = await supabase.from('settings').select('key, value')
-        .in('key', ['modes', 'nationalities_block', 'services', 'monthly', 'monthlySettings', 'stayIn', 'limits', 'materials', 'businessHours', 'brand']);
+        .in('key', ['modes', 'nationalities_block', 'services', 'fixedServices', 'monthly', 'monthlySettings', 'stayIn', 'limits', 'materials', 'businessHours', 'brand']);
       if (error) { console.warn('fetchSettings error:', error.message); return null; }
       return data ? applySettingsMap(Object.fromEntries(data.map(r => [r.key, r.value]))) : null;
     };
@@ -512,7 +518,7 @@ function App() {
     }
   }, [liveServices]);
 
-  const liveData = { services: liveServices, monthly: liveMonthly, stayIn: liveStayIn, materialsRate: liveMaterialsRate, nationalityEnabled: liveNatBlockEnabled };
+  const liveData = { services: liveServices, fixedServices: liveFixedServices, monthly: liveMonthly, stayIn: liveStayIn, materialsRate: liveMaterialsRate, nationalityEnabled: liveNatBlockEnabled };
   const breakdown = computePrice(state, filteredNats || liveNats || undefined, liveData);
 
   const visibleSteps = (state.mode === "monthly" || state.mode === "stayin")
@@ -618,7 +624,7 @@ function App() {
         total:          breakdown.total,
         address:        state.address || '',
         notes:          state.notes  || '',
-        status:         'New',
+        status:         'Pending',
         assigned_staff,
       };
 
@@ -751,7 +757,7 @@ function App() {
           {/* Step content */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-7 py-3 sm:py-4"
             data-screen-label={`0${idx+1} ${visibleSteps[idx]?.label || "Success"}`}>
-            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} />}
+            {stepKey === "service" && <StepService  state={state} set={set} nationalities={filteredNats} enabledModes={liveModes} liveModesData={liveModesData} natsBlockEnabled={liveNatBlockEnabled} liveServices={liveServices} liveFixedServices={liveFixedServices} liveMonthly={liveMonthly} liveStayIn={liveStayIn} liveLimits={liveLimits} materialsRate={liveMaterialsRate} totalStaff={totalStaffCount} />}
             {stepKey === "date"    && <StepDate     state={state} set={set} liveLimits={liveLimits} liveAvailability={liveAvailability} />}
             {stepKey === "time"    && <StepTime     state={state} set={set} slotData={slotData} businessHours={liveBusinessHours} />}
             {stepKey === "place"   && <StepLocation state={state} set={set} />}

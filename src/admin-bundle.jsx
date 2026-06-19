@@ -358,13 +358,20 @@ const ModeHeaderCard = ({ mode, store, set }) => {
 const HourlySection = ({ store, set }) => {
   const updateService = (id, p) => set({ services: store.services.map(s => s.id === id ? { ...s, ...p } : s) });
   const removeService = (id) => set({ services: store.services.filter(s => s.id !== id) });
+
+  const fixedSvcs = store.fixedServices || [];
+  const updateFixed = (id, p) => set({ fixedServices: fixedSvcs.map(s => s.id === id ? { ...s, ...p } : s) });
+  const removeFixed = (id) => set({ fixedServices: fixedSvcs.filter(s => s.id !== id) });
+  const addFixed = () => set({ fixedServices: [...fixedSvcs, { id: `fs${Date.now()}`, name: "New fixed service", icon: 'Sparkles', fixedPrice: 100, on: true }] });
+
   const [savedH, setSavedH] = React.useState(false);
   const saveHourly = async () => {
     setSavedH(false);
     try {
       const { error } = await supabase.from('settings').upsert([
-        { key:'services', value:store.services },
-        { key:'limits',   value:store.limits   },
+        { key:'services',      value:store.services },
+        { key:'fixedServices', value:fixedSvcs      },
+        { key:'limits',        value:store.limits   },
       ]);
       if (error) throw error;
       broadcastSettingsUpdate();
@@ -397,6 +404,35 @@ const HourlySection = ({ store, set }) => {
                   <IconBtn icon="trash" tone="danger" onClick={() => removeService(s.id)} />
                 </div>
               </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Fixed Services" subtitle="Flat-rate services shown on the customer app — e.g. sofa cleaning, car detailing. Price is fixed regardless of hours or maids."
+        action={<PrimaryBtn size="sm" onClick={addFixed}><AdminIcon name="plus" className="w-4 h-4"/>Add service</PrimaryBtn>}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {fixedSvcs.length === 0 && (
+            <div className="col-span-2 py-8 text-center text-[13px] text-ink-400">
+              No fixed-price services yet. Click "Add service" to create one.
+            </div>
+          )}
+          {fixedSvcs.map(s => (
+            <div key={s.id} className="rounded-xl hairline bg-white p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <IconPicker value={s.icon} onChange={v => updateFixed(s.id, { icon: v })} />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <TextField value={s.name} onChange={v => updateFixed(s.id, { name: v })} placeholder="Service name" />
+                  <div className="flex items-center justify-between rounded-lg hairline bg-ink-50 px-3 h-10">
+                    <span className="text-[12px] text-ink-600 font-medium">Active</span>
+                    <Switch on={s.on} onChange={v => updateFixed(s.id, { on: v })} ariaLabel={`Toggle ${s.name}`} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-ink-100">
+                <span className="text-[11px] font-mono text-ink-400">Price: <TextField type="number" value={s.fixedPrice} onChange={v => updateFixed(s.id, { fixedPrice: v })} suffix="QAR flat" className="inline-flex w-32"/></span>
+                <IconBtn icon="trash" tone="danger" onClick={() => removeFixed(s.id)} />
+              </div>
+            </div>
           ))}
         </div>
       </Card>
@@ -1295,7 +1331,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
     ? (dateFrom === dateTo ? dateFrom : `${dateFrom} – ${dateTo}`)
     : '';
 
-  const filters    = ["All", "Confirmed", "Pending", "In Progress", "Completed", "Cancelled"];
+  const filters    = ["All", "Pending", "Confirmed", "Completed", "Cancelled"];
   const payFilters = ["All", "Paid", "Pending"];
 
   return (
@@ -1499,6 +1535,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
               <th className="px-3 py-3">Customer</th>
               <th className="px-3 py-3">Service</th>
               <th className="px-3 py-3">Date</th>
+              <th className="px-3 py-3">Status</th>
               <th className="px-3 py-3">Maids</th>
               <th className="px-3 py-3">Assigned to</th>
               <th className="px-3 py-3">Payment</th>
@@ -1528,6 +1565,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
                   <div className="text-[11.5px] text-ink-500">{b.mode}</div>
                 </td>
                 <td className="px-3 py-3.5 text-[13px] text-ink-700">{b.date}<div className="text-[11.5px] text-ink-500">{b.time}</div></td>
+                <td className="px-3 py-3.5"><StatusPill status={b.status}/></td>
                 <td className="px-3 py-3.5 text-[13px] font-mono tabular-nums text-ink-700">{b.maids} × {b.hours}h</td>
                 <td className="px-3 py-3.5"><AssignStaff booking={b} store={store} set={set}/></td>
                 <td className="px-3 py-3.5"><PaymentBadge booking={b}/></td>
@@ -1741,6 +1779,10 @@ const initialStore = () => ({
     { id: "deep",    name: "Deep Cleaning",     icon: "SprayCan",  rate: 18, on: true  },
     { id: "movein",  name: "Move-in / Out",     icon: "Package",   rate: 20, on: true  },
     { id: "post",    name: "Post-Construction", icon: "HardHat",   rate: 25, on: false },
+  ],
+  fixedServices: [
+    { id: "sofa",   name: "Sofa Cleaning",  icon: "Sparkles", fixedPrice: 150, on: true },
+    { id: "cardet", name: "Car Detailing",  icon: "SprayCan", fixedPrice: 200, on: true },
   ],
   limits: {
     minHours: 3,
@@ -1969,7 +2011,7 @@ const BottomNav = ({ section, onNav, onMenu }) => {
 /* ─── Top bar ─── */
 const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookings = [] }) => {
   const [notifOpen, setNotifOpen] = React.useState(false);
-  const newBookings = bookings.filter(b => (b.status || b._raw?.status) === 'New').slice(0, 8);
+  const newBookings = bookings.filter(b => (b.status || b._raw?.status) === 'Pending').slice(0, 8);
   const titles = {
     overview: "Overview",
     bookings: "Bookings",
@@ -2640,7 +2682,7 @@ const RegularsView = () => {
       cleaners:       Number(schedule.maids) || 1,
       rate:           0,
       total:          0,
-      status:         'Confirmed',
+      status:         'Pending',
       assigned_staff: staffToUse,
       // Embed schedule ID so syncFutureBookings can find these bookings precisely
       notes:          `[sch:${schedule.id}] Recurring: ${label}`,
@@ -3882,7 +3924,7 @@ const HOUR_OPTIONS = Array.from({ length: 18 }, (_, i) => {
 });
 
 const SettingsSection = ({ store, set }) => {
-  const brand = store.brand || { name:'Maid Pro', whatsapp:'', callNumber:'', currency:'QAR', timezone:'Asia/Qatar (GMT+3)', logo:'' }
+  const brand = store.brand || { name:'Maid Pro', whatsapp:'', callNumber:'', currency:'QAR', language:'en', timezone:'Asia/Qatar (GMT+3)', logo:'' }
   const rules = store.bookingRules || { autoConfirm:true, smsReminders:true, guestCheckout:false, idVerification:true, noShowFee:false, maidPhotos:true, autoAssign:true }
   const hours = store.businessHours || { open: 8, close: 19 }
   const setB = p => set({ brand: { ...brand, ...p } })
@@ -3903,13 +3945,13 @@ const SettingsSection = ({ store, set }) => {
     } catch(e) { alert('Save failed: ' + (e.message || 'Network error — check your connection.')) }
   }
   return (
-    <div className="space-y-5 fade-up">
+    <div className="space-y-4 fade-up">
       <Card title="Brand Identity" subtitle="Company name, logo and contact details — shown in the sidebar and booking page.">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><Label>Brand name</Label><TextField value={brand.name} onChange={v=>setB({name:v})} className="mt-2"/></div>
           <div><Label>WhatsApp number</Label><TextField value={brand.whatsapp||''} onChange={v=>setB({whatsapp:v})} placeholder="+974 5000 0000" className="mt-2"/></div>
           <div><Label>Call number</Label><TextField value={brand.callNumber||''} onChange={v=>setB({callNumber:v})} placeholder="+974 4400 0000" className="mt-2"/></div>
-          <div className="md:col-span-2">
+          <div className="sm:col-span-2">
             <Label>Company Logo</Label>
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               {brand.logo && (
@@ -3935,71 +3977,129 @@ const SettingsSection = ({ store, set }) => {
               <p className="text-[11.5px] text-ink-500">PNG, JPG or SVG · shown in sidebar &amp; booking page</p>
             </div>
           </div>
-          <div><Label>Currency</Label><TextField value={brand.currency} onChange={v=>setB({currency:v})} className="mt-2"/></div>
+          <div>
+            <Label>Currency</Label>
+            <div className="relative mt-2">
+              <select value={brand.currency || 'QAR'} onChange={e => setB({ currency: e.target.value })}
+                className="w-full h-10 rounded-xl hairline bg-white pl-3 pr-8 text-[13.5px] text-ink-900 outline-none focus:ring-2 focus:ring-mint-400 appearance-none cursor-pointer">
+                {[
+                  ['AED','AED — UAE Dirham'],
+                  ['QAR','QAR — Qatari Riyal'],
+                  ['SAR','SAR — Saudi Riyal'],
+                  ['KWD','KWD — Kuwaiti Dinar'],
+                  ['BHD','BHD — Bahraini Dinar'],
+                  ['OMR','OMR — Omani Rial'],
+                  ['USD','USD — US Dollar'],
+                  ['EUR','EUR — Euro'],
+                  ['GBP','GBP — British Pound'],
+                  ['CAD','CAD — Canadian Dollar'],
+                  ['AUD','AUD — Australian Dollar'],
+                  ['SGD','SGD — Singapore Dollar'],
+                  ['INR','INR — Indian Rupee'],
+                  ['PKR','PKR — Pakistani Rupee'],
+                  ['EGP','EGP — Egyptian Pound'],
+                ].map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div>
+            <Label>Language</Label>
+            <div className="relative mt-2">
+              <select value={brand.language || 'en'} onChange={e => setB({ language: e.target.value })}
+                className="w-full h-10 rounded-xl hairline bg-white pl-3 pr-8 text-[13.5px] text-ink-900 outline-none focus:ring-2 focus:ring-mint-400 appearance-none cursor-pointer">
+                {[
+                  ['en','English'],
+                  ['ar','Arabic (العربية)'],
+                  ['fr','French (Français)'],
+                  ['es','Spanish (Español)'],
+                  ['de','German (Deutsch)'],
+                  ['ur','Urdu (اردو)'],
+                  ['hi','Hindi (हिन्दी)'],
+                  ['tl','Filipino (Tagalog)'],
+                  ['bn','Bengali (বাংলা)'],
+                  ['ru','Russian (Русский)'],
+                  ['tr','Turkish (Türkçe)'],
+                ].map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
           <div><Label>Time zone</Label><TextField value={brand.timezone} onChange={v=>setB({timezone:v})} className="mt-2"/></div>
         </div>
       </Card>
+
       <Card title="Auto Assign" subtitle="Automatically route each new booking to the right maid — no manual picking needed.">
-        <div className={`flex items-start sm:items-center justify-between gap-4 rounded-xl px-4 py-4 transition-all
+        <div className={`flex items-start justify-between gap-4 rounded-xl px-4 py-4 transition-all
           ${rules.autoAssign ? "bg-mint-50 ring-1 ring-mint-300" : "bg-ink-50 hairline"}`}>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="text-[13.5px] font-semibold text-ink-900">Enable Auto Assign</div>
-            <div className="text-[12px] text-ink-500 mt-0.5 max-w-sm">
-              When on, every new booking is instantly assigned to the maid carrying the <span className="font-semibold">fewest active jobs</span>. Only maids whose <span className="font-semibold">working days</span> include the booking date are considered.
+            <div className="text-[12px] text-ink-500 mt-0.5">
+              When on, every new booking is assigned to the maid with the <span className="font-semibold">fewest active jobs</span>. Only maids whose <span className="font-semibold">working days</span> match the booking date are considered.
             </div>
           </div>
           <Switch on={!!rules.autoAssign} onChange={v => setR({ autoAssign: v })} ariaLabel="Auto Assign"/>
         </div>
         {rules.autoAssign && (
           <div className="mt-3 flex items-center gap-2 text-[12px] text-mint-700 font-medium">
-            <AdminIcon name="check" className="w-3.5 h-3.5"/>
+            <AdminIcon name="check" className="w-3.5 h-3.5 flex-shrink-0"/>
             Auto Assign is active — new bookings will be assigned automatically.
           </div>
         )}
       </Card>
 
       <Card title="Business Hours" subtitle="Set the opening and closing time for customer bookings. Slots outside these hours are hidden.">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div>
             <Label>Opening time</Label>
-            <select value={hours.open} onChange={e => setH({ open: Number(e.target.value) })}
-              className="mt-2 w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]">
-              {HOUR_OPTIONS.filter(o => o.value < hours.close).map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <div className="relative mt-2">
+              <select value={hours.open} onChange={e => setH({ open: Number(e.target.value) })}
+                className="w-full h-10 pl-3 pr-8 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:ring-2 focus:ring-mint-400 appearance-none cursor-pointer">
+                {HOUR_OPTIONS.filter(o => o.value < hours.close).map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
           </div>
           <div>
             <Label>Closing time</Label>
-            <select value={hours.close} onChange={e => setH({ close: Number(e.target.value) })}
-              className="mt-2 w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]">
-              {HOUR_OPTIONS.filter(o => o.value > hours.open).map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <div className="relative mt-2">
+              <select value={hours.close} onChange={e => setH({ close: Number(e.target.value) })}
+                className="w-full h-10 pl-3 pr-8 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none focus:ring-2 focus:ring-mint-400 appearance-none cursor-pointer">
+                {HOUR_OPTIONS.filter(o => o.value > hours.open).map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-ink-50 text-[12.5px] text-ink-600">
+        <div className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1 px-3 py-2.5 rounded-lg bg-ink-50 text-[12.5px] text-ink-600 leading-snug">
           <AdminIcon name="calendar" className="w-3.5 h-3.5 flex-shrink-0"/>
-          Customers can book from <span className="font-semibold mx-1">{HOUR_OPTIONS.find(o=>o.value===hours.open)?.label}</span> to <span className="font-semibold mx-1">{HOUR_OPTIONS.find(o=>o.value===hours.close)?.label}</span> · {hours.close - hours.open} hour window
+          <span>Customers can book from</span>
+          <span className="font-semibold">{HOUR_OPTIONS.find(o=>o.value===hours.open)?.label}</span>
+          <span>to</span>
+          <span className="font-semibold">{HOUR_OPTIONS.find(o=>o.value===hours.close)?.label}</span>
+          <span>· {hours.close - hours.open} hour window</span>
         </div>
       </Card>
 
       <Card title="Notifications" subtitle="Control which sounds and alerts the admin panel plays.">
         <div className={`rounded-xl px-4 py-4 transition-all space-y-3
           ${rules.bookingSound !== false ? 'bg-mint-50 ring-1 ring-mint-300' : 'bg-ink-50 hairline'}`}>
-          <div className="flex items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
               <span className={`w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 text-[20px] ${rules.bookingSound !== false ? 'bg-mint-100' : 'bg-ink-100'}`}>🔔</span>
-              <div>
+              <div className="min-w-0">
                 <div className="text-[13.5px] font-semibold text-ink-900">Booking notification sound</div>
-                <div className="text-[12px] text-ink-500 mt-0.5">Play a chime when a new booking is received in real-time.</div>
+                <div className="text-[12px] text-ink-500 mt-0.5 leading-snug">Play a chime when a new booking is received in real-time.</div>
               </div>
             </div>
             <Switch on={rules.bookingSound !== false} onChange={v => { setR({ bookingSound: v }); if (v) playBookingChime(); }} ariaLabel="Booking notification sound"/>
           </div>
           {rules.bookingSound !== false && (
-            <div className="flex items-center gap-3 pt-1 border-t border-mint-200">
+            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-mint-200">
               <button onClick={playBookingChime}
                 className="flex items-center gap-2 h-8 px-4 rounded-lg bg-white ring-1 ring-mint-300 text-[12.5px] font-semibold text-mint-700 hover:bg-mint-50 transition-colors">
                 🔔 Test sound
@@ -4010,9 +4110,9 @@ const SettingsSection = ({ store, set }) => {
         </div>
       </Card>
 
-      <div className="flex items-center justify-end gap-3 border-t border-ink-200 mt-4 pt-4">
-        {saved && <span className="flex items-center gap-1.5 text-[13px] font-semibold text-mint-700"><AdminIcon name="check" className="w-4 h-4"/>Saved!</span>}
-        <PrimaryBtn onClick={save}><AdminIcon name="check" className="w-4 h-4"/>Save Changes</PrimaryBtn>
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3 border-t border-ink-200 mt-2 pt-4">
+        {saved && <span className="flex items-center justify-center gap-1.5 text-[13px] font-semibold text-mint-700"><AdminIcon name="check" className="w-4 h-4"/>Saved!</span>}
+        <PrimaryBtn onClick={save} className="w-full sm:w-auto justify-center"><AdminIcon name="check" className="w-4 h-4"/>Save Changes</PrimaryBtn>
       </div>
     </div>
   )
@@ -4069,11 +4169,11 @@ const OverviewCharts = ({ bookings }) => {
 }
 
 /* --- Booking Detail Modal --- */
-const BOOKING_STATUSES = ['New','Confirmed','Pending','In Progress','Completed','Cancelled']
+const BOOKING_STATUSES = ['Pending','Confirmed','Completed','Cancelled']
 
 const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const [status, setStatus] = React.useState(
-    BOOKING_STATUSES.includes(booking.status) ? booking.status : 'New'
+    BOOKING_STATUSES.includes(booking.status) ? booking.status : 'Pending'
   )
   const [notes, setNotes] = React.useState(booking._raw?.notes || '')
   // Keep as string so the user can freely type decimals (e.g. "10.50")
@@ -4094,6 +4194,13 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
   const total = Number(booking.total) || 0
   const paidNum = parseFloat(paidAmount) || 0
   const due = Math.max(0, total - paidNum)
+
+  // Auto-complete when fully paid
+  React.useEffect(() => {
+    if (total > 0 && paidNum >= total && status !== 'Cancelled' && status !== 'Completed') {
+      setStatus('Completed')
+    }
+  }, [paidNum, total])
 
   // ── Staff hours helpers ───────────────────────────────────────────────────
   // All maids work the FULL booking duration simultaneously.
@@ -4371,7 +4478,7 @@ const NewBookingModal = ({ store, onClose }) => {
   }, [])
   const defSvc = svcs[0]?.name || 'Regular Cleaning'
   const defDate = (() => { const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; })()
-  const [f, setF] = React.useState({ name:'', phone:'', service:defSvc, date:defDate, time:'9:00 AM', hours:3, cleaners:1, rate:15, total:45, address:'', notes:'', status:'New', manualStaff:[] })
+  const [f, setF] = React.useState({ name:'', phone:'', service:defSvc, date:defDate, time:'9:00 AM', hours:3, cleaners:1, rate:15, total:45, address:'', notes:'', status:'Pending', manualStaff:[] })
   const upd = p => setF(prev => ({ ...prev, ...p }))
   const [saving, setSaving] = React.useState(false)
   const [err, setErr] = React.useState('')
@@ -4690,7 +4797,7 @@ const NewBookingModal = ({ store, onClose }) => {
           )}
           <div><Label className="mb-1.5">Rate QAR/hr</Label><TextField type="number" value={f.rate} onChange={v=>upd({rate:v})} suffix="QAR"/></div>
           <div><Label className="mb-1.5">Total</Label><TextField type="number" value={f.total} onChange={v=>upd({total:v})} suffix="QAR"/></div>
-          <div className="col-span-2"><Label className="mb-1.5">Status</Label><select value={f.status} onChange={e=>upd({status:e.target.value})} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">{['New','Confirmed','Pending'].map(s=><option key={s}>{s}</option>)}</select></div>
+          <div className="col-span-2"><Label className="mb-1.5">Status</Label><select value={f.status} onChange={e=>upd({status:e.target.value})} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">{BOOKING_STATUSES.map(s=><option key={s}>{s}</option>)}</select></div>
           <div className="col-span-2"><Label className="mb-1.5">Address</Label><TextField value={f.address} onChange={v=>upd({address:v})} placeholder="Building, street, zone"/></div>
           <div className="col-span-2"><Label className="mb-1.5">Notes</Label><textarea value={f.notes} onChange={e=>upd({notes:e.target.value})} rows={2} placeholder="Special instructions..." className="w-full p-3 rounded-xl bg-white hairline text-[13px] text-ink-900 placeholder:text-ink-400 outline-none resize-none"/></div>
         </div>
@@ -4712,16 +4819,16 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const [to,   setTo]   = React.useState(todayStr);
   const [selectedStaff, setSelectedStaff] = React.useState(null);
 
-  const inRange = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
-  const confirmed = inRange.filter(b => ['Confirmed','Completed'].includes(b.status));
-  const revenue   = confirmed.reduce((s, b) => s + b.total, 0);
-  const paidTotal = inRange.reduce((s, b) => s + (b.paid_amount || 0), 0);
-  const dueTotal  = inRange.reduce((s, b) => s + Math.max(0, b.total - (b.paid_amount || 0)), 0);
-  const avgVal    = confirmed.length > 0 ? revenue / confirmed.length : 0;
-  const cancelled = inRange.filter(b => b.status === 'Cancelled').length;
-  const completed = inRange.filter(b => b.status === 'Completed').length;
-  const newBks    = inRange.filter(b => b.status === 'New').length;
-  const cancRate  = inRange.length > 0 ? ((cancelled / inRange.length) * 100).toFixed(1) : '0';
+  const inRange    = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
+  const completed  = inRange.filter(b => b.status === 'Completed');
+  const revenue    = completed.reduce((s, b) => s + b.total, 0);
+  const paidTotal  = completed.reduce((s, b) => s + (b.paid_amount || 0), 0);
+  const dueTotal   = completed.reduce((s, b) => s + Math.max(0, b.total - (b.paid_amount || 0)), 0);
+  const avgVal     = completed.length > 0 ? revenue / completed.length : 0;
+  const cancelled  = inRange.filter(b => b.status === 'Cancelled').length;
+  const pending    = inRange.filter(b => b.status === 'Pending').length;
+  const confirmed  = inRange.filter(b => b.status === 'Confirmed').length;
+  const cancRate   = inRange.length > 0 ? ((cancelled / inRange.length) * 100).toFixed(1) : '0';
 
   // Breakdowns
   const byService = {};
@@ -4729,7 +4836,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const svc = b.service || 'Unknown';
     if (!byService[svc]) byService[svc] = { count: 0, revenue: 0 };
     byService[svc].count += 1;
-    if (['Confirmed','Completed'].includes(b.status)) byService[svc].revenue += b.total;
+    if (b.status === 'Completed') byService[svc].revenue += b.total;
   });
   const byStatus = {};
   inRange.forEach(b => { byStatus[b.status] = (byStatus[b.status] || 0) + 1; });
@@ -4743,7 +4850,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const d    = new Date(fromD.getTime() + i * dayMs);
     const dStr = d.toISOString().slice(0, 10);
     const lbl  = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const rev  = confirmed.filter(b => b._raw?.date === dStr).reduce((s, b) => s + b.total, 0);
+    const rev  = completed.filter(b => b._raw?.date === dStr).reduce((s, b) => s + b.total, 0);
     const cnt  = inRange.filter(b => b._raw?.date === dStr).length;
     return { date: dStr, label: lbl, revenue: rev, count: cnt };
   });
@@ -4766,7 +4873,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const activeStaff = (store?.staff || []).filter(s => s.active !== false);
   const staffPerf = activeStaff.map(s => {
     const bks = inRange.filter(b => (b._raw?.assigned_staff || []).includes(s.id));
-    const rev = bks.filter(b => ['Confirmed','Completed'].includes(b.status)).reduce((acc, b) => acc + b.total, 0);
+    const rev = bks.filter(b => b.status === 'Completed').reduce((acc, b) => acc + b.total, 0);
     return { ...s, bkCount: bks.length, bkRevenue: rev };
   }).sort((a, b) => b.bkCount - a.bkCount);
   const maxBkCount = Math.max(...staffPerf.map(s => s.bkCount), 1);
@@ -4777,7 +4884,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const key = (b.phone && b.phone !== '—') ? b.phone : b.customer;
     if (!custMap[key]) custMap[key] = { name: b.customer, phone: b.phone, count: 0, spent: 0 };
     custMap[key].count += 1;
-    if (['Confirmed','Completed'].includes(b.status)) custMap[key].spent += b.total;
+    if (b.status === 'Completed') custMap[key].spent += b.total;
   });
   const topCustomers = Object.values(custMap).sort((a, b) => b.count - a.count).slice(0, 8);
   const maxCustCount = Math.max(...topCustomers.map(c => c.count), 1);
@@ -4826,8 +4933,9 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
           return ids.map(id => (staffList.find(s => s.id === id)?.name || '—')).join(', ');
         };
 
-        const totalHours  = inRange.filter(b => b.status !== 'Cancelled' && b.payment_status !== 'Pending').reduce((s, b) => s + (b.hours || 0), 0);
-        const totalAmount = inRange.filter(b => b.status !== 'Cancelled' && b.payment_status !== 'Pending').reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+        const completedJobs = inRange.filter(b => b.status === 'Completed');
+        const totalHours    = completedJobs.reduce((s, b) => s + (b.hours || 0), 0);
+        const totalAmount   = completedJobs.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
 
         const handlePrint = () => {
           const brand     = store?.brand || {};
@@ -4840,28 +4948,17 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
             ? `<img src="${brandLogo}" alt="${brandName}" style="height:56px;max-width:160px;object-fit:contain;display:block;"/>`
             : `<div style="width:48px;height:48px;border-radius:12px;background:#16a34a;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:900;letter-spacing:-1px;">${brandName.slice(0,1)}</div>`;
 
-          const rows = inRange.map((b, i) => {
-            const isCancelled = b.status === 'Cancelled';
-            const isPending   = !isCancelled && b.payment_status === 'Pending';
-            const dimRow      = isCancelled || isPending;
-            return `
-            <tr class="${i % 2 === 1 ? 'even' : ''}${dimRow ? ' cancelled-row' : ''}">
+          const rows = completedJobs.map((b, i) => `
+            <tr class="${i % 2 === 1 ? 'even' : ''}">
               <td class="num">${i + 1}</td>
               <td class="mono" style="font-size:10px;color:#9ca3af">${b.ref || '—'}</td>
               <td class="mono">${b._raw?.date || '—'}</td>
               <td class="mono">${b._raw?.time || b.time || '—'}</td>
               <td>${getMaids(b)}</td>
               <td class="bold">${b.customer || '—'}</td>
-              <td class="center">${isCancelled ? '—' : (b.hours ?? '—')}</td>
-              <td class="right mono">${
-                isCancelled
-                  ? '<span style="background:#f3f4f6;color:#9ca3af;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.05em">CANCELLED</span>'
-                  : isPending
-                  ? '<span style="background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.05em">PENDING</span>'
-                  : 'QAR ' + (Number(b._raw?.paid_amount) || 0).toLocaleString()
-              }</td>
-            </tr>`;
-          }).join('');
+              <td class="center">${b.hours ?? '—'}</td>
+              <td class="right mono">QAR ${(Number(b._raw?.paid_amount) || 0).toLocaleString()}</td>
+            </tr>`).join('');
 
           const html = `<!DOCTYPE html>
 <html lang="en"><head>
@@ -4939,8 +5036,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   <!-- Summary pills -->
   <div class="summary">
     <div class="pill">
-      <div class="pill-label">Total Jobs</div>
-      <div class="pill-value">${inRange.length}<span class="pill-unit">jobs</span></div>
+      <div class="pill-label">Completed Jobs</div>
+      <div class="pill-value">${completedJobs.length}<span class="pill-unit">jobs</span></div>
     </div>
     <div class="pill">
       <div class="pill-label">Total Hours</div>
@@ -4952,7 +5049,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     </div>
     <div class="pill">
       <div class="pill-label">Avg per Job</div>
-      <div class="pill-value">${inRange.length ? Math.round(totalAmount / inRange.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div>
+      <div class="pill-value">${completedJobs.length ? Math.round(totalAmount / completedJobs.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div>
     </div>
   </div>
 
@@ -4999,8 +5096,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
 
         return (
           <Card
-            title="Jobs Report"
-            subtitle={`${inRange.length} job${inRange.length !== 1 ? 's' : ''} · ${from} → ${to}`}
+            title="Jobs Report — Completed"
+            subtitle={`${completedJobs.length} completed job${completedJobs.length !== 1 ? 's' : ''} · ${from} → ${to}`}
             padded={false}
             action={
               <button onClick={handlePrint}
@@ -5024,32 +5121,24 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {inRange.length === 0 ? (
-                    <tr><td colSpan={8} className="px-5 py-12 text-center text-[13px] text-ink-400">No jobs in selected range.</td></tr>
-                  ) : inRange.map((b, i) => {
-                    const isCancelled = b.status === 'Cancelled';
-                    const isPending   = !isCancelled && b.payment_status === 'Pending';
-                    return (
-                    <tr key={b.ref} className={`border-t border-ink-100 transition-colors ${isCancelled || isPending ? 'bg-ink-50/40 opacity-70' : 'hover:bg-ink-50/50'}`}>
+                  {completedJobs.length === 0 ? (
+                    <tr><td colSpan={8} className="px-5 py-12 text-center text-[13px] text-ink-400">No completed jobs in selected range.</td></tr>
+                  ) : completedJobs.map((b, i) => (
+                    <tr key={b.ref} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
                       <td className="px-5 py-3 font-mono text-[12px] text-ink-400 tabular-nums">{i + 1}</td>
                       <td className="px-3 py-3 font-mono text-[12px] text-ink-500">{b.ref || '—'}</td>
                       <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.date || '—'}</td>
                       <td className="px-3 py-3 font-mono text-[12.5px] text-ink-600">{b._raw?.time || b.time || '—'}</td>
                       <td className="px-3 py-3 text-[13px] text-ink-700">{getMaids(b)}</td>
                       <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
-                      <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{isCancelled ? '—' : (b.hours ?? '—')}</td>
-                      <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold">
-                        {isCancelled
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ink-100 text-ink-500 text-[11px] font-semibold">Cancelled</span>
-                          : isPending
-                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-semibold">Pending</span>
-                          : <span className="text-ink-900">QAR {(Number(b._raw?.paid_amount) || 0).toLocaleString()}</span>}
+                      <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{b.hours ?? '—'}</td>
+                      <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold text-ink-900">
+                        QAR {(Number(b._raw?.paid_amount) || 0).toLocaleString()}
                       </td>
                     </tr>
-                    );
-                  })}
+                  ))}
                 </tbody>
-                {inRange.length > 0 && (
+                {completedJobs.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-ink-200 bg-ink-50/60">
                       <td colSpan={6} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
@@ -5067,12 +5156,11 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
       {reportType === 'staff' && (() => {
         const allStaff = (store?.staff || []).filter(s => s.active !== false);
 
-        // Per-staff bookings in range — exclude cancelled and pending-payment jobs
+        // Per-staff bookings in range — completed jobs only
         const staffBookings = (s) =>
           inRange.filter(b =>
             (b._raw?.assigned_staff || []).includes(s.id) &&
-            b.status !== 'Cancelled' &&
-            b.payment_status !== 'Pending'
+            b.status === 'Completed'
           );
 
         // Parse "9:00 AM" → 9, "2:30 PM" → 14.5
@@ -5462,6 +5550,7 @@ const App = () => {
       const m = Object.fromEntries(data.map(r => [r.key, r.value]));
       const p = {};
       if (m.services)        p.services        = m.services;
+      if (m.fixedServices)   p.fixedServices   = m.fixedServices;
       if (m.limits)          p.limits          = m.limits;
       if (m.modes) {
         // Fix garbled emojis stored from old encoding — always use canonical emojis

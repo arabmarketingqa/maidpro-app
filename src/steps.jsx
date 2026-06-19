@@ -216,7 +216,7 @@ const SVC_COLOR_DEFAULT = {
   check:  'text-violet-600',
 };
 
-const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveMonthly, liveStayIn, liveLimits, materialsRate, totalStaff }) => {
+const StepService = ({ state, set, nationalities, enabledModes, liveModesData, natsBlockEnabled, liveServices, liveFixedServices, liveMonthly, liveStayIn, liveLimits, materialsRate, totalStaff }) => {
   const NATS     = nationalities || NATIONALITIES;
   const minHours = Number(liveLimits?.minHours) || 2;
   const maxHours = Number(liveLimits?.maxHours) || 12;
@@ -224,9 +224,10 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
   // Daily availability is enforced separately at the time-slot step via isFull().
   const adminCap = Number(liveLimits?.maxMaids) || 99;
   const maxMaids = totalStaff ? Math.min(adminCap, totalStaff) : adminCap;
-  const SERVICES = (liveServices && liveServices.length) ? liveServices : SERVICE_TYPES;
-  const MONTHLY  = (liveMonthly  && liveMonthly.length)  ? liveMonthly  : MONTHLY_PACKAGES;
-  const STAYIN   = (liveStayIn   && liveStayIn.length)   ? liveStayIn   : STAYIN_PACKAGES;
+  const SERVICES       = (liveServices      && liveServices.length)      ? liveServices      : SERVICE_TYPES;
+  const FIXED_SERVICES = (liveFixedServices && liveFixedServices.length) ? liveFixedServices : [];
+  const MONTHLY        = (liveMonthly       && liveMonthly.length)       ? liveMonthly       : MONTHLY_PACKAGES;
+  const STAYIN         = (liveStayIn        && liveStayIn.length)        ? liveStayIn        : STAYIN_PACKAGES;
   const modeEnabled = (id) => !enabledModes || enabledModes.includes(id);
 
   // Returns the nationality-adjusted rate/price for any service, package or plan
@@ -245,7 +246,7 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
     if (rates[natId] != null) return Number(rates[natId]);
     return svc.rate;
   };
-  const selectedSvc = SERVICES.find(s => s.id === state.serviceType);
+  const selectedSvc = SERVICES.find(s => s.id === state.serviceType) || FIXED_SERVICES.find(s => s.id === state.serviceType);
   const isFixedService = selectedSvc != null && selectedSvc.fixedPrice != null && selectedSvc.fixedPrice !== '';
 
   return (
@@ -320,6 +321,34 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
             );
           })}
         </div>
+        </div>
+      )}
+
+      {/* Fixed-price services — separate subsection */}
+      {state.mode === "hourly" && FIXED_SERVICES.length > 0 && (
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-400 mb-2">Fixed-price services</div>
+          <div className="grid grid-cols-1 gap-2">
+            {FIXED_SERVICES.map(t => {
+              const active = state.serviceType === t.id;
+              const theme = SERVICE_COLORS[t.id] || SVC_COLOR_DEFAULT;
+              return (
+                <button key={t.id} onClick={() => set({ serviceType: t.id, maids: 1 })}
+                  className={`h-11 sm:h-12 px-2.5 sm:px-3 rounded-xl text-[12.5px] sm:text-[13px] font-semibold flex items-center gap-2.5 sm:gap-3 transition-all
+                    ${active ? theme.active : theme.idle}`}>
+                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
+                    ${active ? "bg-white/30" : "bg-white hairline"}`}>
+                    {t.icon
+                      ? <SvcIcon name={t.icon} className={`w-4 h-4 ${theme.icon}`} strokeWidth={1.6}/>
+                      : <span className="text-[15px]">{t.emoji}</span>}
+                  </div>
+                  <span className={`flex-1 text-left truncate ${theme.name}`}>{t.name}</span>
+                  <span className={`font-mono text-[11.5px] sm:text-[12px] flex-shrink-0 ${theme.rate}`}>{Number(t.fixedPrice).toLocaleString()} QAR</span>
+                  {active && <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${theme.check} bg-white/30`}><Icon name="check" className="w-3 h-3" strokeWidth={3}/></span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

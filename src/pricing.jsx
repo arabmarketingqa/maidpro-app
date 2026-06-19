@@ -45,11 +45,12 @@ function natRate(state, natsList) {
 
 function computePrice(state, natsList, liveData) {
   const SVCS    = (liveData?.services && liveData.services.length) ? liveData.services : SERVICE_TYPES;
+  const FIXED   = (liveData?.fixedServices && liveData.fixedServices.length) ? liveData.fixedServices : [];
   const MONTHLY = (liveData?.monthly  && liveData.monthly.length)  ? liveData.monthly  : MONTHLY_PACKAGES;
   const STAYIN  = (liveData?.stayIn   && liveData.stayIn.length)   ? liveData.stayIn   : STAYIN_PACKAGES;
   const MAT_RATE = (liveData?.materialsRate != null) ? Number(liveData.materialsRate) : MATERIALS_PER_HOUR;
 
-  const type       = SVCS.find(t => t.id === state.serviceType) || SVCS[0];
+  const type       = SVCS.find(t => t.id === state.serviceType) || FIXED.find(t => t.id === state.serviceType) || SVCS[0];
   const natRateVal = natRate(state, natsList);
   const nat        = state.nationality || '';
 
