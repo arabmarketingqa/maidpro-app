@@ -32,37 +32,61 @@ const ServicesSection = ({ store, set }) => {
       </Card>
 
       {/* Service Configurator */}
-      <Card title="Hourly Service Configurator" subtitle="Manage names, icons and per-hour pricing for each cleaning type."
+      <Card title="Service Configurator" subtitle="Manage names, icons and pricing for each service. Choose hourly (rate × hours × maids) or fixed flat price."
         action={<GhostBtn size="sm" tone="mint"><AdminIcon name="plus" className="w-4 h-4"/>Add service</GhostBtn>}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {store.services.map(s => (
-            <div key={s.id} className="rounded-xl hairline bg-white p-4">
-              <div className="flex items-start gap-3">
-                <input
-                  value={s.emoji}
-                  onChange={e => updateService(s.id, { emoji: e.target.value })}
-                  className="w-12 h-12 text-center text-[26px] rounded-lg hairline bg-ink-50 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"
-                />
-                <div className="flex-1 min-w-0 space-y-2">
-                  <TextField value={s.name} onChange={v => updateService(s.id, { name: v })} placeholder="Service name" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <TextField type="number" value={s.rate} onChange={v => updateService(s.id, { rate: v })} suffix="QAR/hr" />
-                    <div className="flex items-center justify-between rounded-lg hairline bg-ink-50 px-3">
-                      <span className="text-[12px] text-ink-600 font-medium">Active</span>
-                      <Switch on={s.on} onChange={v => updateService(s.id, { on: v })} ariaLabel={`Toggle ${s.name}`} />
+          {store.services.map(s => {
+            const isFixed = s.fixedPrice != null && s.fixedPrice !== '';
+            return (
+              <div key={s.id} className="rounded-xl hairline bg-white p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    value={s.emoji}
+                    onChange={e => updateService(s.id, { emoji: e.target.value })}
+                    className="w-12 h-12 text-center text-[26px] rounded-lg hairline bg-ink-50 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"
+                  />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <TextField value={s.name} onChange={v => updateService(s.id, { name: v })} placeholder="Service name" />
+
+                    {/* Pricing type toggle */}
+                    <div className="flex rounded-lg hairline overflow-hidden bg-ink-50 p-0.5 gap-0.5">
+                      <button
+                        onClick={() => updateService(s.id, { fixedPrice: null })}
+                        className={`flex-1 h-7 rounded-md text-[11.5px] font-semibold transition-colors ${!isFixed ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>
+                        Hourly
+                      </button>
+                      <button
+                        onClick={() => updateService(s.id, { fixedPrice: isFixed ? s.fixedPrice : (s.rate || 100) })}
+                        className={`flex-1 h-7 rounded-md text-[11.5px] font-semibold transition-colors ${isFixed ? 'bg-white shadow-sm text-ink-900' : 'text-ink-500 hover:text-ink-700'}`}>
+                        Fixed price
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {isFixed
+                        ? <TextField type="number" value={s.fixedPrice} onChange={v => updateService(s.id, { fixedPrice: v })} suffix="QAR flat" />
+                        : <TextField type="number" value={s.rate} onChange={v => updateService(s.id, { rate: v })} suffix="QAR/hr" />
+                      }
+                      <div className="flex items-center justify-between rounded-lg hairline bg-ink-50 px-3">
+                        <span className="text-[12px] text-ink-600 font-medium">Active</span>
+                        <Switch on={s.on} onChange={v => updateService(s.id, { on: v })} ariaLabel={`Toggle ${s.name}`} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-[11.5px] font-mono text-ink-500">id: {s.id}</span>
-                <div className="flex">
-                  <IconBtn icon="edit" />
-                  <IconBtn icon="trash" tone="danger" />
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11.5px] font-mono text-ink-500">id: {s.id}</span>
+                    {isFixed && <span className="text-[10.5px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">Fixed</span>}
+                  </div>
+                  <div className="flex">
+                    <IconBtn icon="edit" />
+                    <IconBtn icon="trash" tone="danger" />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </Card>
 

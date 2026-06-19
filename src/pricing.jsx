@@ -119,6 +119,20 @@ function computePrice(state, natsList, liveData) {
     };
   }
 
+  // Fixed-price service (e.g. sofa cleaning, car detailing)
+  if (type?.fixedPrice != null && type.fixedPrice !== '') {
+    const fixedAmt = Number(type.fixedPrice);
+    return {
+      rate: 0, hours: 0, maids: 1, visits: 1,
+      labour: fixedAmt, materials: 0, subtotal: fixedAmt,
+      monthlyDiscount: 0,
+      total: fixedAmt,
+      serviceName: type.name,
+      isFixed: true,
+      fixedPrice: fixedAmt,
+    };
+  }
+
   // Hourly
   const labour = svcRate * hours * maids;
   const materials = state.materials ? MAT_RATE * hours : 0;
@@ -147,13 +161,13 @@ const Row = ({ label, value, sub, dim }) => (
 );
 
 const PriceCard = ({ state, breakdown, step, onPrimary, primaryLabel, primaryDisabled, compact }) => {
-  const { rate, hours, maids, visits, labour, materials, subtotal, monthlyDiscount, total, serviceName, matRate } = breakdown;
+  const { rate, hours, maids, visits, labour, materials, subtotal, monthlyDiscount, total, serviceName, matRate, isFixed } = breakdown;
   return (
     <aside className={`bg-white rounded-xl2 hairline shadow-card overflow-hidden ${compact ? "" : ""}`}>
       <div className="px-5 pt-5 pb-3 border-b border-ink-200/70">
         <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-[0.18em] text-ink-500">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-mint-500"></span>
-          Live estimate
+          {isFixed ? 'Fixed price' : 'Live estimate'}
         </div>
         <div className="mt-2 flex items-baseline gap-2">
           <div className="text-[40px] leading-none font-bold text-ink-900 tracking-tight">
@@ -161,16 +175,23 @@ const PriceCard = ({ state, breakdown, step, onPrimary, primaryLabel, primaryDis
           </div>
         </div>
         <div className="mt-1 text-[12px] text-ink-500">
-          {state.mode === "monthly"
-            ? `${visits} visits / month · all-in`
-            : `${hours} hr${hours > 1 ? "s" : ""} · ${maids} maid${maids > 1 ? "s" : ""} · all-in`}
+          {isFixed
+            ? 'Flat-rate service · all-in'
+            : state.mode === "monthly"
+              ? `${visits} visits / month · all-in`
+              : `${hours} hr${hours > 1 ? "s" : ""} · ${maids} maid${maids > 1 ? "s" : ""} · all-in`}
         </div>
       </div>
 
       <div className="px-5 py-4">
-        <Row label={serviceName} sub={`${rate} QAR/hr`} value={<span className="font-mono tabular-nums text-ink-700">×{hours * maids * visits}h</span>} />
-        <Row label="Labour" value={<Money value={labour} className="text-ink-800" />} />
-        {state.materials && <Row label="Cleaning materials" sub={`${matRate ?? MATERIALS_PER_HOUR} QAR/hr`} value={<Money value={materials} />} />}
+        {isFixed
+          ? <Row label={serviceName} sub="Fixed price" value={<Money value={total} className="text-ink-700" />} />
+          : <>
+              <Row label={serviceName} sub={`${rate} QAR/hr`} value={<span className="font-mono tabular-nums text-ink-700">×{hours * maids * visits}h</span>} />
+              <Row label="Labour" value={<Money value={labour} className="text-ink-800" />} />
+              {state.materials && <Row label="Cleaning materials" sub={`${matRate ?? MATERIALS_PER_HOUR} QAR/hr`} value={<Money value={materials} />} />}
+            </>
+        }
         {monthlyDiscount > 0 && <Row label="Monthly plan discount" value={<span className="font-mono tabular-nums text-mint-700">−<Money value={monthlyDiscount} /></span>} />}
         <div className="my-3 border-t border-dashed border-ink-200"></div>
         <div className="flex items-baseline justify-between">

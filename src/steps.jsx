@@ -245,6 +245,9 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
     if (rates[natId] != null) return Number(rates[natId]);
     return svc.rate;
   };
+  const selectedSvc = SERVICES.find(s => s.id === state.serviceType);
+  const isFixedService = selectedSvc != null && selectedSvc.fixedPrice != null && selectedSvc.fixedPrice !== '';
+
   return (
     <div className="fade-up space-y-4">
       {/* Mode tabs */}
@@ -296,8 +299,9 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
           {SERVICES.map(t => {
             const active = state.serviceType === t.id;
             const theme = SERVICE_COLORS[t.id] || SVC_COLOR_DEFAULT;
+            const tIsFixed = t.fixedPrice != null && t.fixedPrice !== '';
             return (
-              <button key={t.id} onClick={() => set({ serviceType: t.id })}
+              <button key={t.id} onClick={() => set({ serviceType: t.id, ...(tIsFixed ? { maids: 1 } : {}) })}
                 className={`h-11 sm:h-12 px-2.5 sm:px-3 rounded-xl text-[12.5px] sm:text-[13px] font-semibold flex items-center gap-2.5 sm:gap-3 transition-all
                   ${active ? theme.active : theme.idle}`}>
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
@@ -307,7 +311,10 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
                     : <span className="text-[15px]">{t.emoji}</span>}
                 </div>
                 <span className={`flex-1 text-left truncate ${theme.name}`}>{t.name}</span>
-                <span className={`font-mono text-[11.5px] sm:text-[12px] flex-shrink-0 ${theme.rate}`}>{getHourlyRate(t)} QAR/hr</span>
+                {tIsFixed
+                  ? <span className={`font-mono text-[11.5px] sm:text-[12px] flex-shrink-0 ${theme.rate}`}>{Number(t.fixedPrice).toLocaleString()} QAR</span>
+                  : <span className={`font-mono text-[11.5px] sm:text-[12px] flex-shrink-0 ${theme.rate}`}>{getHourlyRate(t)} QAR/hr</span>
+                }
                 {active && <span className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${theme.check} bg-white/30`}><Icon name="check" className="w-3 h-3" strokeWidth={3}/></span>}
               </button>
             );
@@ -316,16 +323,30 @@ const StepService = ({ state, set, nationalities, enabledModes, liveModesData, n
         </div>
       )}
 
-      {/* Counters — hourly */}
-      {state.mode === "hourly" && (
+      {/* Counters — hourly (not for fixed-price services) */}
+      {state.mode === "hourly" && !isFixedService && (
         <div className="grid grid-cols-2 gap-2">
           <BigCounter label={`Hours (min ${minHours})`} value={state.hours} onChange={v => set({ hours: v })} min={minHours} max={maxHours} suffix="hrs"/>
           <BigCounter label="Number of maids" value={state.maids} onChange={v => set({ maids: v })} min={1} max={maxMaids} suffix={state.maids === 1 ? "maid" : "maids"}/>
         </div>
       )}
 
-      {/* Materials add-on — hourly only */}
-      {state.mode === "hourly" && (
+      {/* Fixed-price notice */}
+      {state.mode === "hourly" && isFixedService && (
+        <div className="flex items-center gap-3 p-3 sm:p-4 rounded-xl bg-violet-50 ring-1 ring-violet-200">
+          <div className="w-9 h-9 rounded-xl bg-violet-100 grid place-items-center flex-shrink-0">
+            <Icon name="shield" className="w-5 h-5 text-violet-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-ink-900 text-[13px] sm:text-[14px]">Fixed-price service</div>
+            <div className="text-[11.5px] sm:text-[12.5px] text-ink-500 mt-0.5">One flat rate — no hourly calculation needed.</div>
+          </div>
+          <span className="font-mono font-bold text-violet-700 text-[14px]">{Number(selectedSvc?.fixedPrice || 0).toLocaleString()} QAR</span>
+        </div>
+      )}
+
+      {/* Materials add-on — hourly only, not for fixed-price services */}
+      {state.mode === "hourly" && !isFixedService && (
         <label className={`flex items-center gap-2.5 sm:gap-3 p-3 sm:p-4 rounded-xl cursor-pointer transition-all
           ${state.materials ? "bg-mint-50 ring-2 ring-mint-500" : "bg-ink-50 hairline hover:bg-ink-100"}`}>
           <input type="checkbox" className="sr-only" checked={state.materials} onChange={e => set({ materials: e.target.checked })} />
@@ -684,7 +705,7 @@ const StepConfirm = ({ state, set, breakdown, goTo }) => {
         </div>
         <SummaryRow icon="broom"    label="Service"  value={`${breakdown.serviceName}${state.materials?" · with materials":""}`} onEdit={() => goTo(0)} />
         <SummaryRow icon="calendar" label="Date"     value={fmtDate}                                                             onEdit={() => goTo(1)} />
-        <SummaryRow icon="clock"    label="Time"     value={state.time ? `${state.time} · ${breakdown.hours}h · ${breakdown.maids} maid${breakdown.maids>1?"s":""}` : null} onEdit={() => goTo(2)} />
+        <SummaryRow icon="clock"    label="Time"     value={state.time ? `${state.time}${!breakdown.isFixed ? ` · ${breakdown.hours}h · ${breakdown.maids} maid${breakdown.maids>1?"s":""}` : ''}` : null} onEdit={() => goTo(2)} />
         <SummaryRow icon="user"     label="Customer" value={[state.name, state.phone].filter(Boolean).join(" · ")}               onEdit={() => goTo(3)} />
         <SummaryRow icon="pin"      label="Location" value={state.address}                                                       onEdit={() => goTo(3)} />
       </div>
@@ -701,8 +722,34 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
 
   const handleWhatsApp = () => {
     const num = whatsappNumber.replace(/\D/g, '');
-    const msg = encodeURIComponent(`Hi! I just made a booking (Ref: ${bookingId}). I need some help.`);
-    window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
+    const lines = [
+      `📋 *New Booking*`,
+      `Ref: *${bookingId}*`,
+      ``,
+      `👤 *Customer*`,
+      `Name: ${state.name || '—'}`,
+      `Phone: ${state.phone || '—'}`,
+      state.email ? `Email: ${state.email}` : null,
+      ``,
+      `🧹 *Service*`,
+      `Service: ${breakdown.serviceName || '—'}`,
+      breakdown.isFixed ? `Pricing: Fixed rate` : (breakdown.hours ? `Duration: ${breakdown.hours}h · ${breakdown.maids} maid${breakdown.maids > 1 ? 's' : ''}` : null),
+      state.bedrooms != null ? `Bedrooms: ${state.bedrooms}` : null,
+      state.bathrooms != null ? `Bathrooms: ${state.bathrooms}` : null,
+      state.extras?.length ? `Extras: ${state.extras.join(', ')}` : null,
+      ``,
+      `📅 *Schedule*`,
+      `Date: ${fmtDate}`,
+      state.time ? `Time: ${state.time}` : null,
+      ``,
+      `📍 *Location*`,
+      `Address: ${state.address || '—'}`,
+      state.accessNote ? `Access note: ${state.accessNote}` : null,
+      ``,
+      `💰 *Total: ${brand?.currency || 'QAR'} ${breakdown.total}*`,
+      state.paymentMethod ? `Payment: ${state.paymentMethod}` : null,
+    ].filter(Boolean).join('\n');
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(lines)}`, '_blank');
   };
 
   const handleCall = () => {
@@ -777,8 +824,9 @@ const StepSuccess = ({ state, breakdown, bookingId, onReset, brand }) => {
     <div class="row"><span class="row-label">Phone</span><span class="row-value">${state.phone || '—'}</span></div>
     <div class="row"><span class="row-label">Date</span><span class="row-value">${fmtDate}</span></div>
     ${state.time ? `<div class="row"><span class="row-label">Time</span><span class="row-value">${state.time}</span></div>` : ''}
-    <div class="row"><span class="row-label">Duration</span><span class="row-value">${breakdown.hours} hour${breakdown.hours !== 1 ? 's' : ''}</span></div>
-    <div class="row"><span class="row-label">Maids</span><span class="row-value">${breakdown.maids}</span></div>
+    ${!breakdown.isFixed ? `<div class="row"><span class="row-label">Duration</span><span class="row-value">${breakdown.hours} hour${breakdown.hours !== 1 ? 's' : ''}</span></div>` : ''}
+    ${!breakdown.isFixed ? `<div class="row"><span class="row-label">Maids</span><span class="row-value">${breakdown.maids}</span></div>` : ''}
+    ${breakdown.isFixed ? `<div class="row"><span class="row-label">Pricing</span><span class="row-value">Fixed rate</span></div>` : ''}
     ${state.address ? `<div class="row"><span class="row-label">Location</span><span class="row-value">${state.address}</span></div>` : ''}
   </div>
 
