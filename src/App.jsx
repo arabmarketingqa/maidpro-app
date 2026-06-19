@@ -510,13 +510,15 @@ function App() {
   }, [filteredNats]);
 
   // Auto-reset selected service if it's been removed/disabled in the admin
+  // Check both hourly services and fixed services before resetting
   React.useEffect(() => {
     if (!liveServices || liveServices.length === 0) return;
     if (state.mode !== 'hourly') return;
-    if (!liveServices.find(s => s.id === state.serviceType)) {
+    const allSvcs = [...liveServices, ...(liveFixedServices || [])];
+    if (!allSvcs.find(s => s.id === state.serviceType)) {
       set({ serviceType: liveServices[0].id });
     }
-  }, [liveServices]);
+  }, [liveServices, liveFixedServices]);
 
   const liveData = { services: liveServices, fixedServices: liveFixedServices, monthly: liveMonthly, stayIn: liveStayIn, materialsRate: liveMaterialsRate, nationalityEnabled: liveNatBlockEnabled };
   const breakdown = computePrice(state, filteredNats || liveNats || undefined, liveData);
