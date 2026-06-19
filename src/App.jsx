@@ -563,8 +563,9 @@ function App() {
       if (autoAssign) try {
         const needed   = breakdown.maids || 1;
         const mode     = state.mode || 'hourly';
-        // Find the skill ID for the selected service (e.g. "Regular Cleaning" → "regular")
-        const svcId    = (liveServices || []).find(s => s.name === breakdown.serviceName)?.id;
+        // Find the skill ID for the selected service — checks both hourly and fixed services
+        const _allSvcs = [...(liveServices || []), ...(liveFixedServices || [])];
+        const svcId    = _allSvcs.find(s => s.name === breakdown.serviceName)?.id;
 
         const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
         let staffRes = await supabase.from('staff').select('id, skills, working_days, active');

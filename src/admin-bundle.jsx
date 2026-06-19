@@ -3613,8 +3613,10 @@ const StaffSection = ({ store, set, bookings }) => {
                     <div className="flex flex-wrap gap-1.5">
                       {(() => {
                         const hourlyOn = (s.serviceTypes || []).includes('hourly');
-                        return store.services.map(sv => {
+                        const allSvcs = [...store.services, ...(store.fixedServices || [])];
+                        return allSvcs.map(sv => {
                         const on = s.skills.includes(sv.id);
+                        const isFixed = sv.fixedPrice != null;
                         return (
                           <button key={sv.id}
                             disabled={!hourlyOn}
@@ -3623,7 +3625,7 @@ const StaffSection = ({ store, set, bookings }) => {
                             className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[11.5px] font-semibold transition-colors
                               ${!hourlyOn
                                 ? "opacity-35 cursor-not-allowed hairline text-ink-400"
-                                : on ? "bg-mint-500 text-ink-900" : "hairline text-ink-600 hover:bg-ink-50"}`}>
+                                : on ? (isFixed ? "bg-violet-500 text-white" : "bg-mint-500 text-ink-900") : "hairline text-ink-600 hover:bg-ink-50"}`}>
                             <SvcIcon name={sv.icon} className="w-3.5 h-3.5" strokeWidth={1.75} />
                             {sv.name.split(" ")[0]}
                           </button>
@@ -3756,12 +3758,13 @@ const StaffSection = ({ store, set, bookings }) => {
               <div>
                 <Label>Cleaning skills</Label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {store.services.map(sv => {
+                  {[...store.services, ...(store.fixedServices || [])].map(sv => {
                     const on = draft.skills.includes(sv.id);
+                    const isFixed = sv.fixedPrice != null;
                     return (
                       <button key={sv.id} onClick={() => toggleDraftSkill(sv.id)}
                         className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full text-[12px] font-semibold transition-colors
-                          ${on ? "bg-mint-500 text-ink-900" : "hairline text-ink-600 hover:bg-ink-50"}`}>
+                          ${on ? (isFixed ? "bg-violet-500 text-white" : "bg-mint-500 text-ink-900") : "hairline text-ink-600 hover:bg-ink-50"}`}>
                         <SvcIcon name={sv.icon} className="w-3.5 h-3.5" strokeWidth={1.75} />
                         {sv.name.split(" ")[0]}
                       </button>
