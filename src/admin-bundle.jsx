@@ -1944,7 +1944,7 @@ const Sidebar = ({ active, onNav, onClose, mobile, bookingsCount = 0, brand = {}
             <div className="text-[11px] text-ink-400 truncate">Operations Lead</div>
           </div>
           <button className="text-ink-400 hover:text-white" aria-label="Sign out"
-            onClick={() => { try { localStorage.removeItem('mp_admin_auth'); } catch(_){} window.location.reload(); }}>
+            onClick={() => supabase.auth.signOut()}>
             <AdminIcon name="logout" className="w-4 h-4"/>
           </button>
         </div>
@@ -5563,18 +5563,19 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
 };
 
 /* ─── Admin Login ─── */
-const LoginScreen = ({ onLogin }) => {
-  const [user, setUser] = React.useState('');
-  const [pass, setPass] = React.useState('');
-  const [err, setErr] = React.useState('');
-  const submit = (e) => {
+const LoginScreen = () => {
+  const [email, setEmail] = React.useState('');
+  const [pass, setPass]   = React.useState('');
+  const [err, setErr]     = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const submit = async (e) => {
     e.preventDefault();
-    if (user.trim() === 'admin' && pass === 'admin') {
-      try { localStorage.setItem('mp_admin_auth', '1'); } catch(_) {}
-      onLogin();
-    } else {
-      setErr('Invalid username or password.');
-    }
+    setErr('');
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
+    setLoading(false);
+    if (error) setErr(error.message || 'Invalid email or password.');
+    // On success onAuthStateChange in App fires automatically — no manual action needed
   };
   return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4">
@@ -5588,10 +5589,10 @@ const LoginScreen = ({ onLogin }) => {
         </div>
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Username</label>
+            <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Email</label>
             <div className="relative">
               <AdminIcon name="contact" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
-              <input type="text" value={user} onChange={e => setUser(e.target.value)} placeholder="admin"
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com" autoComplete="email"
                 className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
             </div>
           </div>
@@ -5599,14 +5600,14 @@ const LoginScreen = ({ onLogin }) => {
             <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Password</label>
             <div className="relative">
               <AdminIcon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
-              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••"
+              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" autoComplete="current-password"
                 className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
             </div>
           </div>
           {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
-          <button type="submit"
-            className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 text-ink-900 font-bold text-[14px] shadow-mint transition-colors mt-1">
-            Sign in
+          <button type="submit" disabled={loading}
+            className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[14px] shadow-mint transition-colors mt-1">
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </div>
@@ -5986,10 +5987,26 @@ const AdminPanel = () => {
 };
 
 const App = () => {
-  const [authed, setAuthed] = React.useState(() => {
-    try { return localStorage.getItem('mp_admin_auth') === '1'; } catch(_) { return false; }
-  });
-  if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
+  const [session, setSession] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) return (
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
+    </div>
+  );
+  if (!session) return <LoginScreen />;
   return <AdminPanel />;
 };
 
