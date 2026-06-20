@@ -1678,7 +1678,7 @@ const OverviewSection = ({ store, set, kpis, bookings }) => (
   <div className="space-y-5 fade-up">
     <OverviewCharts bookings={bookings}/>
     {/* KPI tiles */}
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
       {kpis.map(k => (
         <div key={k.label}
           onClick={k.onClick}
@@ -4111,7 +4111,7 @@ const OverviewCharts = ({ bookings }) => {
   const data = days.map(day => {
     const bks = bookings.filter(b => b._raw && b._raw.date === day)
     return { day, label: String(new Date(day+'T12:00').getDate()), count: bks.length,
-      revenue: bks.filter(b=>['Confirmed','Completed'].includes(b.status)).reduce((s,b)=>s+b.total,0) }
+      revenue: bks.filter(b=>b.status !== 'Cancelled').reduce((s,b)=>s+b.total,0) }
   })
   const maxC = Math.max(...data.map(d=>d.count),1)
   const maxR = Math.max(...data.map(d=>d.revenue),1)
@@ -4135,13 +4135,13 @@ const OverviewCharts = ({ bookings }) => {
       </div>
       <div className="bg-white rounded-xl2 hairline shadow-card p-5">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-500">Revenue (QAR) last 14 days</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-500">Total Revenue (QAR) last 14 days</div>
           <div className="text-[13px] font-bold text-ink-900 font-mono">{data.reduce((s,d)=>s+d.revenue,0).toLocaleString()} QAR</div>
         </div>
         <svg viewBox={'0 0 '+W+' '+(H+PY)} className="w-full" style={{overflow:'visible'}}>
           <defs><linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="oklch(0.72 0.13 168)" stopOpacity="0.25"/><stop offset="100%" stopColor="oklch(0.72 0.13 168)" stopOpacity="0"/></linearGradient></defs>
           {maxR>1&&<><path d={areaPath} fill="url(#revGrad)"/><path d={linePath} fill="none" stroke="oklch(0.62 0.13 168)" strokeWidth="2"/>{lp.map((p,i)=>data[i].revenue>0&&<circle key={i} cx={p.x} cy={p.y} r="3" fill="oklch(0.62 0.13 168)" stroke="#fff" strokeWidth="1.5"/>)}</>}
-          {maxR<=1&&<text x={W/2} y={H/2} textAnchor="middle" fontSize="11" fill="#d1d5db">No confirmed revenue yet</text>}
+          {maxR<=1&&<text x={W/2} y={H/2} textAnchor="middle" fontSize="11" fill="#d1d5db">No revenue yet</text>}
           {data.map((d,i)=><text key={i} x={i*bw+bw/2} y={H+PY-1} textAnchor="middle" fontSize="8" fill="#9ca3af">{d.label}</text>)}
           <line x1="0" y1={H} x2={W} y2={H} stroke="#f3f4f6"/>
         </svg>
@@ -4949,12 +4949,13 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const [to,   setTo]   = React.useState(todayStr);
   const [selectedStaff, setSelectedStaff] = React.useState(null);
 
-  const inRange    = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
-  const completed  = inRange.filter(b => b.status === 'Completed');
-  const revenue    = completed.reduce((s, b) => s + b.total, 0);
-  const paidTotal  = completed.reduce((s, b) => s + (b.paid_amount || 0), 0);
-  const dueTotal   = completed.reduce((s, b) => s + Math.max(0, b.total - (b.paid_amount || 0)), 0);
-  const avgVal     = completed.length > 0 ? revenue / completed.length : 0;
+  const inRange      = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
+  const completed    = inRange.filter(b => b.status === 'Completed');
+  const nonCancelled = inRange.filter(b => b.status !== 'Cancelled');
+  const revenue      = nonCancelled.reduce((s, b) => s + (Number(b.total) || 0), 0);
+  const paidTotal    = nonCancelled.reduce((s, b) => s + (Number(b.paid_amount) || 0), 0);
+  const dueTotal     = nonCancelled.reduce((s, b) => s + Math.max(0, (Number(b.total) || 0) - (Number(b.paid_amount) || 0)), 0);
+  const avgVal       = nonCancelled.length > 0 ? revenue / nonCancelled.length : 0;
   const cancelled  = inRange.filter(b => b.status === 'Cancelled').length;
   const pending    = inRange.filter(b => b.status === 'Pending').length;
   const confirmed  = inRange.filter(b => b.status === 'Confirmed').length;
@@ -4966,7 +4967,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const svc = b.service || 'Unknown';
     if (!byService[svc]) byService[svc] = { count: 0, revenue: 0 };
     byService[svc].count += 1;
-    if (b.status === 'Completed') byService[svc].revenue += b.total;
+    if (b.status !== 'Cancelled') byService[svc].revenue += (Number(b.total) || 0);
   });
   const byStatus = {};
   inRange.forEach(b => { byStatus[b.status] = (byStatus[b.status] || 0) + 1; });
@@ -4980,7 +4981,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const d    = new Date(fromD.getTime() + i * dayMs);
     const dStr = d.toISOString().slice(0, 10);
     const lbl  = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const rev  = completed.filter(b => b._raw?.date === dStr).reduce((s, b) => s + b.total, 0);
+    const rev  = nonCancelled.filter(b => b._raw?.date === dStr).reduce((s, b) => s + (Number(b.total) || 0), 0);
     const cnt  = inRange.filter(b => b._raw?.date === dStr).length;
     return { date: dStr, label: lbl, revenue: rev, count: cnt };
   });
@@ -5003,7 +5004,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const activeStaff = (store?.staff || []).filter(s => s.active !== false);
   const staffPerf = activeStaff.map(s => {
     const bks = inRange.filter(b => (b._raw?.assigned_staff || []).includes(s.id));
-    const rev = bks.filter(b => b.status === 'Completed').reduce((acc, b) => acc + b.total, 0);
+    const rev = bks.filter(b => b.status !== 'Cancelled').reduce((acc, b) => acc + (Number(b.total) || 0), 0);
     return { ...s, bkCount: bks.length, bkRevenue: rev };
   }).sort((a, b) => b.bkCount - a.bkCount);
   const maxBkCount = Math.max(...staffPerf.map(s => s.bkCount), 1);
@@ -5014,7 +5015,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const key = (b.phone && b.phone !== '—') ? b.phone : b.customer;
     if (!custMap[key]) custMap[key] = { name: b.customer, phone: b.phone, count: 0, spent: 0 };
     custMap[key].count += 1;
-    if (b.status === 'Completed') custMap[key].spent += b.total;
+    if (b.status !== 'Cancelled') custMap[key].spent += (Number(b.total) || 0);
   });
   const topCustomers = Object.values(custMap).sort((a, b) => b.count - a.count).slice(0, 8);
   const maxCustCount = Math.max(...topCustomers.map(c => c.count), 1);
@@ -5063,9 +5064,11 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
           return ids.map(id => (staffList.find(s => s.id === id)?.name || '—')).join(', ');
         };
 
-        const completedJobs = inRange.filter(b => b.status === 'Completed');
-        const totalHours    = completedJobs.reduce((s, b) => s + (b.hours || 0), 0);
-        const totalAmount   = completedJobs.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+        const completedJobs    = inRange.filter(b => b.status === 'Completed');
+        const totalHours       = completedJobs.reduce((s, b) => s + (b.hours || 0), 0);
+        const totalRevenue     = completedJobs.reduce((s, b) => s + (Number(b.total) || 0), 0);
+        const totalReceived    = completedJobs.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+        const totalOutstanding = Math.max(0, totalRevenue - totalReceived);
 
         const handlePrint = () => {
           const brand     = store?.brand || {};
@@ -5087,7 +5090,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
               <td>${getMaids(b)}</td>
               <td class="bold">${b.customer || '—'}</td>
               <td class="center">${b.hours ?? '—'}</td>
-              <td class="right mono">QAR ${(Number(b._raw?.paid_amount) || 0).toLocaleString()}</td>
+              <td class="right mono">QAR ${(Number(b.total) || 0).toLocaleString()}</td>
             </tr>`).join('');
 
           const html = `<!DOCTYPE html>
@@ -5174,12 +5177,16 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
       <div class="pill-value">${totalHours}<span class="pill-unit">hrs</span></div>
     </div>
     <div class="pill">
-      <div class="pill-label">Total Amount</div>
-      <div class="pill-value">${totalAmount.toLocaleString()}<span class="pill-unit">QAR</span></div>
+      <div class="pill-label">Revenue</div>
+      <div class="pill-value">${totalRevenue.toLocaleString()}<span class="pill-unit">QAR</span></div>
     </div>
     <div class="pill">
-      <div class="pill-label">Avg per Job</div>
-      <div class="pill-value">${completedJobs.length ? Math.round(totalAmount / completedJobs.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div>
+      <div class="pill-label">Received</div>
+      <div class="pill-value">${totalReceived.toLocaleString()}<span class="pill-unit">QAR</span></div>
+    </div>
+    <div class="pill" style="border-color:${totalOutstanding > 0 ? '#fde68a' : '#bbf7d0'};background:${totalOutstanding > 0 ? '#fffbeb' : '#f0fdf4'}">
+      <div class="pill-label" style="color:${totalOutstanding > 0 ? '#92400e' : '#15803d'}">Outstanding</div>
+      <div class="pill-value" style="color:${totalOutstanding > 0 ? '#78350f' : '#14532d'}">${totalOutstanding.toLocaleString()}<span class="pill-unit">QAR</span></div>
     </div>
   </div>
 
@@ -5194,15 +5201,16 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         <th>Maid</th>
         <th>Customer Name</th>
         <th style="text-align:center">Hours</th>
-        <th style="text-align:right">Amount</th>
+        <th style="text-align:right">Job Total</th>
       </tr>
     </thead>
     <tbody>${rows || '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
     <tfoot>
       <tr>
-        <td colspan="6" style="text-align:right;letter-spacing:.05em;text-transform:uppercase;font-size:10px">Total</td>
+        <td colspan="5" style="text-align:right;letter-spacing:.05em;text-transform:uppercase;font-size:10px">Total</td>
         <td style="text-align:center">${totalHours} hrs</td>
-        <td style="text-align:right">QAR ${totalAmount.toLocaleString()}</td>
+        <td style="text-align:right">QAR ${totalRevenue.toLocaleString()}</td>
+        <td style="text-align:right;font-size:10.5px">Rcvd: QAR ${totalReceived.toLocaleString()}</td>
       </tr>
     </tfoot>
   </table>
@@ -5247,7 +5255,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                     <th className="px-3 py-3">Maid</th>
                     <th className="px-3 py-3">Customer</th>
                     <th className="px-3 py-3 text-center w-20">Hours</th>
-                    <th className="px-5 py-3 text-right w-32">Amount</th>
+                    <th className="px-5 py-3 text-right w-32">Job Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -5263,7 +5271,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                       <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer}</td>
                       <td className="px-3 py-3 text-center font-mono tabular-nums text-[13px] text-ink-700">{b.hours ?? '—'}</td>
                       <td className="px-5 py-3 text-right font-mono tabular-nums text-[13px] font-semibold text-ink-900">
-                        QAR {(Number(b._raw?.paid_amount) || 0).toLocaleString()}
+                        QAR {(Number(b.total) || 0).toLocaleString()}
                       </td>
                     </tr>
                   ))}
@@ -5271,9 +5279,13 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 {completedJobs.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-ink-200 bg-ink-50/60">
-                      <td colSpan={6} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
+                      <td colSpan={5} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
                       <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900 tabular-nums">{totalHours}</td>
-                      <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900 tabular-nums">QAR {totalAmount.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right font-mono font-bold text-[13px] text-ink-900 tabular-nums">
+                        <div>QAR {totalRevenue.toLocaleString()}</div>
+                        <div className="text-[11px] font-semibold text-mint-700 mt-0.5">Rcvd {totalReceived.toLocaleString()}</div>
+                        {totalOutstanding > 0 && <div className="text-[11px] font-semibold text-amber-600 mt-0.5">Due {totalOutstanding.toLocaleString()}</div>}
+                      </td>
                     </tr>
                   </tfoot>
                 )}
@@ -5323,8 +5335,10 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
         const selected = selectedStaff ? allStaff.find(s => s.id === selectedStaff) : null;
         const selectedBks = selected ? staffBookings(selected) : [];
 
-        const totalHoursStaff = selectedBks.reduce((s, b) => s + (Number(b.hours) || 0), 0);
-        const totalAmtStaff   = selectedBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+        const totalHoursStaff    = selectedBks.reduce((s, b) => s + (Number(b.hours) || 0), 0);
+        const totalRevenueStaff  = selectedBks.reduce((s, b) => s + (Number(b.total) || 0), 0);
+        const totalReceivedStaff = selectedBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+        const totalDueStaff      = Math.max(0, totalRevenueStaff - totalReceivedStaff);
 
         const handlePrintStaff = () => {
           if (!selected) return;
@@ -5346,7 +5360,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
               <td class="mono">${fmtFinish(b)}</td>
               <td class="bold">${b.customer || '—'}</td>
               <td class="center">${b.hours ?? '—'}</td>
-              <td class="right mono">QAR ${(Number(b._raw?.paid_amount) || 0).toLocaleString()}</td>
+              <td class="right mono">QAR ${(Number(b.total) || 0).toLocaleString()}</td>
             </tr>`).join('');
 
           const html = `<!DOCTYPE html>
@@ -5409,19 +5423,20 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   <div class="summary">
     <div class="pill"><div class="pill-label">Total Jobs</div><div class="pill-value">${selectedBks.length}<span class="pill-unit">jobs</span></div></div>
     <div class="pill"><div class="pill-label">Total Hours</div><div class="pill-value">${totalHoursStaff}<span class="pill-unit">hrs</span></div></div>
-    <div class="pill"><div class="pill-label">Total Amount</div><div class="pill-value">${totalAmtStaff.toLocaleString()}<span class="pill-unit">QAR</span></div></div>
-    <div class="pill"><div class="pill-label">Avg per Job</div><div class="pill-value">${selectedBks.length ? Math.round(totalAmtStaff/selectedBks.length).toLocaleString() : 0}<span class="pill-unit">QAR</span></div></div>
+    <div class="pill"><div class="pill-label">Revenue</div><div class="pill-value">${totalRevenueStaff.toLocaleString()}<span class="pill-unit">QAR</span></div></div>
+    <div class="pill"><div class="pill-label">Received</div><div class="pill-value">${totalReceivedStaff.toLocaleString()}<span class="pill-unit">QAR</span></div></div>
+    <div class="pill" style="border-color:${totalDueStaff > 0 ? '#fde68a' : '#bbf7d0'};background:${totalDueStaff > 0 ? '#fffbeb' : '#f0fdf4'}"><div class="pill-label" style="color:${totalDueStaff > 0 ? '#92400e' : '#15803d'}">Outstanding</div><div class="pill-value" style="color:${totalDueStaff > 0 ? '#78350f' : '#14532d'}">${totalDueStaff.toLocaleString()}<span class="pill-unit">QAR</span></div></div>
   </div>
   <table>
     <thead><tr>
       <th>No.</th><th>Date</th><th>Start Time</th><th>Finish Time</th><th>Customer</th>
-      <th style="text-align:center">Hours</th><th style="text-align:right">Amount (Paid)</th>
+      <th style="text-align:center">Hours</th><th style="text-align:right">Job Total</th>
     </tr></thead>
     <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:24px">No jobs in selected range</td></tr>'}</tbody>
     <tfoot><tr>
       <td colspan="5" style="text-align:right;text-transform:uppercase;font-size:10px;letter-spacing:.05em">Total</td>
       <td style="text-align:center">${totalHoursStaff} hrs</td>
-      <td style="text-align:right">QAR ${totalAmtStaff.toLocaleString()}</td>
+      <td style="text-align:right">QAR ${totalRevenueStaff.toLocaleString()}<br/><span style="font-size:10px;font-weight:500">Rcvd: QAR ${totalReceivedStaff.toLocaleString()}</span>${totalDueStaff > 0 ? `<br/><span style="font-size:10px;font-weight:500;color:#92400e">Due: QAR ${totalDueStaff.toLocaleString()}</span>` : ''}</td>
     </tr></tfoot>
   </table>
   <div class="footer"><span>${brandName} · Staff Report · ${selected.name}</span><span>Generated ${printDate}</span></div>
@@ -5446,7 +5461,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-1">
                   {allStaff.map((s, idx) => {
                     const bks  = staffBookings(s);
-                    const rev  = bks.reduce((a, b) => a + (Number(b._raw?.paid_amount) || 0), 0);
+                    const rev  = bks.reduce((a, b) => a + (Number(b.total) || 0), 0);
+                    const rcvd = bks.reduce((a, b) => a + (Number(b._raw?.paid_amount) || 0), 0);
                     const hrs  = bks.reduce((a, b) => a + (Number(b.hours) || 0), 0);
                     const col  = COLORS[idx % COLORS.length];
                     const isSel = selectedStaff === s.id;
@@ -5465,7 +5481,10 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                         </div>
                         <div className="flex justify-between text-[11.5px]">
                           <span className="text-ink-500">{hrs} hrs</span>
-                          <span className="font-semibold text-ink-700">QAR {rev.toLocaleString()}</span>
+                          <div className="text-right">
+                            <div className="font-semibold text-ink-700">QAR {rev.toLocaleString()}</div>
+                            <div className="text-[10px] text-mint-700">Rcvd {rcvd.toLocaleString()}</div>
+                          </div>
                         </div>
                         {isSel && (
                           <div className="mt-2 text-[10.5px] font-semibold text-[#16a34a] uppercase tracking-wide">Selected ✓</div>
@@ -5498,7 +5517,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                         <th className="px-3 py-3 w-28">Finish Time</th>
                         <th className="px-3 py-3">Customer</th>
                         <th className="px-3 py-3 text-center w-20">Hours</th>
-                        <th className="px-5 py-3 text-right w-32">Amount</th>
+                        <th className="px-5 py-3 text-right w-36">Job Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5513,7 +5532,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                           <td className="px-3 py-3 text-[13px] font-semibold text-ink-900">{b.customer || '—'}</td>
                           <td className="px-3 py-3 text-center font-mono text-[13px] text-ink-700">{b.hours ?? '—'}</td>
                           <td className="px-5 py-3 text-right font-mono font-semibold text-[13px] text-ink-900">
-                            QAR {(Number(b._raw?.paid_amount) || 0).toLocaleString()}
+                            QAR {(Number(b.total) || 0).toLocaleString()}
                           </td>
                         </tr>
                       ))}
@@ -5523,7 +5542,11 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                         <tr className="border-t-2 border-ink-200 bg-ink-50/60">
                           <td colSpan={5} className="px-5 py-3 text-right text-[12px] font-bold text-ink-600 uppercase tracking-wider">Total</td>
                           <td className="px-3 py-3 text-center font-mono font-bold text-[13px] text-ink-900">{totalHoursStaff}</td>
-                          <td className="px-5 py-3 text-right font-mono font-bold text-[14px] text-ink-900">QAR {totalAmtStaff.toLocaleString()}</td>
+                          <td className="px-5 py-3 text-right font-mono font-bold text-[13px] text-ink-900">
+                            <div>QAR {totalRevenueStaff.toLocaleString()}</div>
+                            <div className="text-[11px] font-semibold text-mint-700 mt-0.5">Rcvd {totalReceivedStaff.toLocaleString()}</div>
+                            {totalDueStaff > 0 && <div className="text-[11px] font-semibold text-amber-600 mt-0.5">Due {totalDueStaff.toLocaleString()}</div>}
+                          </td>
                         </tr>
                       </tfoot>
                     )}
@@ -5866,23 +5889,16 @@ const AdminPanel = () => {
   const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO && b.status !== 'Cancelled');
   // Active maids: staff who are active and scheduled to work today (not day off)
   const activeMaids = (store.staff || []).filter(s => s.active !== false && isWorkingDay(s, todayISO)).length;
-  // Today revenue: sum of paid_amount on today's bookings
-  const todayRev  = todayBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
-  const pendingPayBks   = bookings.filter(b => b.payment_status === 'Pending' && b.status !== 'Cancelled');
-  const pendingPayTotal = pendingPayBks.reduce((s, b) => s + Math.max(0, b.total - b.paid_amount), 0);
+  // Today financials — all non-cancelled bookings for today
+  const todayRevenue     = todayBks.reduce((s, b) => s + (Number(b.total) || 0), 0);
+  const todayReceived    = todayBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
+  const todayOutstanding = Math.max(0, todayRevenue - todayReceived);
   const dynamicKpis = [
-    { label: "Bookings Today",  value: String(todayBks.length),    unit: "jobs",     icon: "calendar", tone: "mint" },
-    { label: "Active Maids",    value: String(activeMaids),        unit: "working",  icon: "users",    tone: "ink"  },
-    { label: "Today Revenue",   value: todayRev.toLocaleString(),  unit: "QAR",      icon: "money",    tone: "mint" },
-    {
-      label: "Pending Payments",
-      value: String(pendingPayBks.length),
-      unit:  "bookings",
-      sub:   `QAR ${pendingPayTotal.toLocaleString()} due`,
-      icon:  "money",
-      tone:  "warn",
-      onClick: () => { setSection('bookings'); setPayFilter('Pending'); },
-    },
+    { label: "Bookings Today",  value: String(todayBks.length),          unit: "jobs",    icon: "calendar", tone: "mint" },
+    { label: "Active Maids",    value: String(activeMaids),              unit: "working", icon: "users",    tone: "ink"  },
+    { label: "Today Revenue",   value: todayRevenue.toLocaleString(),    unit: "QAR",     icon: "money",    tone: "mint" },
+    { label: "Today Received",  value: todayReceived.toLocaleString(),   unit: "QAR",     icon: "check",    tone: "mint" },
+    { label: "Outstanding",     value: todayOutstanding.toLocaleString(), unit: "QAR",    icon: "money",    tone: todayOutstanding > 0 ? "warn" : "ink" },
   ];
   const sections = {
     overview:      <OverviewSection store={store} set={set} kpis={dynamicKpis} bookings={bookings}/>,
