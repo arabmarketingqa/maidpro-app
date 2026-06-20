@@ -5464,10 +5464,7 @@ const LoginScreen = ({ onLogin }) => {
   );
 };
 
-const App = () => {
-  const [authed, setAuthed] = React.useState(() => {
-    try { return localStorage.getItem('mp_admin_auth') === '1'; } catch(_) { return false; }
-  });
+const AdminPanel = () => {
   const [section, setSection] = React.useState("overview");
   const [payFilter, setPayFilter] = React.useState("All");
   const [store, setStore] = React.useState(initialStore());
@@ -5481,7 +5478,6 @@ const App = () => {
     notifSoundRef.current = store.bookingRules?.bookingSound !== false;
   }, [store.bookingRules?.bookingSound]);
 
-  if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
   const set = (p) => setStore(prev => { const patch = typeof p === 'function' ? p(prev) : p; return { ...prev, ...patch }; });
 
   /* Connection health-check — runs once on mount and on manual retry */
@@ -5844,6 +5840,14 @@ const App = () => {
       </div>
     </div>
   );
+};
+
+const App = () => {
+  const [authed, setAuthed] = React.useState(() => {
+    try { return localStorage.getItem('mp_admin_auth') === '1'; } catch(_) { return false; }
+  });
+  if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />;
+  return <AdminPanel />;
 };
 
 export default App;

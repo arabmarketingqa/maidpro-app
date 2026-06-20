@@ -44,7 +44,7 @@ export function fmtBooking(b) {
     total,
     paid_amount:    paidAmt,
     payment_status: (paidAmt >= total && total > 0) ? 'Paid' : 'Pending',
-    status:         b.status || 'New',
+    status:         b.status || 'Pending',
     _raw:           b,
   }
 }
