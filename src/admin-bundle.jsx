@@ -1705,27 +1705,6 @@ const OverviewSection = ({ store, set, kpis, bookings }) => (
     {/* Booking table */}
     <BookingsSection bookings={bookings.slice(0, 8)} store={store} set={set}/>
 
-    {/* live-mode summary */}
-    <Card title="Live Service Status" subtitle="At-a-glance of which booking modes are accepting new orders.">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {store.modes.map(m => (
-          <div key={m.id} className="rounded-xl hairline bg-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className={`w-9 h-9 rounded-lg grid place-items-center ${m.on ? "bg-mint-100 text-mint-700" : "bg-ink-100 text-ink-500"}`}>
-                <span className="text-[18px]">{m.emoji}</span>
-              </span>
-              <div>
-                <div className="text-[13.5px] font-bold text-ink-900">{m.name}</div>
-                <div className={`text-[11.5px] font-mono ${m.on ? "text-mint-700" : "text-ink-500"}`}>
-                  {m.on ? "â— ACCEPTING" : "â—‹ PAUSED"}
-                </div>
-              </div>
-            </div>
-            <span className="font-mono tabular-nums text-[13px] text-ink-700">{m.bookings}</span>
-          </div>
-        ))}
-      </div>
-    </Card>
   </div>
 );
 
