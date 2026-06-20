@@ -5610,7 +5610,7 @@ const LoginScreen = ({ onResetActive }) => {
   const submitCode = async (e) => {
     e.preventDefault();
     setErr('');
-    if (code.trim().length < 6) { setErr('Please enter the full 6-digit code.'); return; }
+    if (code.trim().length < 6) { setErr('Please enter the full code from your email.'); return; }
     setLoading(true);
     // Set resetMode BEFORE the await so App doesn't auto-navigate when session is established
     onResetActive(true);
@@ -5712,12 +5712,12 @@ const LoginScreen = ({ onResetActive }) => {
             <Logo />
             <form onSubmit={submitCode} className="space-y-3">
               <p className="text-[13px] text-ink-500 -mt-2">
-                Enter the 6-digit code sent to <strong className="text-ink-800">{email}</strong>.
+                Enter the code sent to <strong className="text-ink-800">{email}</strong>.
               </p>
               <input
-                type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6}
-                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="123456" autoComplete="one-time-code"
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••••••" autoComplete="one-time-code"
                 className="w-full h-14 px-4 rounded-xl bg-white hairline text-[28px] font-mono tracking-[0.4em] text-ink-900 text-center outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
               {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
               <button type="submit" disabled={loading} className={bp}>{loading ? 'Verifying…' : 'Verify code'}</button>
