@@ -5564,52 +5564,121 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
 
 /* ─── Admin Login ─── */
 const LoginScreen = () => {
-  const [email, setEmail] = React.useState('');
-  const [pass, setPass]   = React.useState('');
-  const [err, setErr]     = React.useState('');
+  const [email, setEmail]     = React.useState('');
+  const [pass, setPass]       = React.useState('');
+  const [err, setErr]         = React.useState('');
   const [loading, setLoading] = React.useState(false);
-  const submit = async (e) => {
+  const [forgot, setForgot]   = React.useState(false);
+  const [resetSent, setResetSent] = React.useState(false);
+
+  const submitLogin = async (e) => {
     e.preventDefault();
     setErr('');
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
     setLoading(false);
     if (error) setErr(error.message || 'Invalid email or password.');
-    // On success onAuthStateChange in App fires automatically — no manual action needed
   };
+
+  const submitForgot = async (e) => {
+    e.preventDefault();
+    setErr('');
+    setLoading(true);
+    await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: 'https://maidpro-app.vercel.app/admin',
+    });
+    setLoading(false);
+    setResetSent(true);
+  };
+
+  const Logo = () => (
+    <div className="text-center">
+      <div className="w-14 h-14 rounded-2xl bg-mint-500 grid place-items-center mx-auto shadow-mint mb-4">
+        <AdminIcon name="sparkle" className="w-7 h-7 text-ink-900" strokeWidth={2.2}/>
+      </div>
+      <h1 className="text-[22px] font-extrabold text-ink-900 tracking-tight">Maid Pro Admin</h1>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-8 space-y-6">
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-2xl bg-mint-500 grid place-items-center mx-auto shadow-mint mb-4">
-            <AdminIcon name="sparkle" className="w-7 h-7 text-ink-900" strokeWidth={2.2}/>
-          </div>
-          <h1 className="text-[22px] font-extrabold text-ink-900 tracking-tight">Maid Pro Admin</h1>
-          <p className="text-[13px] text-ink-500 mt-1">Sign in to your admin panel</p>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          <div>
-            <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Email</label>
-            <div className="relative">
-              <AdminIcon name="contact" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com" autoComplete="email"
-                className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+
+        {/* ── Forgot password ── */}
+        {forgot ? (
+          <>
+            <Logo />
+            {resetSent ? (
+              <div className="space-y-4">
+                <div className="rounded-xl bg-mint-50 border border-mint-200 px-4 py-4 text-[13.5px] text-mint-900 leading-relaxed">
+                  If an account exists for <strong>{email}</strong>, a password reset link has been sent. Check your inbox (and spam folder).
+                </div>
+                <button onClick={() => { setForgot(false); setResetSent(false); setErr(''); }}
+                  className="w-full h-10 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={submitForgot} className="space-y-3">
+                <p className="text-[13px] text-ink-500 -mt-2">Enter your email and we'll send you a reset link.</p>
+                <div>
+                  <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Email</label>
+                  <div className="relative">
+                    <AdminIcon name="contact" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com" autoComplete="email" required
+                      className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+                  </div>
+                </div>
+                {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+                <button type="submit" disabled={loading}
+                  className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[14px] shadow-mint transition-colors">
+                  {loading ? 'Sending…' : 'Send reset link'}
+                </button>
+                <button type="button" onClick={() => { setForgot(false); setErr(''); }}
+                  className="w-full h-10 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                  Back to sign in
+                </button>
+              </form>
+            )}
+          </>
+        ) : (
+          /* ── Normal login ── */
+          <>
+            <div className="text-center">
+              <Logo />
+              <p className="text-[13px] text-ink-500 mt-1">Sign in to your admin panel</p>
             </div>
-          </div>
-          <div>
-            <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Password</label>
-            <div className="relative">
-              <AdminIcon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
-              <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" autoComplete="current-password"
-                className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
-            </div>
-          </div>
-          {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
-          <button type="submit" disabled={loading}
-            className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[14px] shadow-mint transition-colors mt-1">
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+            <form onSubmit={submitLogin} className="space-y-3">
+              <div>
+                <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Email</label>
+                <div className="relative">
+                  <AdminIcon name="contact" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com" autoComplete="email"
+                    className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Password</label>
+                <div className="relative">
+                  <AdminIcon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
+                  <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" autoComplete="current-password"
+                    className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+                </div>
+              </div>
+              {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+              <button type="submit" disabled={loading}
+                className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[14px] shadow-mint transition-colors mt-1">
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+              <div className="text-center pt-1">
+                <button type="button" onClick={() => { setForgot(true); setErr(''); }}
+                  className="text-[13px] text-ink-500 hover:text-ink-800 underline underline-offset-2 transition-colors">
+                  Forgot password?
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -5986,17 +6055,84 @@ const AdminPanel = () => {
   );
 };
 
+/* ─── Password Reset (landed from email link) ─── */
+const ResetPasswordScreen = ({ onDone }) => {
+  const [password, setPassword]   = React.useState('');
+  const [confirm, setConfirm]     = React.useState('');
+  const [err, setErr]             = React.useState('');
+  const [loading, setLoading]     = React.useState(false);
+  const [success, setSuccess]     = React.useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr('');
+    if (password.length < 6) { setErr('Password must be at least 6 characters.'); return; }
+    if (password !== confirm) { setErr('Passwords do not match.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) { setErr(error.message || 'Failed to update password. Try requesting a new link.'); return; }
+    setSuccess(true);
+    setTimeout(onDone, 1800);
+  };
+
+  return (
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-8 space-y-6">
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-2xl bg-mint-500 grid place-items-center mx-auto shadow-mint mb-4">
+            <AdminIcon name="sparkle" className="w-7 h-7 text-ink-900" strokeWidth={2.2}/>
+          </div>
+          <h1 className="text-[22px] font-extrabold text-ink-900 tracking-tight">Set new password</h1>
+          <p className="text-[13px] text-ink-500 mt-1">Choose a strong password for your admin account.</p>
+        </div>
+        {success ? (
+          <div className="rounded-xl bg-mint-50 border border-mint-200 px-4 py-4 text-[13.5px] text-mint-900 text-center leading-relaxed">
+            Password updated! Taking you to the admin panel…
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-3">
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">New password</label>
+              <div className="relative">
+                <AdminIcon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" required
+                  className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Confirm password</label>
+              <div className="relative">
+                <AdminIcon name="settings" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
+                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="••••••••" autoComplete="new-password" required
+                  className="w-full h-11 pl-9 pr-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+              </div>
+            </div>
+            {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+            <button type="submit" disabled={loading}
+              className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[14px] shadow-mint transition-colors mt-1">
+              {loading ? 'Updating…' : 'Update password'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
-  const [session, setSession] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [session, setSession]   = React.useState(null);
+  const [loading, setLoading]   = React.useState(true);
+  const [recovery, setRecovery] = React.useState(false);
 
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -6006,6 +6142,7 @@ const App = () => {
       <div className="w-8 h-8 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
     </div>
   );
+  if (recovery) return <ResetPasswordScreen onDone={() => setRecovery(false)} />;
   if (!session) return <LoginScreen />;
   return <AdminPanel />;
 };
