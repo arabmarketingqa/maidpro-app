@@ -67,7 +67,9 @@
       "Bash(git remote *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue)",
+      "Bash(git commit *)"
     ]
   }
 }
