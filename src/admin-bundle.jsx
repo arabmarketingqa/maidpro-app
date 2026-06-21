@@ -6454,6 +6454,107 @@ const ViewAdminsModal = ({ company, onClose }) => {
   );
 };
 
+/* ─── Super Admin: permanently delete a company + everything it owns ───
+   Destructive. Calls the delete-company Edge Function (super-admin only,
+   service_role server-side). Requires typing the company name to confirm;
+   the main company (Al Zahour) gets one extra final confirmation. */
+const AL_ZAHOUR_ID = '00000000-0000-0000-0000-000000000001';
+
+const DeleteCompanyModal = ({ company, onClose, onDeleted }) => {
+  const [typed, setTyped] = React.useState('');
+  const [stage, setStage] = React.useState('type'); // 'type' | 'final' (final only for the main company)
+  const [busy, setBusy]   = React.useState(false);
+  const [err, setErr]     = React.useState('');
+
+  const nameMatches = typed.trim() === (company.name || '').trim();
+  const isMain = String(company.id) === AL_ZAHOUR_ID;
+
+  const doDelete = async () => {
+    setBusy(true); setErr('');
+    const { data, error } = await supabase.functions.invoke('delete-company', {
+      body: { company_id: company.id },
+    });
+    setBusy(false);
+    if (error) {
+      let msg = error.message || 'Failed to delete company.';
+      try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch (_) {}
+      setErr(msg);
+      return;
+    }
+    if (data?.error) { setErr(data.error); return; }
+    onDeleted();
+  };
+
+  const onPrimary = () => {
+    if (!nameMatches || busy) return;
+    if (isMain && stage === 'type') { setStage('final'); return; }
+    doDelete();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={() => !busy && onClose()}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[16px] font-extrabold text-red-700">Delete company</h3>
+          <button onClick={() => !busy && onClose()} className="text-ink-400 hover:text-ink-700">
+            <AdminIcon name="x" className="w-5 h-5"/>
+          </button>
+        </div>
+
+        {stage === 'type' ? (
+          <>
+            <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-[12.5px] text-red-800 leading-snug space-y-1">
+              <div className="font-bold">This permanently deletes <span className="break-all">{company.name}</span>.</div>
+              <div>
+                It erases <strong>all</strong> of its bookings, staff, customers, settings, nationalities,
+                schedules, availability, services — and <strong>all of its admin logins</strong>. This cannot be undone.
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">
+                Type <span className="font-mono normal-case text-ink-900">{company.name}</span> to confirm
+              </label>
+              <input value={typed} autoFocus autoComplete="off"
+                onChange={e => setTyped(e.target.value)}
+                placeholder={company.name}
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+            </div>
+            {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose} disabled={busy}
+                className="flex-1 h-11 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={onPrimary} disabled={!nameMatches || busy}
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-[13.5px] transition-colors">
+                {busy ? 'Deleting…' : (isMain ? 'Continue' : 'Delete company')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-[13px] text-red-800 leading-snug font-medium">
+              This is your main company <strong>Al Zahour</strong>. Deleting it erases all its real data
+              permanently. Are you absolutely sure?
+            </div>
+            {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose} disabled={busy}
+                className="flex-1 h-11 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={doDelete} disabled={busy}
+                className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold text-[13.5px] transition-colors">
+                {busy ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* ─── Super Admin: banner shown while impersonating a company ─── */
 const ViewingBanner = ({ company, onBack }) => {
   const [addAdmin, setAddAdmin]   = React.useState(false);
@@ -6505,6 +6606,7 @@ const SuperAdminDashboard = ({ onView }) => {
   const [formErr, setFormErr]     = React.useState('');
   const [adminFor, setAdminFor]   = React.useState(null); // company whose "Add admin" modal is open
   const [viewAdminsFor, setViewAdminsFor] = React.useState(null); // company whose "View admins" modal is open
+  const [deleteFor, setDeleteFor] = React.useState(null); // company whose "Delete company" modal is open
 
   const fetchAll = React.useCallback(async () => {
     const { data: cos, error: coErr } = await supabase.from('companies').select('*').order('name');
@@ -6663,6 +6765,10 @@ const SuperAdminDashboard = ({ onView }) => {
                     View as
                     <AdminIcon name="arrow-right" className="w-4 h-4" strokeWidth={2.2}/>
                   </button>
+                  <button onClick={() => setDeleteFor(c)}
+                    className="self-center mt-0.5 text-[11.5px] font-semibold text-red-500/80 hover:text-red-700 hover:underline transition-colors">
+                    Delete company
+                  </button>
                 </div>
               </div>
             ))}
@@ -6719,6 +6825,13 @@ const SuperAdminDashboard = ({ onView }) => {
 
       {/* View admins modal */}
       {viewAdminsFor && <ViewAdminsModal company={viewAdminsFor} onClose={() => setViewAdminsFor(null)} />}
+
+      {/* Delete company modal */}
+      {deleteFor && (
+        <DeleteCompanyModal company={deleteFor}
+          onClose={() => setDeleteFor(null)}
+          onDeleted={() => { setDeleteFor(null); fetchAll(); }} />
+      )}
     </div>
   );
 };
