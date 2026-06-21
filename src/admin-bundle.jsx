@@ -6184,13 +6184,13 @@ const FullScreenSpinner = () => (
   </div>
 );
 
-const NoAccessScreen = ({ message }) => (
+const NoAccessScreen = ({ message, title }) => (
   <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4">
     <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-8 text-center space-y-4">
       <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 grid place-items-center mx-auto">
         <AdminIcon name="x" className="w-6 h-6" strokeWidth={2.4}/>
       </div>
-      <h1 className="text-[18px] font-extrabold text-ink-900">No admin access</h1>
+      <h1 className="text-[18px] font-extrabold text-ink-900">{title || 'No admin access'}</h1>
       <p className="text-[13px] text-ink-500 leading-snug">
         {message || 'This account is not linked to an admin profile. Contact your administrator.'}
       </p>
@@ -6298,6 +6298,10 @@ const ViewAdminsModal = ({ company, onClose }) => {
   const [err, setErr]             = React.useState('');
   const [confirmId, setConfirmId] = React.useState(null);
   const [removingId, setRemovingId] = React.useState(null);
+  const [resetId, setResetId]     = React.useState(null); // row in reset-password mode
+  const [resetPass, setResetPass] = React.useState('');
+  const [resetBusy, setResetBusy] = React.useState(false);
+  const [resetDoneId, setResetDoneId] = React.useState(null); // row that just succeeded
 
   const parseErr = async (error, fallback) => {
     let msg = error.message || fallback;
@@ -6327,6 +6331,23 @@ const ViewAdminsModal = ({ company, onClose }) => {
     if (data?.error) { setErr(data.error); return; }
     setConfirmId(null);
     load();
+  };
+
+  const openReset = (userId) => {
+    setResetId(userId); setResetPass(''); setConfirmId(null);
+    setErr(''); setResetDoneId(null);
+  };
+
+  const resetPassword = async (userId) => {
+    if (resetPass.length < 6) { setErr('Password must be at least 6 characters.'); return; }
+    setResetBusy(true); setErr('');
+    const { data, error } = await supabase.functions.invoke('manage-company-admins', {
+      body: { action: 'reset_password', company_id: company.id, user_id: userId, new_password: resetPass },
+    });
+    setResetBusy(false);
+    if (error) { setErr(await parseErr(error, 'Failed to reset password.')); return; }
+    if (data?.error) { setErr(data.error); return; }
+    setResetId(null); setResetPass(''); setResetDoneId(userId);
   };
 
   const fmtDate = (iso) => {
@@ -6374,17 +6395,49 @@ const ViewAdminsModal = ({ company, onClose }) => {
                       {removingId === a.user_id ? 'Removing…' : 'Remove'}
                     </button>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13.5px] font-semibold text-ink-900 font-mono break-all">{a.email}</div>
-                      <div className="text-[11.5px] text-ink-500">Added {fmtDate(a.created_at)}</div>
+                ) : resetId === a.user_id ? (
+                  <div className="space-y-2">
+                    <div className="text-[12.5px] text-ink-600">
+                      New password for <span className="font-semibold break-all">{a.email}</span>
                     </div>
-                    <button onClick={() => { setConfirmId(a.user_id); setErr(''); }}
-                      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[12.5px] font-semibold transition-colors">
-                      <AdminIcon name="trash" className="w-3.5 h-3.5"/>
-                      Remove
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={resetPass} autoFocus autoComplete="off"
+                        onChange={e => setResetPass(e.target.value)}
+                        placeholder="At least 6 characters"
+                        className="flex-1 min-w-0 h-9 px-3 rounded-lg bg-white hairline text-[13px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+                      <button onClick={() => { setResetId(null); setResetPass(''); }} disabled={resetBusy}
+                        className="flex-shrink-0 h-9 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={() => resetPassword(a.user_id)} disabled={resetBusy}
+                        className="flex-shrink-0 h-9 px-3 rounded-lg bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 text-[12.5px] font-bold transition-colors">
+                        {resetBusy ? 'Updating…' : 'Update'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13.5px] font-semibold text-ink-900 font-mono break-all">{a.email}</div>
+                        <div className="text-[11.5px] text-ink-500">Added {fmtDate(a.created_at)}</div>
+                      </div>
+                      <button onClick={() => openReset(a.user_id)}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-ink-200 text-ink-700 hover:bg-ink-50 text-[12.5px] font-semibold transition-colors">
+                        <AdminIcon name="settings" className="w-3.5 h-3.5"/>
+                        Reset password
+                      </button>
+                      <button onClick={() => { setConfirmId(a.user_id); setResetId(null); setErr(''); setResetDoneId(null); }}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[12.5px] font-semibold transition-colors">
+                        <AdminIcon name="trash" className="w-3.5 h-3.5"/>
+                        Remove
+                      </button>
+                    </div>
+                    {resetDoneId === a.user_id && (
+                      <div className="mt-2 rounded-lg bg-green-50 ring-1 ring-green-200 px-3 py-2 text-[12px] text-green-800 font-medium">
+                        Password updated — share it with the admin.
+                      </div>
+                    )}
                   </div>
                 )}
               </li>
@@ -6487,6 +6540,19 @@ const SuperAdminDashboard = ({ onView }) => {
     fetchAll();
   };
 
+  // Toggle a company active/inactive. Optimistic, reverts on error.
+  // (Allowed by the super_admin_companies RLS policy; this view is super-admin only.)
+  const toggleActive = async (c) => {
+    const next = c.active === false; // currently inactive → activate, else deactivate
+    setError('');
+    setCompanies(cs => cs.map(x => x.id === c.id ? { ...x, active: next } : x));
+    const { error: upErr } = await supabase.from('companies').update({ active: next }).eq('id', c.id);
+    if (upErr) {
+      setCompanies(cs => cs.map(x => x.id === c.id ? { ...x, active: c.active } : x)); // revert
+      setError(`Could not update ${c.name}: ${upErr.message}`);
+    }
+  };
+
   const planTone = (plan) => ({
     Basic:      'bg-ink-100 text-ink-700',
     Pro:        'bg-mint-100 text-mint-700',
@@ -6572,6 +6638,13 @@ const SuperAdminDashboard = ({ onView }) => {
                   ))}
                 </div>
 
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-ink-50 px-3 py-2">
+                  <span className="text-[12.5px] font-semibold text-ink-700">
+                    {c.active === false ? 'Company disabled' : 'Company active'}
+                  </span>
+                  <Switch on={c.active !== false} onChange={() => toggleActive(c)} ariaLabel={`Toggle ${c.name} active`}/>
+                </div>
+
                 <div className="mt-auto flex flex-col gap-2">
                   <div className="flex gap-2">
                     <button onClick={() => setAdminFor(c)}
@@ -6653,6 +6726,7 @@ const SuperAdminDashboard = ({ onView }) => {
 /* ─── Authenticated router: reads profile, routes by role, sets tenant scope ─── */
 const AuthedAdmin = ({ session }) => {
   const [profile, setProfile] = React.useState(undefined); // undefined = loading, null = none
+  const [companyActive, setCompanyActive] = React.useState(undefined); // company_admin only
   const [viewingCompany, setViewingCompany] = React.useState(null);
 
   React.useEffect(() => {
@@ -6664,7 +6738,20 @@ const AuthedAdmin = ({ session }) => {
         .eq('id', session.user.id)
         .maybeSingle();
       if (cancelled) return;
-      setProfile(error ? null : (data || null));
+      const prof = error ? null : (data || null);
+      setProfile(prof);
+      // Company admins are blocked if their company is inactive. Super admins
+      // are never company-gated, so skip the lookup for them.
+      if (prof?.role === 'company_admin' && prof.company_id) {
+        const { data: co } = await supabase
+          .from('companies')
+          .select('active')
+          .eq('id', prof.company_id)
+          .maybeSingle();
+        if (cancelled) return;
+        // Unreadable/missing company → treat as blocked (fail safe).
+        setCompanyActive(co ? (co.active !== false) : false);
+      }
     })();
     return () => { cancelled = true; };
   }, [session.user.id]);
@@ -6679,6 +6766,11 @@ const AuthedAdmin = ({ session }) => {
   if (profile.role === 'company_admin') {
     if (!profile.company_id) {
       return <NoAccessScreen message="This admin account isn't linked to a company yet."/>;
+    }
+    if (companyActive === undefined) return <FullScreenSpinner/>; // company-active check in flight
+    if (companyActive === false) {
+      return <NoAccessScreen title="Account disabled"
+        message="This account is disabled. Please contact support."/>;
     }
     setScopedCompany(profile.company_id);
     return <AdminPanel key={profile.company_id} companyId={profile.company_id} />;

@@ -4,15 +4,18 @@
 // Runs server-side with the service_role key (auto-injected by Supabase),
 // so NO secret ever reaches the browser.
 //
-// POST body: { action: "list" | "remove", company_id, user_id? }
+// POST body: { action: "list" | "remove" | "reset_password",
+//             company_id, user_id?, new_password? }
 //
 //   action "list":   returns every company_admin for company_id, with email
 //                    and signup time (read from the GoTrue Admin API).
 //   action "remove": deletes one company_admin's auth user + profiles row.
-//                    SAFETY GUARD — the target is only removed if its profile
-//                    is role='company_admin' AND its company_id matches the
-//                    company_id passed in. So this endpoint can never delete a
-//                    super_admin, a user from another company, or a random uid.
+//   action "reset_password": sets a new password for one company_admin.
+//                    SAFETY GUARD (remove + reset_password) — the target is only
+//                    touched if its profile is role='company_admin' AND its
+//                    company_id matches the company_id passed in. So these
+//                    actions can never affect a super_admin, a user from another
+//                    company, or a random uid.
 //
 // In all cases the caller is authenticated and must be a super_admin.
 // Deploy via Dashboard → Edge Functions (function name: manage-company-admins).
@@ -139,6 +142,36 @@ Deno.serve(async (req) => {
       const { error: delErr } = await admin.auth.admin.deleteUser(String(userId));
       if (delErr) return json({ error: "Failed to remove user: " + delErr.message }, 500);
       await admin.from("profiles").delete().eq("id", userId); // orphan-safe cleanup
+
+      return json({ ok: true });
+    }
+
+    // ── action: reset_password ──────────────────────────────────────────
+    if (action === "reset_password") {
+      const userId = body.user_id;
+      const newPassword = String(body.new_password || "");
+      if (userId === undefined || userId === null || userId === "") {
+        return json({ error: "user_id is required." }, 400);
+      }
+      if (newPassword.length < 6) {
+        return json({ error: "Password must be at least 6 characters." }, 400);
+      }
+
+      // SAFETY GUARD: the target must be a company_admin of THIS company.
+      const { data: target, error: tErr } = await admin
+        .from("profiles")
+        .select("role, company_id")
+        .eq("id", userId)
+        .maybeSingle();
+      if (tErr) return json({ error: tErr.message }, 500);
+      if (!target) return json({ error: "That admin no longer exists." }, 404);
+      if (target.role !== "company_admin" || String(target.company_id) !== String(companyId)) {
+        return json({ error: "Refused: that user is not a company admin of this company." }, 403);
+      }
+
+      const { error: updErr } = await admin.auth.admin
+        .updateUserById(String(userId), { password: newPassword });
+      if (updErr) return json({ error: "Failed to reset password: " + updErr.message }, 500);
 
       return json({ ok: true });
     }
