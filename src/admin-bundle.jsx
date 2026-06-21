@@ -6114,7 +6114,7 @@ const AdminPanel = ({ companyId, companySlug }) => {
         {companySlug && (
           <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-xl bg-mint-50 ring-1 ring-mint-200 px-4 py-2.5 flex items-center gap-2">
             <AdminIcon name="globe" className="w-4 h-4 text-mint-700 flex-shrink-0"/>
-            <span className="text-[12.5px] font-semibold text-ink-600 flex-shrink-0">Booking link:</span>
+            <span className="hidden sm:inline text-[12.5px] font-semibold text-ink-600 flex-shrink-0">Booking link:</span>
             <CopyLinkInline slug={companySlug}/>
           </div>
         )}
@@ -6369,56 +6369,62 @@ const ViewAdminsModal = ({ company, onClose }) => {
             {admins.map(a => (
               <li key={a.user_id} className="px-1 py-2.5">
                 {confirmId === a.user_id ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div className="flex-1 min-w-0 text-[13px] text-ink-700">
                       Remove <span className="font-semibold break-all">{a.email}</span>?
                     </div>
-                    <button onClick={() => setConfirmId(null)} disabled={removingId === a.user_id}
-                      className="flex-shrink-0 h-8 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={() => remove(a.user_id)} disabled={removingId === a.user_id}
-                      className="flex-shrink-0 h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-[12.5px] font-semibold transition-colors">
-                      {removingId === a.user_id ? 'Removing…' : 'Remove'}
-                    </button>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={() => setConfirmId(null)} disabled={removingId === a.user_id}
+                        className="flex-1 sm:flex-none h-8 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={() => remove(a.user_id)} disabled={removingId === a.user_id}
+                        className="flex-1 sm:flex-none h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-[12.5px] font-semibold transition-colors">
+                        {removingId === a.user_id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
                   </div>
                 ) : resetId === a.user_id ? (
                   <div className="space-y-2">
                     <div className="text-[12.5px] text-ink-600">
                       New password for <span className="font-semibold break-all">{a.email}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <input type="text" value={resetPass} autoFocus autoComplete="off"
                         onChange={e => setResetPass(e.target.value)}
                         placeholder="At least 6 characters"
                         className="flex-1 min-w-0 h-9 px-3 rounded-lg bg-white hairline text-[13px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
-                      <button onClick={() => { setResetId(null); setResetPass(''); }} disabled={resetBusy}
-                        className="flex-shrink-0 h-9 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
-                        Cancel
-                      </button>
-                      <button onClick={() => resetPassword(a.user_id)} disabled={resetBusy}
-                        className="flex-shrink-0 h-9 px-3 rounded-lg bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 text-[12.5px] font-bold transition-colors">
-                        {resetBusy ? 'Updating…' : 'Update'}
-                      </button>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button onClick={() => { setResetId(null); setResetPass(''); }} disabled={resetBusy}
+                          className="flex-1 sm:flex-none h-9 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                          Cancel
+                        </button>
+                        <button onClick={() => resetPassword(a.user_id)} disabled={resetBusy}
+                          className="flex-1 sm:flex-none h-9 px-3 rounded-lg bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 text-[12.5px] font-bold transition-colors">
+                          {resetBusy ? 'Updating…' : 'Update'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="text-[13.5px] font-semibold text-ink-900 font-mono break-all">{a.email}</div>
                         <div className="text-[11.5px] text-ink-500">Added {fmtDate(a.created_at)}</div>
                       </div>
-                      <button onClick={() => openReset(a.user_id)}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-ink-200 text-ink-700 hover:bg-ink-50 text-[12.5px] font-semibold transition-colors">
-                        <AdminIcon name="settings" className="w-3.5 h-3.5"/>
-                        Reset password
-                      </button>
-                      <button onClick={() => { setConfirmId(a.user_id); setResetId(null); setErr(''); setResetDoneId(null); }}
-                        className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[12.5px] font-semibold transition-colors">
-                        <AdminIcon name="trash" className="w-3.5 h-3.5"/>
-                        Remove
-                      </button>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button onClick={() => openReset(a.user_id)}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-ink-200 text-ink-700 hover:bg-ink-50 text-[12.5px] font-semibold transition-colors">
+                          <AdminIcon name="settings" className="w-3.5 h-3.5"/>
+                          Reset password
+                        </button>
+                        <button onClick={() => { setConfirmId(a.user_id); setResetId(null); setErr(''); setResetDoneId(null); }}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[12.5px] font-semibold transition-colors">
+                          <AdminIcon name="trash" className="w-3.5 h-3.5"/>
+                          Remove
+                        </button>
+                      </div>
                     </div>
                     {resetDoneId === a.user_id && (
                       <div className="mt-2 rounded-lg bg-green-50 ring-1 ring-green-200 px-3 py-2 text-[12px] text-green-800 font-medium">
@@ -6547,7 +6553,7 @@ const ViewingBanner = ({ company, onBack }) => {
   const [addAdmin, setAddAdmin]   = React.useState(false);
   const [viewAdmins, setViewAdmins] = React.useState(false);
   return (
-  <div className="sticky top-0 z-50 bg-ink-950 text-white px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3 shadow-md">
+  <div className="sticky top-0 z-50 bg-ink-950 text-white px-3 sm:px-6 lg:px-8 py-2.5 flex items-center gap-2 sm:gap-3 shadow-md">
     <span className="w-7 h-7 rounded-lg bg-mint-500 text-ink-900 grid place-items-center flex-shrink-0">
       <AdminIcon name="grid" className="w-4 h-4" strokeWidth={2.2}/>
     </span>
@@ -6555,24 +6561,24 @@ const ViewingBanner = ({ company, onBack }) => {
       <div className="text-[13px] font-bold leading-tight truncate">
         Viewing: {company.name}
       </div>
-      <div className="text-[11px] text-white/60 leading-tight">
+      <div className="text-[11px] text-white/60 leading-tight truncate">
         Super Admin · {company.plan || 'No plan'}{company.active === false ? ' · inactive' : ''}
       </div>
     </div>
-    <button onClick={() => setViewAdmins(true)}
-      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+    <button onClick={() => setViewAdmins(true)} aria-label="View admins"
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
       <AdminIcon name="users" className="w-3.5 h-3.5" strokeWidth={2.2}/>
-      View admins
+      <span className="hidden sm:inline">View admins</span>
     </button>
-    <button onClick={() => setAddAdmin(true)}
-      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+    <button onClick={() => setAddAdmin(true)} aria-label="Add admin"
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
       <AdminIcon name="plus" className="w-3.5 h-3.5" strokeWidth={2.4}/>
-      Add admin
+      <span className="hidden sm:inline">Add admin</span>
     </button>
-    <button onClick={onBack}
-      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+    <button onClick={onBack} aria-label="Back to all companies"
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
       <AdminIcon name="arrow-left" className="w-3.5 h-3.5" strokeWidth={2.2}/>
-      Back to all companies
+      <span className="hidden sm:inline">Back to all companies</span>
     </button>
     {addAdmin && <AddAdminModal company={company} onClose={() => setAddAdmin(false)} />}
     {viewAdmins && <ViewAdminsModal company={company} onClose={() => setViewAdmins(false)} />}
