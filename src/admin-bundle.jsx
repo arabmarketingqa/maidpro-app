@@ -6290,9 +6290,121 @@ const AddAdminModal = ({ company, onClose }) => {
   );
 };
 
+/* ─── Super Admin: list + remove company_admin logins for a company ───
+   Reads/writes via the manage-company-admins Edge Function (super-admin only,
+   service_role server-side). Remove uses inline confirm-before-delete. */
+const ViewAdminsModal = ({ company, onClose }) => {
+  const [admins, setAdmins]       = React.useState(null); // null = loading
+  const [err, setErr]             = React.useState('');
+  const [confirmId, setConfirmId] = React.useState(null);
+  const [removingId, setRemovingId] = React.useState(null);
+
+  const parseErr = async (error, fallback) => {
+    let msg = error.message || fallback;
+    try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch (_) {}
+    return msg;
+  };
+
+  const load = React.useCallback(async () => {
+    setErr('');
+    const { data, error } = await supabase.functions.invoke('manage-company-admins', {
+      body: { action: 'list', company_id: company.id },
+    });
+    if (error) { setErr(await parseErr(error, 'Failed to load admins.')); setAdmins([]); return; }
+    if (data?.error) { setErr(data.error); setAdmins([]); return; }
+    setAdmins(data.admins || []);
+  }, [company.id]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const remove = async (userId) => {
+    setRemovingId(userId); setErr('');
+    const { data, error } = await supabase.functions.invoke('manage-company-admins', {
+      body: { action: 'remove', company_id: company.id, user_id: userId },
+    });
+    setRemovingId(null);
+    if (error) { setErr(await parseErr(error, 'Failed to remove admin.')); return; }
+    if (data?.error) { setErr(data.error); return; }
+    setConfirmId(null);
+    load();
+  };
+
+  const fmtDate = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return isNaN(d) ? '—' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-float p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[16px] font-extrabold text-ink-900">Admins · {company.name}</h3>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-700">
+            <AdminIcon name="x" className="w-5 h-5"/>
+          </button>
+        </div>
+
+        {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+
+        {admins === null ? (
+          <div className="flex items-center gap-2 text-[13px] text-ink-500 py-8 justify-center">
+            <span className="w-5 h-5 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
+            Loading admins…
+          </div>
+        ) : admins.length === 0 ? (
+          <div className="text-center text-[13px] text-ink-500 py-8">
+            No admins yet for this company. Use <strong>Add admin</strong> to create one.
+          </div>
+        ) : (
+          <ul className="divide-y divide-ink-200/70 -mx-1">
+            {admins.map(a => (
+              <li key={a.user_id} className="px-1 py-2.5">
+                {confirmId === a.user_id ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0 text-[13px] text-ink-700">
+                      Remove <span className="font-semibold break-all">{a.email}</span>?
+                    </div>
+                    <button onClick={() => setConfirmId(null)} disabled={removingId === a.user_id}
+                      className="flex-shrink-0 h-8 px-3 rounded-lg border border-ink-200 text-[12.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={() => remove(a.user_id)} disabled={removingId === a.user_id}
+                      className="flex-shrink-0 h-8 px-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-[12.5px] font-semibold transition-colors">
+                      {removingId === a.user_id ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13.5px] font-semibold text-ink-900 font-mono break-all">{a.email}</div>
+                      <div className="text-[11.5px] text-ink-500">Added {fmtDate(a.created_at)}</div>
+                    </div>
+                    <button onClick={() => { setConfirmId(a.user_id); setErr(''); }}
+                      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[12.5px] font-semibold transition-colors">
+                      <AdminIcon name="trash" className="w-3.5 h-3.5"/>
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <button onClick={onClose}
+          className="w-full h-10 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* ─── Super Admin: banner shown while impersonating a company ─── */
 const ViewingBanner = ({ company, onBack }) => {
-  const [addAdmin, setAddAdmin] = React.useState(false);
+  const [addAdmin, setAddAdmin]   = React.useState(false);
+  const [viewAdmins, setViewAdmins] = React.useState(false);
   return (
   <div className="sticky top-0 z-50 bg-ink-950 text-white px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3 shadow-md">
     <span className="w-7 h-7 rounded-lg bg-mint-500 text-ink-900 grid place-items-center flex-shrink-0">
@@ -6306,6 +6418,11 @@ const ViewingBanner = ({ company, onBack }) => {
         Super Admin · {company.plan || 'No plan'}{company.active === false ? ' · inactive' : ''}
       </div>
     </div>
+    <button onClick={() => setViewAdmins(true)}
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+      <AdminIcon name="users" className="w-3.5 h-3.5" strokeWidth={2.2}/>
+      View admins
+    </button>
     <button onClick={() => setAddAdmin(true)}
       className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
       <AdminIcon name="plus" className="w-3.5 h-3.5" strokeWidth={2.4}/>
@@ -6317,6 +6434,7 @@ const ViewingBanner = ({ company, onBack }) => {
       Back to all companies
     </button>
     {addAdmin && <AddAdminModal company={company} onClose={() => setAddAdmin(false)} />}
+    {viewAdmins && <ViewAdminsModal company={company} onClose={() => setViewAdmins(false)} />}
   </div>
   );
 };
@@ -6333,6 +6451,7 @@ const SuperAdminDashboard = ({ onView }) => {
   const [saving, setSaving]       = React.useState(false);
   const [formErr, setFormErr]     = React.useState('');
   const [adminFor, setAdminFor]   = React.useState(null); // company whose "Add admin" modal is open
+  const [viewAdminsFor, setViewAdminsFor] = React.useState(null); // company whose "View admins" modal is open
 
   const fetchAll = React.useCallback(async () => {
     const { data: cos, error: coErr } = await supabase.from('companies').select('*').order('name');
@@ -6453,14 +6572,21 @@ const SuperAdminDashboard = ({ onView }) => {
                   ))}
                 </div>
 
-                <div className="mt-auto flex gap-2">
-                  <button onClick={() => setAdminFor(c)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-ink-200 text-ink-700 hover:bg-ink-50 font-semibold text-[13px] transition-colors">
-                    <AdminIcon name="plus" className="w-4 h-4" strokeWidth={2.4}/>
-                    Add admin
-                  </button>
+                <div className="mt-auto flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <button onClick={() => setAdminFor(c)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-ink-200 text-ink-700 hover:bg-ink-50 font-semibold text-[13px] transition-colors">
+                      <AdminIcon name="plus" className="w-4 h-4" strokeWidth={2.4}/>
+                      Add admin
+                    </button>
+                    <button onClick={() => setViewAdminsFor(c)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-ink-200 text-ink-700 hover:bg-ink-50 font-semibold text-[13px] transition-colors">
+                      <AdminIcon name="users" className="w-4 h-4" strokeWidth={2}/>
+                      View admins
+                    </button>
+                  </div>
                   <button onClick={() => onView(c)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-semibold text-[13px] transition-colors">
+                    className="w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-semibold text-[13px] transition-colors">
                     View as
                     <AdminIcon name="arrow-right" className="w-4 h-4" strokeWidth={2.2}/>
                   </button>
@@ -6517,6 +6643,9 @@ const SuperAdminDashboard = ({ onView }) => {
 
       {/* Add admin modal */}
       {adminFor && <AddAdminModal company={adminFor} onClose={() => setAdminFor(null)} />}
+
+      {/* View admins modal */}
+      {viewAdminsFor && <ViewAdminsModal company={viewAdminsFor} onClose={() => setViewAdminsFor(null)} />}
     </div>
   );
 };
