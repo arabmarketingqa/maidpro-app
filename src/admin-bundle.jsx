@@ -6202,8 +6202,98 @@ const NoAccessScreen = ({ message }) => (
   </div>
 );
 
+/* ─── Super Admin: create a company_admin login for a company ───
+   Calls the create-company-admin Edge Function, which runs server-side with
+   the service_role key (never exposed here) and enforces super-admin only. */
+const AddAdminModal = ({ company, onClose }) => {
+  const [email, setEmail]       = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [saving, setSaving]     = React.useState(false);
+  const [err, setErr]           = React.useState('');
+  const [done, setDone]         = React.useState(false);
+
+  const submit = async () => {
+    if (!email.trim()) { setErr('Email is required.'); return; }
+    if (password.length < 6) { setErr('Password must be at least 6 characters.'); return; }
+    setSaving(true); setErr('');
+    const { data, error } = await supabase.functions.invoke('create-company-admin', {
+      body: { email: email.trim(), password, company_id: company.id },
+    });
+    setSaving(false);
+    if (error) {
+      // Non-2xx responses surface as FunctionsHttpError; the JSON body is in error.context
+      let msg = error.message || 'Failed to create admin.';
+      try { const ctx = await error.context?.json?.(); if (ctx?.error) msg = ctx.error; } catch (_) {}
+      setErr(msg);
+      return;
+    }
+    if (data?.error) { setErr(data.error); return; }
+    setDone(true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={() => !saving && onClose()}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[16px] font-extrabold text-ink-900">Add admin</h3>
+          <button onClick={() => !saving && onClose()} className="text-ink-400 hover:text-ink-700">
+            <AdminIcon name="x" className="w-5 h-5"/>
+          </button>
+        </div>
+        <p className="text-[12.5px] text-ink-500 leading-snug -mt-1">
+          Creates a <strong>company admin</strong> login for <strong>{company.name}</strong>. They will only see this company's data.
+        </p>
+
+        {done ? (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-green-50 ring-1 ring-green-200 px-4 py-3 text-[13px] text-green-800">
+              <div className="font-bold">Admin created ✓</div>
+              <div className="mt-0.5 leading-snug"><span className="font-mono">{email.trim().toLowerCase()}</span> can now log in and will see only <strong>{company.name}</strong>.</div>
+            </div>
+            <button onClick={onClose}
+              className="w-full h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 text-ink-900 font-bold text-[13.5px] shadow-mint transition-colors">
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Email</label>
+              <input type="email" value={email} autoFocus autoComplete="off"
+                onChange={e => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Temporary password</label>
+              <input type="text" value={password} autoComplete="off"
+                onChange={e => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+              <p className="text-[11px] text-ink-400 mt-1">Share this with the admin — they can change it later via “forgot password”.</p>
+            </div>
+            {err && <div className="text-[12.5px] text-red-600 font-medium">{err}</div>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={onClose} disabled={saving}
+                className="flex-1 h-11 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={submit} disabled={saving}
+                className="flex-1 h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[13.5px] shadow-mint transition-colors">
+                {saving ? 'Creating…' : 'Create admin'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* ─── Super Admin: banner shown while impersonating a company ─── */
-const ViewingBanner = ({ company, onBack }) => (
+const ViewingBanner = ({ company, onBack }) => {
+  const [addAdmin, setAddAdmin] = React.useState(false);
+  return (
   <div className="sticky top-0 z-50 bg-ink-950 text-white px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3 shadow-md">
     <span className="w-7 h-7 rounded-lg bg-mint-500 text-ink-900 grid place-items-center flex-shrink-0">
       <AdminIcon name="grid" className="w-4 h-4" strokeWidth={2.2}/>
@@ -6216,13 +6306,20 @@ const ViewingBanner = ({ company, onBack }) => (
         Super Admin · {company.plan || 'No plan'}{company.active === false ? ' · inactive' : ''}
       </div>
     </div>
+    <button onClick={() => setAddAdmin(true)}
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+      <AdminIcon name="plus" className="w-3.5 h-3.5" strokeWidth={2.4}/>
+      Add admin
+    </button>
     <button onClick={onBack}
       className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
       <AdminIcon name="arrow-left" className="w-3.5 h-3.5" strokeWidth={2.2}/>
       Back to all companies
     </button>
+    {addAdmin && <AddAdminModal company={company} onClose={() => setAddAdmin(false)} />}
   </div>
-);
+  );
+};
 
 /* ─── Super Admin: top-level dashboard listing every company ─── */
 const PLAN_OPTIONS = ['Basic', 'Pro', 'Enterprise'];
@@ -6235,6 +6332,7 @@ const SuperAdminDashboard = ({ onView }) => {
   const [form, setForm]           = React.useState({ name: '', plan: 'Basic', active: true });
   const [saving, setSaving]       = React.useState(false);
   const [formErr, setFormErr]     = React.useState('');
+  const [adminFor, setAdminFor]   = React.useState(null); // company whose "Add admin" modal is open
 
   const fetchAll = React.useCallback(async () => {
     const { data: cos, error: coErr } = await supabase.from('companies').select('*').order('name');
@@ -6355,11 +6453,18 @@ const SuperAdminDashboard = ({ onView }) => {
                   ))}
                 </div>
 
-                <button onClick={() => onView(c)}
-                  className="mt-auto w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-semibold text-[13px] transition-colors">
-                  View as
-                  <AdminIcon name="arrow-right" className="w-4 h-4" strokeWidth={2.2}/>
-                </button>
+                <div className="mt-auto flex gap-2">
+                  <button onClick={() => setAdminFor(c)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl border border-ink-200 text-ink-700 hover:bg-ink-50 font-semibold text-[13px] transition-colors">
+                    <AdminIcon name="plus" className="w-4 h-4" strokeWidth={2.4}/>
+                    Add admin
+                  </button>
+                  <button onClick={() => onView(c)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-semibold text-[13px] transition-colors">
+                    View as
+                    <AdminIcon name="arrow-right" className="w-4 h-4" strokeWidth={2.2}/>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -6409,6 +6514,9 @@ const SuperAdminDashboard = ({ onView }) => {
           </div>
         </div>
       )}
+
+      {/* Add admin modal */}
+      {adminFor && <AddAdminModal company={adminFor} onClose={() => setAdminFor(null)} />}
     </div>
   );
 };
