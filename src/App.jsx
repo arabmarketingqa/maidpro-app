@@ -7,6 +7,40 @@ import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakTogg
 import { supabase, SETTINGS_SYNC_CHANNEL, SETTINGS_SYNC_KEY } from './supabase'
 import { readBookingCache, writeBookingCache, invalidateBookingCache } from './bookingCache'
 
+/* ── Multi-tenant scoping for the public booking page ──
+   The company is resolved from the URL slug BEFORE the booking UI renders
+   (see the App wrapper at the bottom of this file). Every tenant query goes
+   through pdb('<table>'), which filters reads by company_id and injects it
+   into inserts/upserts. supabase.auth / supabase.channel / supabase.rpc are
+   used directly and are NOT scoped. */
+let PUBLIC_COMPANY_ID = null;
+export function setPublicCompany(id) { PUBLIC_COMPANY_ID = id ?? null; }
+function withCompanyPublic(rows, cid) {
+  const add = (r) => (r && typeof r === 'object' && !Array.isArray(r)) ? { ...r, company_id: cid } : r;
+  return Array.isArray(rows) ? rows.map(add) : add(rows);
+}
+function pdb(table) {
+  const cid = PUBLIC_COMPANY_ID;
+  const q = supabase.from(table);
+  return {
+    select: (...a) => q.select(...a).eq('company_id', cid),
+    insert: (rows) => q.insert(withCompanyPublic(rows, cid)),
+    upsert: (rows, opts) => q.upsert(withCompanyPublic(rows, cid), opts),
+    update: (patch) => q.update(patch).eq('company_id', cid),
+    delete: () => q.delete().eq('company_id', cid),
+  };
+}
+
+// Bare URL (no slug) falls back to Al Zahour so the existing live link keeps working.
+const DEFAULT_SLUG = 'alzahour';
+function slugFromPath() {
+  try {
+    const seg = (window.location.pathname || '/').split('/').filter(Boolean)[0] || '';
+    if (!seg || seg === 'admin' || seg === 'admin.html' || seg === 'index.html') return DEFAULT_SLUG;
+    return seg.toLowerCase();
+  } catch (_) { return DEFAULT_SLUG; }
+}
+
 const toFlag = (s) => s && /^[A-Z]{2}$/i.test(s.trim())
   ? String.fromCodePoint(...[...s.trim().toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65))
   : (s || '🌍');
@@ -140,7 +174,7 @@ function applyAccent(accent) {
   `;
 }
 
-function App() {
+function BookingApp() {
   const [state, setState] = React.useState(initialState);
   const initStep = (() => {
     try {
@@ -178,7 +212,7 @@ function App() {
   // Fetch total staff count once on mount and keep in sync via realtime
   React.useEffect(() => {
     const fetch = async () => {
-      const { data, error } = await supabase.from('staff').select('id, active, working_days');
+      const { data, error } = await pdb('staff').select('id, active, working_days');
       if (data) {
         setTotalStaffCount(data.filter(s => {
           if (s.active === false) return false;
@@ -189,12 +223,12 @@ function App() {
         }).length);
       } else if (error) {
         // working_days or active column not yet in DB — try active only
-        const { data: d2, error: e2 } = await supabase.from('staff').select('id, active');
+        const { data: d2, error: e2 } = await pdb('staff').select('id, active');
         if (d2) {
           setTotalStaffCount(d2.filter(s => s.active !== false).length);
         } else {
           // both columns missing — count all staff
-          const { data: fb } = await supabase.from('staff').select('id');
+          const { data: fb } = await pdb('staff').select('id');
           if (fb) setTotalStaffCount(fb.length);
         }
       }
@@ -215,7 +249,7 @@ function App() {
 
   const fetchAvailableSkills = React.useCallback(async (nationality, mode) => {
     if (mode !== 'hourly' || !nationality) { setAvailableSkillIds(null); return; }
-    const { data } = await supabase.from('staff').select('skills')
+    const { data } = await pdb('staff').select('skills')
       .eq('nationality', nationality);
     if (!data) return;
 
@@ -240,7 +274,7 @@ function App() {
   // Global staff skill index — which skill IDs can ANY hourly staff member do?
   // Used to hide fixed services that have no staff assigned.
   const fetchStaffSkillIds = React.useCallback(async () => {
-    const { data } = await supabase.from('staff').select('skills');
+    const { data } = await pdb('staff').select('skills');
     if (!data) return;
     const ids = new Set();
     let anyMode = false;
@@ -255,7 +289,7 @@ function App() {
   // Only show nationalities that have ≥1 available maid configured for the given mode
   // For hourly: maid must also have ≥1 skill selected (otherwise they can't take any booking)
   const fetchAvailableNatIds = React.useCallback(async (mode = 'hourly') => {
-    const { data } = await supabase.from('staff').select('nationality, skills');
+    const { data } = await pdb('staff').select('nationality, skills');
     if (!data) return;
 
     const anyModeConfig = data.some(s =>
@@ -357,19 +391,19 @@ function App() {
 
     // ── Fetchers used by realtime/polling (update state, no cache write) ──
     const fetchNats = async () => {
-      const { data } = await supabase.from('nationalities').select('*').order('name');
+      const { data } = await pdb('nationalities').select('*').order('name');
       return data ? applyNats(data) : null;
     };
 
     const fetchSettings = async () => {
-      const { data, error } = await supabase.from('settings').select('key, value')
+      const { data, error } = await pdb('settings').select('key, value')
         .in('key', ['modes', 'nationalities_block', 'services', 'fixedServices', 'monthly', 'monthlySettings', 'stayIn', 'limits', 'materials', 'businessHours', 'brand']);
       if (error) { console.warn('fetchSettings error:', error.message); return null; }
       return data ? applySettingsMap(Object.fromEntries(data.map(r => [r.key, r.value]))) : null;
     };
 
     const fetchAvailability = async () => {
-      const { data } = await supabase.from('availability').select('*');
+      const { data } = await pdb('availability').select('*');
       if (data && data.length > 0) {
         const avail = {};
         data.forEach(r => { avail[r.date] = { blocked: r.blocked, morning: r.morning, afternoon: r.afternoon }; });
@@ -472,14 +506,14 @@ function App() {
     (async () => {
       try {
         const [{ data: bks }, staffRes] = await Promise.all([
-          supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
-          supabase.from('staff').select('id, working_days, active'),
+          pdb('bookings').select('time, hours, cleaners, assigned_staff').eq('date', dateStr).neq('status', 'Cancelled'),
+          pdb('staff').select('id, working_days, active'),
         ]);
         const dow = new Date(dateStr + 'T00:00:00').getDay();
 
         let staffList = staffRes.data;
         if (staffRes.error || !staffList) {
-          const { data: fallback } = await supabase.from('staff').select('id');
+          const { data: fallback } = await pdb('staff').select('id');
           staffList = (fallback || []).map(s => ({ id: s.id, working_days: null, active: true }));
         }
 
@@ -574,7 +608,7 @@ function App() {
       // Respect the autoAssign setting — if off, booking lands unassigned for admin to pick manually
       let autoAssign = true;
       try {
-        const { data: sr } = await supabase.from('settings').select('value').eq('key', 'bookingRules').maybeSingle();
+        const { data: sr } = await pdb('settings').select('value').eq('key', 'bookingRules').maybeSingle();
         autoAssign = sr?.value?.autoAssign ?? true;
       } catch (_) {}
 
@@ -588,10 +622,10 @@ function App() {
         const svcId    = _allSvcs.find(s => s.name === breakdown.serviceName)?.id;
 
         const bookingDate = state.date ? localDateStr(state.date) : localDateStr(new Date());
-        let staffRes = await supabase.from('staff').select('id, skills, working_days, active');
+        let staffRes = await pdb('staff').select('id, skills, working_days, active');
         let availStaff = staffRes.data;
         if (staffRes.error || !availStaff) {
-          const fb = await supabase.from('staff').select('id, skills');
+          const fb = await pdb('staff').select('id, skills');
           availStaff = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
         }
 
@@ -622,7 +656,7 @@ function App() {
           }
 
           if (pool.length > 0) {
-            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled');
+            const { data: existingBks } = await pdb('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled');
             const jobCounts = {};
             (existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
             const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0));
@@ -652,20 +686,20 @@ function App() {
       };
 
       // Attempt 1 — full row (including assigned_staff)
-      let { error } = await supabase.from('bookings').insert(fullRow);
+      let { error } = await pdb('bookings').insert(fullRow);
 
       // Attempt 2 — strip optional newer columns that may not exist in this DB schema yet
       // Keep assigned_staff — it's a core column and must not be lost
       if (error?.code === 'PGRST204') {
         const { area: _b, mode: _c, materials: _d, rate: _e, address: _f, ...coreRow } = fullRow;
-        ({ error } = await supabase.from('bookings').insert(coreRow));
+        ({ error } = await pdb('bookings').insert(coreRow));
       }
 
       // Attempt 3 — duplicate ref (race condition or deletion gap) → random ref + retry
       if (error?.code === '23505') {
         const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         fullRow.ref = "MP-" + Array.from({ length: 6 }, () => c[Math.floor(Math.random() * c.length)]).join('');
-        ({ error } = await supabase.from('bookings').insert(fullRow));
+        ({ error } = await pdb('bookings').insert(fullRow));
       }
 
       if (error) {
@@ -677,8 +711,9 @@ function App() {
 
       // Auto-save customer record (upsert by phone-based id)
       try {
-        const custId = 'c_' + (fullRow.phone || '').replace(/\D/g, '').slice(-10);
-        await supabase.from('customers').upsert(
+        // Include company id so the same phone in two companies never collides on the PK.
+        const custId = 'c_' + (PUBLIC_COMPANY_ID || '') + '_' + (fullRow.phone || '').replace(/\D/g, '').slice(-10);
+        await pdb('customers').upsert(
           { id: custId, name: fullRow.name, phone: fullRow.phone, address: fullRow.address || '', area: fullRow.area || '' },
           { onConflict: 'id' }
         );
@@ -877,6 +912,58 @@ function App() {
       </TweaksPanel>
     </div>
   );
+}
+
+/* ── Centered full-screen message (not-found / unavailable / loading) ── */
+function BookingMessage({ title, body, spinner }) {
+  return (
+    <div className="min-h-[100dvh] flex items-center justify-center p-6" style={{ background: 'oklch(0.46 0.07 168)' }}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 text-center space-y-3">
+        {spinner ? (
+          <div className="w-8 h-8 rounded-full border-2 border-mint-500 border-t-transparent animate-spin mx-auto"/>
+        ) : (
+          <h1 className="text-[20px] font-extrabold text-ink-900">{title}</h1>
+        )}
+        {!spinner && body && <p className="text-[13.5px] text-ink-500 leading-snug">{body}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Resolver: maps the URL slug → a company, then renders the booking flow
+   scoped to that company. Bare URL falls back to Al Zahour. ── */
+function App() {
+  const [status, setStatus] = React.useState('loading'); // 'loading' | 'ok' | 'notfound' | 'inactive'
+  const [companyId, setCompanyId] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const slug = slugFromPath();
+      const { data, error } = await supabase.rpc('company_by_slug', { p_slug: slug });
+      if (cancelled) return;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) { setStatus('notfound'); return; }
+      if (row.active === false) { setStatus('inactive'); return; }
+      setPublicCompany(row.id);
+      setCompanyId(row.id);
+      setStatus('ok');
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (status === 'loading') return <BookingMessage spinner/>;
+  if (status === 'notfound') {
+    return <BookingMessage title="Booking page not found"
+      body="This link doesn’t match any company. Please double-check the link you were given."/>;
+  }
+  if (status === 'inactive') {
+    return <BookingMessage title="Booking unavailable"
+      body="This booking page is currently unavailable. Please contact the company directly."/>;
+  }
+  // Ensure scope is set before the booking UI mounts (idempotent with the effect).
+  setPublicCompany(companyId);
+  return <BookingApp key={companyId} />;
 }
 
 export default App;

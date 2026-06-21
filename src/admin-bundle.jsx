@@ -150,6 +150,39 @@ const AdminIcon = ({ name, className = "w-5 h-5", strokeWidth = 1.6 }) => {
   }
 };
 
+/* ── Public booking link helpers (shared by the dashboard cards + admin panel) ── */
+const bookingUrl = (slug) => `${window.location.origin}/${slug}`;
+
+function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  } catch (_) {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  } catch (_) {}
+  return Promise.resolve();
+}
+
+const CopyLinkInline = ({ slug }) => {
+  const [copied, setCopied] = React.useState(false);
+  if (!slug) return <span className="text-[11.5px] text-ink-400 italic">No booking link — set a slug</span>;
+  const url = bookingUrl(slug);
+  const doCopy = async () => { await copyText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); };
+  return (
+    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <span className="font-mono text-[11.5px] text-ink-600 truncate" title={url}>{url}</span>
+      <button onClick={doCopy}
+        className="flex-shrink-0 inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-ink-200 text-ink-700 hover:bg-ink-50 text-[11.5px] font-semibold transition-colors">
+        {copied ? <AdminIcon name="check" className="w-3.5 h-3.5"/> : null}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+};
+
 const Switch = ({ on, onChange, dim, ariaLabel }) => (
   <button
     type="button"
@@ -5806,7 +5839,7 @@ const LoginScreen = ({ onResetActive }) => {
   );
 };
 
-const AdminPanel = ({ companyId }) => {
+const AdminPanel = ({ companyId, companySlug }) => {
   const [section, setSection] = React.useState("overview");
   const [payFilter, setPayFilter] = React.useState("All");
   const [store, setStore] = React.useState(initialStore());
@@ -6131,6 +6164,15 @@ const AdminPanel = ({ companyId }) => {
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col min-h-[100dvh]">
         <TopBar section={section} onMenu={() => setDrawerOpen(true)} store={store} onClear={clearAll} searchQuery={globalSearch} onSearch={setGlobalSearch} bookings={bookings}/>
+
+        {/* Booking link for this company */}
+        {companySlug && (
+          <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 rounded-xl bg-mint-50 ring-1 ring-mint-200 px-4 py-2.5 flex items-center gap-2">
+            <AdminIcon name="globe" className="w-4 h-4 text-mint-700 flex-shrink-0"/>
+            <span className="text-[12.5px] font-semibold text-ink-600 flex-shrink-0">Booking link:</span>
+            <CopyLinkInline slug={companySlug}/>
+          </div>
+        )}
 
         {/* Supabase connection banner */}
         {dbStatus === 'error' && (
@@ -6601,7 +6643,8 @@ const SuperAdminDashboard = ({ onView }) => {
   const [counts, setCounts]       = React.useState({ bookings: {}, staff: {}, customers: {} });
   const [error, setError]         = React.useState('');
   const [addOpen, setAddOpen]     = React.useState(false);
-  const [form, setForm]           = React.useState({ name: '', plan: 'Basic', active: true });
+  const [form, setForm]           = React.useState({ name: '', plan: 'Basic', active: true, slug: '' });
+  const [slugEdited, setSlugEdited] = React.useState(false); // true once the user types in the slug field
   const [saving, setSaving]       = React.useState(false);
   const [formErr, setFormErr]     = React.useState('');
   const [adminFor, setAdminFor]   = React.useState(null); // company whose "Add admin" modal is open
@@ -6630,15 +6673,26 @@ const SuperAdminDashboard = ({ onView }) => {
 
   React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // URL-friendly slug: lowercase, keep a-z/0-9, collapse the rest to single dashes.
+  const slugify = (s) => (s || '').toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
   const addCompany = async () => {
     if (!form.name.trim()) { setFormErr('Company name is required.'); return; }
+    const slug = slugify(form.slug || form.name);
+    if (!slug) { setFormErr('A booking-link slug is required (letters/numbers).'); return; }
     setSaving(true); setFormErr('');
     const { error: insErr } = await supabase.from('companies')
-      .insert({ name: form.name.trim(), plan: form.plan, active: form.active });
+      .insert({ name: form.name.trim(), plan: form.plan, active: form.active, slug });
     setSaving(false);
-    if (insErr) { setFormErr(insErr.message); return; }
+    if (insErr) {
+      const taken = insErr.code === '23505' || /duplicate|unique/i.test(insErr.message || '');
+      setFormErr(taken ? `The slug "${slug}" is already taken — choose another.` : insErr.message);
+      return;
+    }
     setAddOpen(false);
-    setForm({ name: '', plan: 'Basic', active: true });
+    setForm({ name: '', plan: 'Basic', active: true, slug: '' });
+    setSlugEdited(false);
     fetchAll();
   };
 
@@ -6740,6 +6794,11 @@ const SuperAdminDashboard = ({ onView }) => {
                   ))}
                 </div>
 
+                <div className="rounded-xl bg-ink-50 px-3 py-2">
+                  <div className="text-[10.5px] font-semibold text-ink-500 uppercase tracking-wide mb-1">Booking link</div>
+                  <CopyLinkInline slug={c.slug}/>
+                </div>
+
                 <div className="flex items-center justify-between gap-2 rounded-xl bg-ink-50 px-3 py-2">
                   <span className="text-[12.5px] font-semibold text-ink-700">
                     {c.active === false ? 'Company disabled' : 'Company active'}
@@ -6789,9 +6848,23 @@ const SuperAdminDashboard = ({ onView }) => {
             <div>
               <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Company name</label>
               <input value={form.name} autoFocus
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={e => {
+                  const name = e.target.value;
+                  // Auto-suggest the slug from the name until the user edits the slug field.
+                  setForm(f => ({ ...f, name, slug: slugEdited ? f.slug : slugify(name) }));
+                }}
                 placeholder="e.g. Sparkle Cleaning"
                 className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Booking-link slug</label>
+              <input value={form.slug}
+                onChange={e => { setSlugEdited(true); setForm(f => ({ ...f, slug: e.target.value })); }}
+                placeholder="e.g. sparkle"
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 font-mono outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+              <p className="text-[11px] text-ink-400 mt-1 truncate">
+                Booking link: <span className="font-mono">{window.location.origin}/{slugify(form.slug || form.name) || '…'}</span>
+              </p>
             </div>
             <div>
               <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Plan</label>
@@ -6840,6 +6913,7 @@ const SuperAdminDashboard = ({ onView }) => {
 const AuthedAdmin = ({ session }) => {
   const [profile, setProfile] = React.useState(undefined); // undefined = loading, null = none
   const [companyActive, setCompanyActive] = React.useState(undefined); // company_admin only
+  const [companySlug, setCompanySlug] = React.useState(null); // company_admin only
   const [viewingCompany, setViewingCompany] = React.useState(null);
 
   React.useEffect(() => {
@@ -6858,12 +6932,13 @@ const AuthedAdmin = ({ session }) => {
       if (prof?.role === 'company_admin' && prof.company_id) {
         const { data: co } = await supabase
           .from('companies')
-          .select('active')
+          .select('active, slug')
           .eq('id', prof.company_id)
           .maybeSingle();
         if (cancelled) return;
         // Unreadable/missing company → treat as blocked (fail safe).
         setCompanyActive(co ? (co.active !== false) : false);
+        setCompanySlug(co?.slug || null);
       }
     })();
     return () => { cancelled = true; };
@@ -6886,7 +6961,7 @@ const AuthedAdmin = ({ session }) => {
         message="This account is disabled. Please contact support."/>;
     }
     setScopedCompany(profile.company_id);
-    return <AdminPanel key={profile.company_id} companyId={profile.company_id} />;
+    return <AdminPanel key={profile.company_id} companyId={profile.company_id} companySlug={companySlug} />;
   }
 
   // Super admin → company dashboard first; "View as" loads a scoped AdminPanel.
@@ -6896,7 +6971,7 @@ const AuthedAdmin = ({ session }) => {
       <>
         <ViewingBanner company={viewingCompany}
           onBack={() => { setScopedCompany(null); setViewingCompany(null); }} />
-        <AdminPanel key={viewingCompany.id} companyId={viewingCompany.id} />
+        <AdminPanel key={viewingCompany.id} companyId={viewingCompany.id} companySlug={viewingCompany.slug} />
       </>
     );
   }
