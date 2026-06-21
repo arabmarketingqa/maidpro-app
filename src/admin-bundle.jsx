@@ -2,6 +2,43 @@
 import { supabase, fmtBooking, broadcastSettingsUpdate } from './supabase'
 import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
 
+/* ─────────────────────────────────────────────────────────────────────────
+   MULTI-TENANT SCOPING
+   Every tenant query in this admin bundle goes through db('<table>') instead
+   of supabase.from('<table>'). The wrapper transparently constrains reads
+   (.eq company_id), constrains updates/deletes (.eq company_id, caller still
+   chains .eq('id', …)), and injects company_id into insert/upsert payloads.
+   It returns the underlying Supabase builder, so every existing chain
+   (.order/.eq/.neq/.maybeSingle/.limit/{count,head}/…) keeps working.
+
+   SCOPED_COMPANY_ID is set BEFORE AdminPanel mounts (see AuthedAdmin) and
+   AdminPanel is keyed by company id, so switching company fully remounts it
+   with fresh, scoped data. Tenant queries never run while it is null.
+   NOTE: control-plane tables (companies, profiles) and supabase.auth /
+   supabase.channel are intentionally NOT scoped and use supabase directly.
+   ───────────────────────────────────────────────────────────────────────── */
+let SCOPED_COMPANY_ID = null;
+export function setScopedCompany(id) { SCOPED_COMPANY_ID = id ?? null; }
+export function getScopedCompany() { return SCOPED_COMPANY_ID; }
+
+function withCompany(rows, cid) {
+  const add = (r) =>
+    (r && typeof r === 'object' && !Array.isArray(r)) ? { ...r, company_id: cid } : r;
+  return Array.isArray(rows) ? rows.map(add) : add(rows);
+}
+
+function db(table) {
+  const cid = SCOPED_COMPANY_ID;
+  const q = supabase.from(table);
+  return {
+    select: (...a) => q.select(...a).eq('company_id', cid),
+    insert: (rows) => q.insert(withCompany(rows, cid)),
+    update: (patch) => q.update(patch).eq('company_id', cid),
+    delete: () => q.delete().eq('company_id', cid),
+    upsert: (rows, opts) => q.upsert(withCompany(rows, cid), opts),
+  };
+}
+
 /* ── Booking notification chime (Web Audio API — no file needed) ── */
 const playBookingChime = () => {
   try {
@@ -308,7 +345,7 @@ const ModeHeaderCard = ({ mode, store, set }) => {
     set({ modes: newModes });
     setSaving(true); setSavedOk(false);
     try {
-      const { error } = await supabase.from('settings').upsert({ key: 'modes', value: newModes });
+      const { error } = await db('settings').upsert({ key: 'modes', value: newModes }, { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
       setSavedOk(true); setTimeout(() => setSavedOk(false), 3000);
@@ -368,11 +405,11 @@ const HourlySection = ({ store, set }) => {
   const saveHourly = async () => {
     setSavedH(false);
     try {
-      const { error } = await supabase.from('settings').upsert([
+      const { error } = await db('settings').upsert([
         { key:'services',      value:store.services },
         { key:'fixedServices', value:fixedSvcs      },
         { key:'limits',        value:store.limits   },
-      ]);
+      ], { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
       setSavedH(true); setTimeout(()=>setSavedH(false),3000);
@@ -487,10 +524,10 @@ const MonthlySection = ({ store, set }) => {
   const saveMonthly = async () => {
     setSavedM(false);
     try {
-      const { error } = await supabase.from('settings').upsert([
+      const { error } = await db('settings').upsert([
         { key:'monthly',         value:store.monthly },
         { key:'monthlySettings', value:ms            }
-      ]);
+      ], { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
       setSavedM(true); setTimeout(()=>setSavedM(false),3000);
@@ -602,10 +639,10 @@ const StayInSection = ({ store, set }) => {
   const saveStayIn = async () => {
     setSavedS(false);
     try {
-      const { error } = await supabase.from('settings').upsert([
+      const { error } = await db('settings').upsert([
         { key:'stayIn',         value:store.stayIn },
         { key:'stayinSettings', value:sis          }
-      ]);
+      ], { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
       setSavedS(true); setTimeout(()=>setSavedS(false),3000);
@@ -709,7 +746,7 @@ const ServicesSection = ({ store, set }) => {
     const newModes = store.modes.map(m => m.id === id ? { ...m, on } : m);
     set({ modes: newModes });
     try {
-      const { error } = await supabase.from('settings').upsert({ key: 'modes', value: newModes });
+      const { error } = await db('settings').upsert({ key: 'modes', value: newModes }, { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
     } catch(e) { set({ modes: prev }); alert('Save failed: ' + (e.message || 'Network error.')); }
@@ -826,17 +863,17 @@ const NationalitiesSection = ({ store, set }) => {
       id: n.id, name: n.name, flag: n.flag || '🌍', enabled: n.on !== false, rate: Number(n.rate) || 15,
     }));
     try {
-      const { error: blockErr } = await supabase.from('settings').upsert(
-        { key: 'nationalities_block', value: { enabled: store.nationalitiesEnabled } }, { onConflict: 'key' }
+      const { error: blockErr } = await db('settings').upsert(
+        { key: 'nationalities_block', value: { enabled: store.nationalitiesEnabled } }, { onConflict: 'company_id,key' }
       );
       if (blockErr) throw blockErr;
-      const { error: natsErr } = await supabase.from('nationalities').upsert(natsPayload, { onConflict: 'id' });
+      const { error: natsErr } = await db('nationalities').upsert(natsPayload, { onConflict: 'company_id,id' });
       if (natsErr) throw natsErr;
-      const { error: svcErr } = await supabase.from('settings').upsert({ key: 'services', value: store.services }, { onConflict: 'key' });
+      const { error: svcErr } = await db('settings').upsert({ key: 'services', value: store.services }, { onConflict: 'company_id,key' });
       if (svcErr) throw svcErr;
-      const { error: mErr } = await supabase.from('settings').upsert({ key: 'monthly', value: store.monthly }, { onConflict: 'key' });
+      const { error: mErr } = await db('settings').upsert({ key: 'monthly', value: store.monthly }, { onConflict: 'company_id,key' });
       if (mErr) throw mErr;
-      const { error: sErr } = await supabase.from('settings').upsert({ key: 'stayIn', value: store.stayIn }, { onConflict: 'key' });
+      const { error: sErr } = await db('settings').upsert({ key: 'stayIn', value: store.stayIn }, { onConflict: 'company_id,key' });
       if (sErr) throw sErr;
       broadcastSettingsUpdate();
       setSaved(true); setTimeout(() => setSaved(false), 2500);
@@ -847,16 +884,16 @@ const NationalitiesSection = ({ store, set }) => {
     set({ nationalities: store.nationalities.map(n => n.id === id ? { ...n, ...patch } : n) });
     const dbPatch = { ...patch };
     if ('on' in dbPatch) { dbPatch.enabled = dbPatch.on; delete dbPatch.on; }
-    supabase.from('nationalities').update(dbPatch).eq('id', id);
+    db('nationalities').update(dbPatch).eq('id', id);
   };
   const remove = (id) => {
     set({ nationalities: store.nationalities.filter(n => n.id !== id) });
-    supabase.from('nationalities').delete().eq('id', id);
+    db('nationalities').delete().eq('id', id);
   };
   const add = () => {
     const n = { id: 'nat_' + Date.now(), name: 'New Nationality', flag: '🌍', on: true };
     set({ nationalities: [...store.nationalities, n] });
-    supabase.from('nationalities').insert({ id: n.id, name: n.name, flag: n.flag, enabled: true });
+    db('nationalities').insert({ id: n.id, name: n.name, flag: n.flag, enabled: true });
   };
 
   // Update a per-nationality price on a service/package/plan
@@ -1089,9 +1126,9 @@ const MaterialsSection = ({ store, set }) => {
   const saveMaterials = async () => {
     setSavedMat(false);
     try {
-      const { error } = await supabase.from('settings').upsert([
+      const { error } = await db('settings').upsert([
         { key:'materials', value:{ rate:store.materialsRate, enabled:store.materialsEnabled, items:store.materialsList } }
-      ]);
+      ], { onConflict: 'company_id,key' });
       if (error) throw error;
       broadcastSettingsUpdate();
       setSavedMat(true); setTimeout(()=>setSavedMat(false),3000);
@@ -1182,7 +1219,7 @@ const AssignStaff = ({ booking, store, set }) => {
       staffHours:  { ...(store.staffHours  || {}), [booking.ref]: newStaffHours },
     });
     if (booking._raw?.id) {
-      await supabase.from('bookings').update({
+      await db('bookings').update({
         assigned_staff: next,
         staff_hours:    newStaffHours,
       }).eq('id', booking._raw.id);
@@ -2131,7 +2168,7 @@ const CalendarSection = ({ store, set, bookings }) => {
   const [view, setView] = React.useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedKey, setSelectedKey] = React.useState(ymd(today));
   React.useEffect(() => {
-    supabase.from('availability').select('*').then(({ data }) => {
+    db('availability').select('*').then(({ data }) => {
       if (!data||!data.length) return
       const avail = {}
       data.forEach(r => { avail[r.date] = { blocked: r.blocked, morning: r.morning, afternoon: r.afternoon } })
@@ -2174,7 +2211,7 @@ const CalendarSection = ({ store, set, bookings }) => {
     const row = { blocked: next, morning: !next, afternoon: !next };
     // Functional updater avoids stale-closure race with Supabase realtime
     set(prev => ({ availability: { ...(prev.availability || {}), [key]: row } }));
-    supabase.from('availability').upsert({ date: key, ...row })
+    db('availability').upsert({ date: key, ...row }, { onConflict: 'company_id,date' })
       .then(({ error }) => {
         if (error) console.warn('availability upsert:', error.message);
         else broadcastSettingsUpdate();
@@ -2186,7 +2223,7 @@ const CalendarSection = ({ store, set, bookings }) => {
     const row = { ...cur, [slot]: !cur[slot] };
     row.blocked = !(row.morning || row.afternoon);
     set(prev => ({ availability: { ...(prev.availability || {}), [key]: row } }));
-    supabase.from('availability').upsert({ date: key, ...row })
+    db('availability').upsert({ date: key, ...row }, { onConflict: 'company_id,date' })
       .then(({ error }) => {
         if (error) console.warn('availability upsert:', error.message);
         else broadcastSettingsUpdate();
@@ -2543,8 +2580,8 @@ const RegularsView = () => {
   const fetchAll = React.useCallback(async () => {
     setLoading(true);
     const [{ data: scheds, error: schErr }, { data: staff }] = await Promise.all([
-      supabase.from('regular_schedules').select('*').order('created_at', { ascending: false }),
-      supabase.from('staff').select('id, name, color, working_days'),
+      db('regular_schedules').select('*').order('created_at', { ascending: false }),
+      db('staff').select('id, name, color, working_days'),
     ]);
     if (schErr) {
       setTableError(
@@ -2605,7 +2642,7 @@ const RegularsView = () => {
     }
 
     // Skip dates that already have a confirmed booking for this customer
-    const { data: existing } = await supabase.from('bookings')
+    const { data: existing } = await db('bookings')
       .select('date').eq('phone', schedule.customer_phone)
       .in('date', allSlots).neq('status', 'Cancelled');
     const existingDates = new Set((existing || []).map(b => b.date));
@@ -2619,10 +2656,10 @@ const RegularsView = () => {
     // Resolve staff: prefer saved preference, otherwise auto-pick by working_days
     let staffToUse = (schedule.assigned_staff || []).filter(Boolean);
     if (!staffToUse.length) {
-      let staffPick = await supabase.from('staff').select('id, skills, working_days, active');
+      let staffPick = await db('staff').select('id, skills, working_days, active');
       let avail = staffPick.data;
       if (staffPick.error || !avail) {
-        const fb = await supabase.from('staff').select('id, skills');
+        const fb = await db('staff').select('id, skills');
         avail = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
       }
       const scheduleDate = schedule.date || new Date().toISOString().split('T')[0];
@@ -2667,7 +2704,7 @@ const RegularsView = () => {
       notes:          `[sch:${schedule.id}] Recurring: ${label}`,
     }));
 
-    const { error } = await supabase.from('bookings').insert(rows);
+    const { error } = await db('bookings').insert(rows);
     setGenResult(r => ({ ...r, [schedule.id]: error
       ? { count: -1, msg: error.message }
       : { count: rows.length, msg: `Generated ${rows.length} booking${rows.length !== 1 ? 's' : ''}.` },
@@ -2685,7 +2722,7 @@ const RegularsView = () => {
     const sid      = newSch.id;
 
     // Fetch ALL future non-cancelled bookings for this customer in one round-trip
-    const { data: allBks } = await supabase.from('bookings')
+    const { data: allBks } = await db('bookings')
       .select('id, date, time, hours, cleaners, notes')
       .eq('phone', newSch.customer_phone)
       .gt('date', todayStr)
@@ -2729,9 +2766,9 @@ const RegularsView = () => {
 
     const ops = [];
     if (toDelete.length)
-      ops.push(supabase.from('bookings').delete().in('id', toDelete));
+      ops.push(db('bookings').delete().in('id', toDelete));
     if (toUpdate.length)
-      ops.push(supabase.from('bookings').update({
+      ops.push(db('bookings').update({
         time:           newSch.start_time || '9:00 AM',
         hours:          Number(newSch.hours) || 4,
         cleaners:       Number(newSch.maids) || 1,
@@ -2771,8 +2808,8 @@ const RegularsView = () => {
     const oldSch = isNew ? null : schedules.find(s => s.id === draft.id);
 
     const { error } = isNew
-      ? await supabase.from('regular_schedules').insert(row)
-      : await supabase.from('regular_schedules').update(row).eq('id', draft.id);
+      ? await db('regular_schedules').insert(row)
+      : await db('regular_schedules').update(row).eq('id', draft.id);
     setSaving(false);
     if (error) { setDraftErr(error.message); return; }
 
@@ -2799,13 +2836,13 @@ const RegularsView = () => {
 
   const deleteSchedule = async (id) => {
     if (!window.confirm('Delete this schedule? Existing generated bookings are kept.')) return;
-    await supabase.from('regular_schedules').delete().eq('id', id);
+    await db('regular_schedules').delete().eq('id', id);
     setSchedules(s => s.filter(x => x.id !== id));
   };
 
   const toggleActive = async (id, active) => {
     setSchedules(s => s.map(x => x.id === id ? { ...x, active } : x));
-    await supabase.from('regular_schedules').update({ active }).eq('id', id);
+    await db('regular_schedules').update({ active }).eq('id', id);
   };
 
   const iniT = (name) => (name || '?').split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase();
@@ -3109,8 +3146,8 @@ const CustomerSection = () => {
 
   const fetchData = React.useCallback(async () => {
     const [{ data: custs }, { data: bks }] = await Promise.all([
-      supabase.from('customers').select('*').order('created_at', { ascending: false }),
-      supabase.from('bookings').select('phone, total, date, status').neq('status', 'Cancelled'),
+      db('customers').select('*').order('created_at', { ascending: false }),
+      db('bookings').select('phone, total, date, status').neq('status', 'Cancelled'),
     ]);
     setCustomers(custs || []);
     const summary = {};
@@ -3129,11 +3166,11 @@ const CustomerSection = () => {
 
   const updateTag = async (id, tag) => {
     setCustomers(cs => cs.map(c => c.id === id ? { ...c, tag } : c));
-    await supabase.from('customers').update({ tag }).eq('id', id);
+    await db('customers').update({ tag }).eq('id', id);
   };
 
   const remove = async (id) => {
-    await supabase.from('customers').delete().eq('id', id);
+    await db('customers').delete().eq('id', id);
     setCustomers(cs => cs.filter(c => c.id !== id));
   };
 
@@ -3158,12 +3195,12 @@ const CustomerSection = () => {
     setSaving(true);
     const payload = { name: draft.name.trim(), phone: draft.phone.trim(), area: draft.area.trim(), address: draft.address.trim(), tag: draft.tag };
     if (editingId) {
-      const { error } = await supabase.from('customers').update(payload).eq('id', editingId);
+      const { error } = await db('customers').update(payload).eq('id', editingId);
       if (error) { setFormErr(error.message); setSaving(false); return; }
       setCustomers(cs => cs.map(c => c.id === editingId ? { ...c, ...payload } : c));
     } else {
       const custId = 'c_' + draft.phone.replace(/\D/g, '').slice(-10) + '_' + Date.now();
-      const { error } = await supabase.from('customers').insert({ id: custId, ...payload });
+      const { error } = await db('customers').insert({ id: custId, ...payload });
       if (error) { setFormErr(error.message); setSaving(false); return; }
       setCustomers(cs => [{ id: custId, ...payload, created_at: new Date().toISOString() }, ...cs]);
     }
@@ -3364,7 +3401,7 @@ const StaffSection = ({ store, set, bookings }) => {
   };
 
   const remove = async (id) => {
-    const { error } = await supabase.from('staff').delete().eq('id', id);
+    const { error } = await db('staff').delete().eq('id', id);
     if (error) { console.error('Staff delete failed:', error.message); return; }
     set({ staff: store.staff.filter(s => s.id !== id) });
     setPendingChanges(p => { const n = { ...p }; delete n[id]; return n; });
@@ -3373,7 +3410,7 @@ const StaffSection = ({ store, set, bookings }) => {
   // Name / nationality — save immediately (not blocked behind Save Changes)
   const updateImmediate = async (id, patch) => {
     set(prev => ({ staff: prev.staff.map(s => s.id === id ? { ...s, ...patch } : s) }));
-    await supabase.from('staff').update(patch).eq('id', id);
+    await db('staff').update(patch).eq('id', id);
   };
 
   // Active/On-Hold toggle — optimistic update, reverts if DB write fails
@@ -3381,7 +3418,7 @@ const StaffSection = ({ store, set, bookings }) => {
     const s = store.staff.find(x => x.id === id); if (!s) return;
     const next = s.active !== false ? false : true;
     set(prev => ({ staff: prev.staff.map(x => x.id === id ? { ...x, active: next } : x) }));
-    const { error } = await supabase.from('staff').update({ active: next }).eq('id', id);
+    const { error } = await db('staff').update({ active: next }).eq('id', id);
     if (error) set(prev => ({ staff: prev.staff.map(x => x.id === id ? { ...x, active: !next } : x) }));
   };
 
@@ -3412,15 +3449,15 @@ const StaffSection = ({ store, set, bookings }) => {
         active: s.active !== false,
       };
       try {
-        const { error } = await supabase.from('staff').update(dbPatch).eq('id', s.id);
+        const { error } = await db('staff').update(dbPatch).eq('id', s.id);
         if (error) {
           if (error.code === 'PGRST204') {
             // active or working_days column not yet in DB — try without active
-            const { error: e2 } = await supabase.from('staff').update({ skills: dbPatch.skills, working_days: dbPatch.working_days }).eq('id', s.id);
+            const { error: e2 } = await db('staff').update({ skills: dbPatch.skills, working_days: dbPatch.working_days }).eq('id', s.id);
             if (e2) {
               if (e2.code === 'PGRST204') {
                 // working_days also missing — just save skills
-                const { error: e3 } = await supabase.from('staff').update({ skills: dbPatch.skills }).eq('id', s.id);
+                const { error: e3 } = await db('staff').update({ skills: dbPatch.skills }).eq('id', s.id);
                 if (e3) throw e3;
               } else throw e2;
             }
@@ -3451,7 +3488,7 @@ const StaffSection = ({ store, set, bookings }) => {
     setModalSaving(true);
     setModalErr('');
     const encodedSkills = encodeSkills(draft.skills, draft.serviceTypes);
-    const { data, error } = await supabase.from('staff').insert({
+    const { data, error } = await db('staff').insert({
       name:         draft.name.trim(),
       nationality:  draft.nationality || '',
       color:        draft.color || 'mint',
@@ -3916,11 +3953,11 @@ const SettingsSection = ({ store, set }) => {
   const save = async () => {
     setSaved(false)
     try {
-      const { error } = await supabase.from('settings').upsert([
+      const { error } = await db('settings').upsert([
         { key:'brand', value:brand },
         { key:'bookingRules', value:rules },
         { key:'businessHours', value:hours },
-      ])
+      ], { onConflict: 'company_id,key' })
       if (error) throw error
       broadcastSettingsUpdate()
       setSaved(true); setTimeout(()=>setSaved(false),3000)
@@ -4338,7 +4375,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     const updated = { ...rawHrsMap, [staffId]: Math.max(0.5, Number(hrs)) }
     set({ staffHours: { ...(store.staffHours || {}), [booking.ref]: updated } })
     if (booking._raw?.id)
-      await supabase.from('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
+      await db('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
   }
   const resetToFullHours = async () => {
     if (!assignedIds.length) return
@@ -4346,14 +4383,14 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     const updated = Object.fromEntries(assignedIds.map(id => [id, totalBookingHours]))
     set({ staffHours: { ...(store.staffHours || {}), [booking.ref]: updated } })
     if (booking._raw?.id)
-      await supabase.from('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
+      await db('bookings').update({ staff_hours: updated }).eq('id', booking._raw.id)
   }
 
   const save = async () => {
     if (!booking._raw?.id) { setSaveError('Booking has no database ID — cannot save.'); return }
     setSaving(true)
     setSaveError('')
-    const { error } = await supabase.from('bookings').update({
+    const { error } = await db('bookings').update({
       status,
       notes,
       date:           editDate,
@@ -4380,7 +4417,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     setCancelling(true)
     const existingNotes = notes.trim()
     const updatedNotes = `[Cancellation reason: ${cancelReason.trim()}]${existingNotes ? '\n\n' + existingNotes : ''}`
-    await supabase.from('bookings').update({ status: 'Cancelled', notes: updatedNotes }).eq('id', booking._raw.id)
+    await db('bookings').update({ status: 'Cancelled', notes: updatedNotes }).eq('id', booking._raw.id)
     setCancelling(false)
     onClose(true)
   }
@@ -4587,7 +4624,7 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
 
 /* --- New Booking Modal --- */
 const mkRef = async () => {
-  const { count } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
+  const { count } = await db('bookings').select('*', { count: 'exact', head: true });
   return `MP-${String((count ?? 0) + 1).padStart(3, '0')}`;
 };
 
@@ -4595,7 +4632,7 @@ const NewBookingModal = ({ store, onClose }) => {
   // Fetch all services fresh from Supabase so modal always has up-to-date list
   const [svcs, setSvcs] = React.useState((store.services||[]))
   React.useEffect(() => {
-    supabase.from('settings').select('value').eq('key','services').maybeSingle()
+    db('settings').select('value').eq('key','services').maybeSingle()
       .then(({ data }) => {
         if (data?.value && Array.isArray(data.value) && data.value.length) {
           setSvcs(data.value)
@@ -4621,7 +4658,7 @@ const NewBookingModal = ({ store, onClose }) => {
   const dropRef = React.useRef(null)
 
   React.useEffect(() => {
-    supabase.from('customers').select('*').order('name').then(({ data }) => setAllCustomers(data || []))
+    db('customers').select('*').order('name').then(({ data }) => setAllCustomers(data || []))
   }, [])
 
   // Close dropdown on outside click
@@ -4666,8 +4703,8 @@ const NewBookingModal = ({ store, onClose }) => {
     if (!f.date) return
     setSlotData(p => ({ ...p, loading: true }))
     Promise.all([
-      supabase.from('bookings').select('time, hours, cleaners, assigned_staff').eq('date', f.date).neq('status', 'Cancelled'),
-      supabase.from('staff').select('id, working_days'),
+      db('bookings').select('time, hours, cleaners, assigned_staff').eq('date', f.date).neq('status', 'Cancelled'),
+      db('staff').select('id, working_days'),
     ]).then(([{ data: bks }, { data: staff }]) => {
       const workingStaff = (staff || []).filter(s => isWorkingDay(s, f.date));
       setSlotData({ bookings: bks || [], availableCount: workingStaff.length, workingStaffIds: workingStaff.map(s => s.id), loading: false })
@@ -4725,7 +4762,7 @@ const NewBookingModal = ({ store, onClose }) => {
       try {
         const needed = Number(f.cleaners) || 1
         const mode   = 'hourly'
-        const { data: availStaff } = await supabase.from('staff').select('id, skills, working_days')
+        const { data: availStaff } = await db('staff').select('id, skills, working_days')
         if (availStaff && availStaff.length > 0) {
           let pool = availStaff.filter(s => {
             const sk = Array.isArray(s.skills) ? s.skills : []
@@ -4742,7 +4779,7 @@ const NewBookingModal = ({ store, onClose }) => {
             if (skilled.length > 0) pool = skilled
           }
           if (pool.length > 0) {
-            const { data: existingBks } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled')
+            const { data: existingBks } = await db('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled')
             const jobCounts = {}
             ;(existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1 }))
             const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0))
@@ -4753,11 +4790,11 @@ const NewBookingModal = ({ store, onClose }) => {
     }
 
     const ref = await mkRef()
-    const { error } = await supabase.from('bookings').insert({ ref, name:f.name, phone:f.phone, service:f.service, date:f.date, time:f.time, hours:Number(f.hours), cleaners:Number(f.cleaners), rate:Number(f.rate), total:Number(f.total), address:f.address, notes:f.notes, status:f.status, materials:false, assigned_staff })
+    const { error } = await db('bookings').insert({ ref, name:f.name, phone:f.phone, service:f.service, date:f.date, time:f.time, hours:Number(f.hours), cleaners:Number(f.cleaners), rate:Number(f.rate), total:Number(f.total), address:f.address, notes:f.notes, status:f.status, materials:false, assigned_staff })
     if (error) { setErr(error.message); setSaving(false); return }
     if (!selectedCust && f.name.trim() && f.phone.trim()) {
       const custId = 'c_' + f.phone.replace(/\D/g,'').slice(-10) + '_' + Date.now()
-      await supabase.from('customers').insert({ id: custId, name: f.name.trim(), phone: f.phone.trim(), address: f.address || '', area: '' }).then(() => {})
+      await db('customers').insert({ id: custId, name: f.name.trim(), phone: f.phone.trim(), address: f.address || '', area: '' }).then(() => {})
     }
     onClose(true)
   }
@@ -5769,7 +5806,7 @@ const LoginScreen = ({ onResetActive }) => {
   );
 };
 
-const AdminPanel = () => {
+const AdminPanel = ({ companyId }) => {
   const [section, setSection] = React.useState("overview");
   const [payFilter, setPayFilter] = React.useState("All");
   const [store, setStore] = React.useState(initialStore());
@@ -5789,7 +5826,7 @@ const AdminPanel = () => {
   const checkConnection = React.useCallback(async () => {
     setDbStatus('checking');
     try {
-      const { error } = await supabase.from('settings').select('key').limit(1);
+      const { error } = await db('settings').select('key').limit(1);
       if (error) {
         setDbStatus('error');
         setDbError(error.message);
@@ -5806,17 +5843,17 @@ const AdminPanel = () => {
   React.useEffect(() => { checkConnection(); }, [checkConnection]);
   const clearAll = async () => {
     /* Step 1 — fetch every row id so we can delete by primary key */
-    const { data: rows, error: fetchErr } = await supabase.from('bookings').select('id');
+    const { data: rows, error: fetchErr } = await db('bookings').select('id');
     if (fetchErr) { alert('Could not read bookings: ' + fetchErr.message); return; }
 
     if (rows && rows.length > 0) {
       const ids = rows.map(r => r.id);
-      const { error: delErr } = await supabase.from('bookings').delete().in('id', ids);
+      const { error: delErr } = await db('bookings').delete().in('id', ids);
       if (delErr) { alert('Delete failed: ' + delErr.message); return; }
     }
 
     /* Step 2 — verify Supabase actually removed the rows */
-    const { count } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
+    const { count } = await db('bookings').select('*', { count: 'exact', head: true });
     if (count && count > 0) {
       alert(
         `${count} booking(s) could not be deleted.\n\n` +
@@ -5828,9 +5865,9 @@ const AdminPanel = () => {
     }
 
     /* Also clear customers */
-    const { data: custRows } = await supabase.from('customers').select('id');
+    const { data: custRows } = await db('customers').select('id');
     if (custRows && custRows.length > 0) {
-      await supabase.from('customers').delete().in('id', custRows.map(r => r.id));
+      await db('customers').delete().in('id', custRows.map(r => r.id));
     }
 
     setBookings([]);
@@ -5840,7 +5877,7 @@ const AdminPanel = () => {
 
   React.useEffect(() => {
     (async () => {
-      const { data, error } = await supabase.from('settings').select('*');
+      const { data, error } = await db('settings').select('*');
       if (error) { console.error('Failed to load settings:', error.message); setDbStatus('error'); setDbError(error.message); return; }
       if (!data || !data.length) { console.log('Settings table empty — using defaults'); return; }
       // Check if the table uses the correct schema (key/value columns, not id/data)
@@ -5882,7 +5919,7 @@ const AdminPanel = () => {
   const knownBookingIds = React.useRef(null); // null = first load, don't chime
 
   const fetchBookings = React.useCallback(async () => {
-    const { data, error } = await supabase.from('bookings').select('*').order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await db('bookings').select('*').order('created_at', { ascending: false }).limit(500);
     if (!error && data) {
       // Detect genuinely new bookings (skip on first load)
       if (knownBookingIds.current !== null) {
@@ -5915,19 +5952,19 @@ const AdminPanel = () => {
     if (!newRow?.id) return;
 
     // Check if autoAssign is enabled in settings (read from DB, not local state)
-    const { data: settingsRows } = await supabase.from('settings').select('key,value').eq('key', 'bookingRules').maybeSingle();
+    const { data: settingsRows } = await db('settings').select('key,value').eq('key', 'bookingRules').maybeSingle();
     const autoAssign = settingsRows?.value?.autoAssign ?? true; // default true if not saved yet
     if (!autoAssign) return;
 
     // Skip if this booking is already assigned
-    const { data: bkRow } = await supabase.from('bookings').select('assigned_staff').eq('id', newRow.id).maybeSingle();
+    const { data: bkRow } = await db('bookings').select('assigned_staff').eq('id', newRow.id).maybeSingle();
     if (bkRow?.assigned_staff?.length > 0) return;
 
     // Get all staff — exclude on-hold, then filter by working_days and mode
-    let staffRes = await supabase.from('staff').select('id, skills, working_days, active');
+    let staffRes = await db('staff').select('id, skills, working_days, active');
     let availableStaff = staffRes.data;
     if (staffRes.error || !availableStaff) {
-      const fb = await supabase.from('staff').select('id, skills');
+      const fb = await db('staff').select('id, skills');
       availableStaff = (fb.data || []).map(s => ({ ...s, working_days: null, active: true }));
     }
     if (!availableStaff || availableStaff.length === 0) return;
@@ -5948,7 +5985,7 @@ const AdminPanel = () => {
 
     // For hourly: also filter by skill (look up service name → skill ID from settings)
     if (mode === 'hourly' && newRow.service) {
-      const { data: svcSettings } = await supabase.from('settings').select('value').eq('key','services').maybeSingle();
+      const { data: svcSettings } = await db('settings').select('value').eq('key','services').maybeSingle();
       const svcId = (svcSettings?.value || []).find(s => s.name === newRow.service)?.id;
       if (svcId) {
         const skilled = pool.filter(s => {
@@ -5962,7 +5999,7 @@ const AdminPanel = () => {
     if (pool.length === 0) return;
 
     // Count only active (non-completed, non-cancelled) jobs per maid so historical load doesn't skew distribution
-    const { data: allBookings } = await supabase.from('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled');
+    const { data: allBookings } = await db('bookings').select('assigned_staff').not('assigned_staff', 'is', null).neq('status', 'Completed').neq('status', 'Cancelled');
     const jobCounts = {};
     (allBookings || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
 
@@ -5972,7 +6009,7 @@ const AdminPanel = () => {
     const assigned = sorted.slice(0, needed).map(s => s.id);
     const ref = newRow.ref || String(newRow.id);
 
-    await supabase.from('bookings').update({ assigned_staff: assigned }).eq('id', newRow.id);
+    await db('bookings').update({ assigned_staff: assigned }).eq('id', newRow.id);
     setStore(prev => ({ ...prev, assignments: { ...(prev.assignments || {}), [ref]: assigned } }));
     fetchBookings();
   }, [fetchBookings]);
@@ -5981,7 +6018,7 @@ const AdminPanel = () => {
     fetchBookings();
 
     // Realtime — instant when Supabase Realtime is enabled for the bookings table
-    const ch = supabase.channel('admin-bookings-live')
+    const ch = supabase.channel('admin-bookings-live-' + companyId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
         fetchBookings(); // chime is handled inside fetchBookings via knownBookingIds
         if (payload.eventType === 'INSERT') handleAutoAssign(payload.new);
@@ -6001,7 +6038,7 @@ const AdminPanel = () => {
 
   /* ── Live nationalities from Supabase ── */
   const fetchNationalities = React.useCallback(async () => {
-    const { data, error } = await supabase.from('nationalities').select('*').order('name');
+    const { data, error } = await db('nationalities').select('*').order('name');
     if (!error && data) {
       setStore(prev => ({ ...prev, nationalities: data.map(n => ({
         id: n.id, name: n.name, flag: toFlag(n.flag || '🌍'),
@@ -6012,7 +6049,7 @@ const AdminPanel = () => {
 
   /* ── Live staff from Supabase ── */
   const fetchStaff = React.useCallback(async () => {
-    const { data, error } = await supabase.from('staff').select('*').order('name');
+    const { data, error } = await db('staff').select('*').order('name');
     if (!error && data && data.length > 0) {
       setStore(prev => ({ ...prev, staff: data.map(s => ({
         id: s.id, name: s.name || '',
@@ -6033,7 +6070,7 @@ const AdminPanel = () => {
     fetchNationalities();
     fetchStaff();
     const ch2 = supabase
-      .channel('admin-nat-staff-live')
+      .channel('admin-nat-staff-live-' + companyId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'nationalities' }, fetchNationalities)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, fetchStaff)
       .subscribe();
@@ -6140,6 +6177,291 @@ const AdminPanel = () => {
   );
 };
 
+/* ─── Shared full-screen states ─── */
+const FullScreenSpinner = () => (
+  <div className="min-h-screen bg-ink-950 flex items-center justify-center">
+    <div className="w-8 h-8 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
+  </div>
+);
+
+const NoAccessScreen = ({ message }) => (
+  <div className="min-h-screen bg-ink-950 flex items-center justify-center p-4">
+    <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-8 text-center space-y-4">
+      <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 grid place-items-center mx-auto">
+        <AdminIcon name="x" className="w-6 h-6" strokeWidth={2.4}/>
+      </div>
+      <h1 className="text-[18px] font-extrabold text-ink-900">No admin access</h1>
+      <p className="text-[13px] text-ink-500 leading-snug">
+        {message || 'This account is not linked to an admin profile. Contact your administrator.'}
+      </p>
+      <button onClick={() => supabase.auth.signOut()}
+        className="w-full h-10 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+        Sign out
+      </button>
+    </div>
+  </div>
+);
+
+/* ─── Super Admin: banner shown while impersonating a company ─── */
+const ViewingBanner = ({ company, onBack }) => (
+  <div className="sticky top-0 z-50 bg-ink-950 text-white px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-3 shadow-md">
+    <span className="w-7 h-7 rounded-lg bg-mint-500 text-ink-900 grid place-items-center flex-shrink-0">
+      <AdminIcon name="grid" className="w-4 h-4" strokeWidth={2.2}/>
+    </span>
+    <div className="min-w-0 flex-1">
+      <div className="text-[13px] font-bold leading-tight truncate">
+        Viewing: {company.name}
+      </div>
+      <div className="text-[11px] text-white/60 leading-tight">
+        Super Admin · {company.plan || 'No plan'}{company.active === false ? ' · inactive' : ''}
+      </div>
+    </div>
+    <button onClick={onBack}
+      className="flex-shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12.5px] font-semibold transition-colors">
+      <AdminIcon name="arrow-left" className="w-3.5 h-3.5" strokeWidth={2.2}/>
+      Back to all companies
+    </button>
+  </div>
+);
+
+/* ─── Super Admin: top-level dashboard listing every company ─── */
+const PLAN_OPTIONS = ['Basic', 'Pro', 'Enterprise'];
+
+const SuperAdminDashboard = ({ onView }) => {
+  const [companies, setCompanies] = React.useState(null); // null = loading
+  const [counts, setCounts]       = React.useState({ bookings: {}, staff: {}, customers: {} });
+  const [error, setError]         = React.useState('');
+  const [addOpen, setAddOpen]     = React.useState(false);
+  const [form, setForm]           = React.useState({ name: '', plan: 'Basic', active: true });
+  const [saving, setSaving]       = React.useState(false);
+  const [formErr, setFormErr]     = React.useState('');
+
+  const fetchAll = React.useCallback(async () => {
+    const { data: cos, error: coErr } = await supabase.from('companies').select('*').order('name');
+    if (coErr) { setError(coErr.message); setCompanies([]); return; }
+    setError('');
+    setCompanies(cos || []);
+    // Counts: pull company_id columns across tenant tables and tally client-side
+    // (one query per table regardless of how many companies exist).
+    const [bk, st, cu] = await Promise.all([
+      supabase.from('bookings').select('company_id'),
+      supabase.from('staff').select('company_id'),
+      supabase.from('customers').select('company_id'),
+    ]);
+    const tally = (res) => {
+      const m = {};
+      (res.data || []).forEach(r => { if (r.company_id != null) m[r.company_id] = (m[r.company_id] || 0) + 1; });
+      return m;
+    };
+    setCounts({ bookings: tally(bk), staff: tally(st), customers: tally(cu) });
+  }, []);
+
+  React.useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const addCompany = async () => {
+    if (!form.name.trim()) { setFormErr('Company name is required.'); return; }
+    setSaving(true); setFormErr('');
+    const { error: insErr } = await supabase.from('companies')
+      .insert({ name: form.name.trim(), plan: form.plan, active: form.active });
+    setSaving(false);
+    if (insErr) { setFormErr(insErr.message); return; }
+    setAddOpen(false);
+    setForm({ name: '', plan: 'Basic', active: true });
+    fetchAll();
+  };
+
+  const planTone = (plan) => ({
+    Basic:      'bg-ink-100 text-ink-700',
+    Pro:        'bg-mint-100 text-mint-700',
+    Enterprise: 'bg-violet-100 text-violet-700',
+  }[plan] || 'bg-ink-100 text-ink-700');
+
+  return (
+    <div className="min-h-[100dvh] bg-ink-50">
+      {/* Header */}
+      <header className="bg-ink-950 text-white">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
+          <span className="w-10 h-10 rounded-2xl bg-mint-500 text-ink-900 grid place-items-center flex-shrink-0 shadow-mint">
+            <AdminIcon name="sparkle" className="w-5 h-5" strokeWidth={2.2}/>
+          </span>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[17px] font-extrabold tracking-tight leading-tight">Super Admin</h1>
+            <p className="text-[12px] text-white/60 leading-tight">All companies</p>
+          </div>
+          <button onClick={() => supabase.auth.signOut()}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-[12.5px] font-semibold transition-colors">
+            <AdminIcon name="logout" className="w-4 h-4"/>
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <h2 className="text-[15px] font-bold text-ink-900">
+            Companies {companies ? `(${companies.length})` : ''}
+          </h2>
+          <button onClick={() => { setAddOpen(true); setFormErr(''); }}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 text-ink-900 font-bold text-[13.5px] shadow-mint transition-colors">
+            <AdminIcon name="plus" className="w-4 h-4" strokeWidth={2.4}/>
+            Add company
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-xl bg-red-50 ring-1 ring-red-200 px-4 py-3 text-[13px] text-red-700 mb-5">
+            <strong>Could not load companies:</strong> {error}
+          </div>
+        )}
+
+        {companies === null ? (
+          <div className="flex items-center gap-2 text-[13px] text-ink-500 py-10 justify-center">
+            <span className="w-5 h-5 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
+            Loading companies…
+          </div>
+        ) : companies.length === 0 ? (
+          <div className="text-center text-[13px] text-ink-500 py-10">
+            No companies yet. Click <strong>Add company</strong> to create the first one.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {companies.map(c => (
+              <div key={c.id} className="bg-white rounded-2xl ring-1 ring-black/5 shadow-sm p-5 flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[15px] font-bold text-ink-900 truncate">{c.name}</h3>
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${planTone(c.plan)}`}>
+                        {c.plan || 'No plan'}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.active === false ? 'bg-ink-100 text-ink-500' : 'bg-green-100 text-green-700'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${c.active === false ? 'bg-ink-400' : 'bg-green-500'}`}/>
+                        {c.active === false ? 'Inactive' : 'Active'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { label: 'Bookings',  value: counts.bookings[c.id]  || 0 },
+                    { label: 'Staff',     value: counts.staff[c.id]     || 0 },
+                    { label: 'Customers', value: counts.customers[c.id] || 0 },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-xl bg-ink-50 py-2.5">
+                      <div className="text-[18px] font-extrabold text-ink-900 leading-none">{s.value}</div>
+                      <div className="text-[10.5px] font-semibold text-ink-500 uppercase tracking-wide mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <button onClick={() => onView(c)}
+                  className="mt-auto w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-semibold text-[13px] transition-colors">
+                  View as
+                  <AdminIcon name="arrow-right" className="w-4 h-4" strokeWidth={2.2}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Add company modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => !saving && setAddOpen(false)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-float p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-[16px] font-extrabold text-ink-900">Add company</h3>
+              <button onClick={() => !saving && setAddOpen(false)} className="text-ink-400 hover:text-ink-700">
+                <AdminIcon name="x" className="w-5 h-5"/>
+              </button>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Company name</label>
+              <input value={form.name} autoFocus
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Sparkle Cleaning"
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]"/>
+            </div>
+            <div>
+              <label className="block text-[11.5px] font-bold text-ink-600 uppercase tracking-[0.1em] mb-1">Plan</label>
+              <select value={form.plan}
+                onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}
+                className="w-full h-11 px-3 rounded-xl bg-white hairline text-[14px] text-ink-900 outline-none focus:shadow-[inset_0_0_0_2px_oklch(0.72_0.13_168)]">
+                {PLAN_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <Switch on={form.active} onChange={(v) => setForm(f => ({ ...f, active: v }))} ariaLabel="Active"/>
+              <span className="text-[13.5px] font-semibold text-ink-700">Active</span>
+            </label>
+            {formErr && <div className="text-[12.5px] text-red-600 font-medium">{formErr}</div>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setAddOpen(false)} disabled={saving}
+                className="flex-1 h-11 rounded-xl border border-ink-200 text-[13.5px] font-semibold text-ink-700 hover:bg-ink-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={addCompany} disabled={saving}
+                className="flex-1 h-11 rounded-xl bg-mint-500 hover:bg-mint-400 active:bg-mint-600 disabled:opacity-60 text-ink-900 font-bold text-[13.5px] shadow-mint transition-colors">
+                {saving ? 'Adding…' : 'Add company'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─── Authenticated router: reads profile, routes by role, sets tenant scope ─── */
+const AuthedAdmin = ({ session }) => {
+  const [profile, setProfile] = React.useState(undefined); // undefined = loading, null = none
+  const [viewingCompany, setViewingCompany] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role, company_id')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setProfile(error ? null : (data || null));
+    })();
+    return () => { cancelled = true; };
+  }, [session.user.id]);
+
+  if (profile === undefined) return <FullScreenSpinner/>;
+
+  if (!profile || (profile.role !== 'super_admin' && profile.role !== 'company_admin')) {
+    return <NoAccessScreen/>;
+  }
+
+  // Company admin → straight into their own company, no dashboard, no banner.
+  if (profile.role === 'company_admin') {
+    if (!profile.company_id) {
+      return <NoAccessScreen message="This admin account isn't linked to a company yet."/>;
+    }
+    setScopedCompany(profile.company_id);
+    return <AdminPanel key={profile.company_id} companyId={profile.company_id} />;
+  }
+
+  // Super admin → company dashboard first; "View as" loads a scoped AdminPanel.
+  if (viewingCompany) {
+    setScopedCompany(viewingCompany.id);
+    return (
+      <>
+        <ViewingBanner company={viewingCompany}
+          onBack={() => { setScopedCompany(null); setViewingCompany(null); }} />
+        <AdminPanel key={viewingCompany.id} companyId={viewingCompany.id} />
+      </>
+    );
+  }
+  setScopedCompany(null);
+  return <SuperAdminDashboard onView={(c) => { setScopedCompany(c.id); setViewingCompany(c); }} />;
+};
+
 const App = () => {
   const [session, setSession]       = React.useState(null);
   const [loading, setLoading]       = React.useState(true);
@@ -6156,13 +6478,9 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return (
-    <div className="min-h-screen bg-ink-950 flex items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-mint-500 border-t-transparent animate-spin"/>
-    </div>
-  );
+  if (loading) return <FullScreenSpinner/>;
   if (resetMode || !session) return <LoginScreen onResetActive={setResetMode} />;
-  return <AdminPanel />;
+  return <AuthedAdmin session={session} />;
 };
 
 export default App;
