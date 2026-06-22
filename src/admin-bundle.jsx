@@ -5311,7 +5311,9 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
       })()}
 
       {reportType === 'staff' && (() => {
-        const allStaff = (store?.staff || []).filter(s => s.active !== false);
+        // Show ALL staff in the report, including on-hold ones. Deleted staff are
+        // already removed from store.staff, so they stay excluded automatically.
+        const allStaff = (store?.staff || []);
 
         // Per-staff bookings in range — completed jobs only
         const staffBookings = (s) =>
@@ -5471,7 +5473,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
             {/* Staff grid */}
             <Card title="Select Staff Member" subtitle="Click a card to view their job report for the selected date range.">
               {allStaff.length === 0 ? (
-                <div className="py-10 text-center text-[13px] text-ink-400">No active staff found.</div>
+                <div className="py-10 text-center text-[13px] text-ink-400">No staff found.</div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-1">
                   {allStaff.map((s, idx) => {
@@ -5490,7 +5492,12 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                             {s.name.slice(0,1).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-[13.5px] text-ink-900 truncate">{s.name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="font-semibold text-[13.5px] text-ink-900 truncate">{s.name}</div>
+                              {s.active === false && (
+                                <span className="flex-shrink-0 h-4 px-1.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-bold uppercase tracking-wide flex items-center">On Hold</span>
+                              )}
+                            </div>
                             <div className="text-[11px] text-ink-400 mt-0.5">{bks.length} job{bks.length !== 1 ? 's' : ''}</div>
                           </div>
                         </div>
