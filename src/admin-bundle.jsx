@@ -6112,8 +6112,14 @@ const AdminPanel = ({ companyId, companySlug }) => {
     return () => supabase.removeChannel(ch2);
   }, [fetchNationalities, fetchStaff]);
 
-  const todayISO  = new Date().toISOString().split('T')[0];
-  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO && !isCancelledBooking(b));
+  // Local calendar date (YYYY-MM-DD) — use the admin's own timezone, not UTC, so
+  // "today" doesn't drift to the wrong day near midnight (e.g. GMT+3 Qatar).
+  const _now = new Date();
+  const todayISO  = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+  // bookingDateKey() normalises both ISO ("2026-06-24") and formatted dates, so the
+  // match works regardless of how the row's date is stored. These three KPIs below
+  // (Bookings Today / Today Revenue / Today Received) count ONLY today's bookings.
+  const todayBks  = bookings.filter(b => bookingDateKey(b) === todayISO && !isCancelledBooking(b));
   // Active maids: staff who are active and scheduled to work today (not day off)
   const activeMaids = (store.staff || []).filter(s => s.active !== false && isWorkingDay(s, todayISO)).length;
   // Today financials — all non-cancelled bookings whose service date is today.
