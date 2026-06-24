@@ -1,6 +1,8 @@
 ﻿import React from 'react'
 import { supabase, fmtBooking, broadcastSettingsUpdate } from './supabase'
 import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
+import { COUNTRIES as BRAND_COUNTRIES, dialCodeFor, timezoneFor } from './countries'
+import { useAdminI18n } from './admin-i18n'
 
 /* ─────────────────────────────────────────────────────────────────────────
    MULTI-TENANT SCOPING
@@ -1808,9 +1810,9 @@ const NAV = [
       { id: "stayin",  label: "Stay-In",        icon: "home"    },
     ],
   },
-  { id: "nationalities", label: "Nationalities",    icon: "globe" },
-  { id: "materials",     label: "Materials",        icon: "spray" },
-  { id: "settings",      label: "Settings",         icon: "settings" },
+  { id: "nationalities",    label: "Nationalities",    icon: "globe" },
+  { id: "materials",        label: "Materials",        icon: "spray" },
+  { id: "settings",         label: "Settings",         icon: "settings" },
 ];
 
 /* Bookings loaded live from Supabase */
@@ -2066,6 +2068,8 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
           <TextField icon="search" value={searchQuery||''} onChange={v => onSearch && onSearch(v)} placeholder="Search bookings..."/>
         </div>
 
+        {/* Clear-all-bookings button — hidden for now, may be re-enabled later. */}
+        {false && (
         <button
           onClick={() => { if (window.confirm('Delete ALL bookings permanently? This cannot be undone.')) onClear(); }}
           className="h-9 w-9 sm:w-auto sm:px-3.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
@@ -2073,6 +2077,7 @@ const TopBar = ({ section, onMenu, store, onClear, searchQuery, onSearch, bookin
           <AdminIcon name="trash" className="w-4 h-4"/>
           <span className="hidden sm:inline">Clear</span>
         </button>
+        )}
 
         <div className="relative">
           <button onClick={() => setNotifOpen(o => !o)} className="relative w-10 h-10 rounded-lg grid place-items-center text-ink-700 hover:bg-ink-100">
@@ -3921,7 +3926,7 @@ const HOUR_OPTIONS = Array.from({ length: 18 }, (_, i) => {
 });
 
 const SettingsSection = ({ store, set }) => {
-  const brand = store.brand || { name:'Maid Pro', whatsapp:'', callNumber:'', currency:'QAR', language:'en', timezone:'Asia/Qatar (GMT+3)', logo:'' }
+  const brand = store.brand || { name:'Maid Pro', whatsapp:'', callNumber:'', country:'qa', currency:'QAR', language:'en', timezone:'Asia/Qatar (GMT+3)', logo:'' }
   const rules = store.bookingRules || { autoConfirm:true, smsReminders:true, guestCheckout:false, idVerification:true, noShowFee:false, maidPhotos:true, autoAssign:true }
   const hours = store.businessHours || { open: 8, close: 19 }
   const setB = p => set({ brand: { ...brand, ...p } })
@@ -3948,6 +3953,22 @@ const SettingsSection = ({ store, set }) => {
           <div><Label>Brand name</Label><TextField value={brand.name} onChange={v=>setB({name:v})} className="mt-2"/></div>
           <div><Label>WhatsApp number</Label><TextField value={brand.whatsapp||''} onChange={v=>setB({whatsapp:v})} placeholder="+974 5000 0000" className="mt-2"/></div>
           <div><Label>Call number</Label><TextField value={brand.callNumber||''} onChange={v=>setB({callNumber:v})} placeholder="+974 4400 0000" className="mt-2"/></div>
+          <div className="sm:col-span-2">
+            <Label>Country</Label>
+            <div className="relative mt-2 max-w-xs">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">
+                <Flag code={brand.country || 'qa'} size={22}/>
+              </span>
+              <select value={brand.country || 'qa'} onChange={e => setB({ country: e.target.value, timezone: timezoneFor(e.target.value) })}
+                className="w-full h-10 rounded-xl hairline bg-white pl-10 pr-8 text-[13.5px] text-ink-900 outline-none focus:ring-2 focus:ring-mint-400 appearance-none cursor-pointer">
+                {BRAND_COUNTRIES.map(c => <option key={c.iso} value={c.iso}>{c.name} ({c.dial})</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <p className="mt-1.5 text-[11.5px] text-ink-500">
+              Sets the phone country code (<span className="font-mono">{dialCodeFor(brand.country)}</span>) shown to customers, and the time zone (<span className="font-mono">{timezoneFor(brand.country)}</span>) automatically.
+            </p>
+          </div>
           <div className="sm:col-span-2">
             <Label>Company Logo</Label>
             <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -4022,7 +4043,6 @@ const SettingsSection = ({ store, set }) => {
               <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </div>
           </div>
-          <div><Label>Time zone</Label><TextField value={brand.timezone} onChange={v=>setB({timezone:v})} className="mt-2"/></div>
         </div>
       </Card>
 
@@ -4601,9 +4621,18 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
 }
 
 /* --- New Booking Modal --- */
+// Derive the next ref from the highest existing ref — NOT the row count.
+// Using count breaks after any deletion (count < max ref number → regenerates
+// an existing ref → "duplicate key value violates unique constraint Bookings_ref_key").
 const mkRef = async () => {
-  const { count } = await db('bookings').select('*', { count: 'exact', head: true });
-  return `MP-${String((count ?? 0) + 1).padStart(3, '0')}`;
+  const { data } = await db('bookings')
+    .select('ref').order('id', { ascending: false }).limit(1);
+  let base = 0;
+  if (data?.[0]?.ref) {
+    const m = String(data[0].ref).match(/^MP-(\d+)$/);
+    if (m) base = parseInt(m[1], 10);
+  }
+  return `MP-${String(base + 1).padStart(3, '0')}`;
 };
 
 const NewBookingModal = ({ store, onClose }) => {
@@ -4767,8 +4796,14 @@ const NewBookingModal = ({ store, onClose }) => {
       } catch (_) {}
     }
 
-    const ref = await mkRef()
-    const { error } = await db('bookings').insert({ ref, name:f.name, phone:f.phone, service:f.service, date:f.date, time:f.time, hours:Number(f.hours), cleaners:Number(f.cleaners), rate:Number(f.rate), total:Number(f.total), address:f.address, notes:f.notes, status:f.status, materials:false, assigned_staff })
+    const row = { ref: await mkRef(), name:f.name, phone:f.phone, service:f.service, date:f.date, time:f.time, hours:Number(f.hours), cleaners:Number(f.cleaners), rate:Number(f.rate), total:Number(f.total), address:f.address, notes:f.notes, status:f.status, materials:false, assigned_staff }
+    let { error } = await db('bookings').insert(row)
+    // Duplicate ref (deletion gap or concurrent insert) → fall back to a random ref and retry once.
+    if (error && (error.code === '23505' || /duplicate key|Bookings_ref_key/i.test(error.message || ''))) {
+      const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      row.ref = 'MP-' + Array.from({ length: 6 }, () => c[Math.floor(Math.random() * c.length)]).join('')
+      ;({ error } = await db('bookings').insert(row))
+    }
     if (error) { setErr(error.message); setSaving(false); return }
     if (!selectedCust && f.name.trim() && f.phone.trim()) {
       const custId = 'c_' + f.phone.replace(/\D/g,'').slice(-10) + '_' + Date.now()
@@ -5799,6 +5834,10 @@ const AdminPanel = ({ companyId, companySlug }) => {
   const [globalSearch, setGlobalSearch] = React.useState('');
   const [dbStatus, setDbStatus] = React.useState('checking'); // 'checking' | 'ok' | 'error'
   const [dbError, setDbError] = React.useState('');
+  // Translate the admin UI into the brand's chosen language (see admin-i18n.js)
+  const adminLang = store.brand?.language || 'en';
+  const adminRootRef = React.useRef(null);
+  useAdminI18n(adminLang, () => adminRootRef.current);
   // Ref so the realtime handler always reads the latest setting without stale closure
   const notifSoundRef = React.useRef(true);
   React.useEffect(() => {
@@ -6094,7 +6133,7 @@ const AdminPanel = ({ companyId, companySlug }) => {
   };
 
   return (
-    <div className="flex flex-row min-h-[100dvh] bg-ink-50" data-screen-label="01 Admin Dashboard">
+    <div key={'lang-' + adminLang} ref={adminRootRef} className="flex flex-row min-h-[100dvh] bg-ink-50" data-screen-label="01 Admin Dashboard">
       {/* Desktop sidebar */}
       <div className="hidden lg:block w-64 flex-shrink-0">
         <Sidebar active={section} onNav={setSection} bookingsCount={bookings.length} brand={store.brand}/>
