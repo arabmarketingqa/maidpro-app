@@ -4,6 +4,10 @@ import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
 import { COUNTRIES as BRAND_COUNTRIES, dialCodeFor, timezoneFor } from './countries'
 import { useAdminI18n } from './admin-i18n'
 
+// A cancelled booking must never count toward any revenue/received/outstanding
+// figure. Case/whitespace-tolerant so legacy rows stored as "cancelled" still match.
+const isCancelledBooking = (b) => String(b?.status || '').trim().toLowerCase() === 'cancelled'
+
 /* ─────────────────────────────────────────────────────────────────────────
    MULTI-TENANT SCOPING
    Every tenant query in this admin bundle goes through db('<table>') instead
@@ -1574,7 +1578,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
                       {filtered.length} booking{filtered.length !== 1 ? 's' : ''}
                     </div>
                     <div className="text-[11.5px] text-ink-500">
-                      QAR {filtered.reduce((s,b)=>s+b.total,0).toLocaleString()} total
+                      QAR {filtered.filter(b => !isCancelledBooking(b)).reduce((s,b)=>s+b.total,0).toLocaleString()} total
                     </div>
                   </>
                 ) : (
@@ -4146,7 +4150,7 @@ const OverviewCharts = ({ bookings }) => {
   const data = days.map(day => {
     const bks = bookings.filter(b => b._raw && b._raw.date === day)
     return { day, label: String(new Date(day+'T12:00').getDate()), count: bks.length,
-      revenue: bks.filter(b=>b.status !== 'Cancelled').reduce((s,b)=>s+b.total,0) }
+      revenue: bks.filter(b=>!isCancelledBooking(b)).reduce((s,b)=>s+b.total,0) }
   })
   const maxC = Math.max(...data.map(d=>d.count),1)
   const maxR = Math.max(...data.map(d=>d.revenue),1)
@@ -4415,7 +4419,11 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     setCancelling(true)
     const existingNotes = notes.trim()
     const updatedNotes = `[Cancellation reason: ${cancelReason.trim()}]${existingNotes ? '\n\n' + existingNotes : ''}`
-    await db('bookings').update({ status: 'Cancelled', notes: updatedNotes }).eq('id', booking._raw.id)
+    // Cancelling deletes the payment: zero the received amount so it never counts
+    // toward revenue, received, or outstanding anywhere.
+    await db('bookings')
+      .update({ status: 'Cancelled', notes: updatedNotes, paid_amount: 0 })
+      .eq('id', booking._raw.id)
     setCancelling(false)
     onClose(true)
   }
@@ -5001,7 +5009,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
 
   const inRange      = bookings.filter(b => { const d = b._raw?.date || ''; return d >= from && d <= to; });
   const completed    = inRange.filter(b => b.status === 'Completed');
-  const nonCancelled = inRange.filter(b => b.status !== 'Cancelled');
+  const nonCancelled = inRange.filter(b => !isCancelledBooking(b));
   const revenue      = nonCancelled.reduce((s, b) => s + (Number(b.total) || 0), 0);
   const paidTotal    = nonCancelled.reduce((s, b) => s + (Number(b.paid_amount) || 0), 0);
   const dueTotal     = nonCancelled.reduce((s, b) => s + Math.max(0, (Number(b.total) || 0) - (Number(b.paid_amount) || 0)), 0);
@@ -5054,7 +5062,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   const activeStaff = (store?.staff || []).filter(s => s.active !== false);
   const staffPerf = activeStaff.map(s => {
     const bks = inRange.filter(b => (b._raw?.assigned_staff || []).includes(s.id));
-    const rev = bks.filter(b => b.status !== 'Cancelled').reduce((acc, b) => acc + (Number(b.total) || 0), 0);
+    const rev = bks.filter(b => !isCancelledBooking(b)).reduce((acc, b) => acc + (Number(b.total) || 0), 0);
     return { ...s, bkCount: bks.length, bkRevenue: rev };
   }).sort((a, b) => b.bkCount - a.bkCount);
   const maxBkCount = Math.max(...staffPerf.map(s => s.bkCount), 1);
@@ -5065,7 +5073,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
     const key = (b.phone && b.phone !== '—') ? b.phone : b.customer;
     if (!custMap[key]) custMap[key] = { name: b.customer, phone: b.phone, count: 0, spent: 0 };
     custMap[key].count += 1;
-    if (b.status !== 'Cancelled') custMap[key].spent += (Number(b.total) || 0);
+    if (!isCancelledBooking(b)) custMap[key].spent += (Number(b.total) || 0);
   });
   const topCustomers = Object.values(custMap).sort((a, b) => b.count - a.count).slice(0, 8);
   const maxCustCount = Math.max(...topCustomers.map(c => c.count), 1);
@@ -6102,13 +6110,18 @@ const AdminPanel = ({ companyId, companySlug }) => {
   }, [fetchNationalities, fetchStaff]);
 
   const todayISO  = new Date().toISOString().split('T')[0];
-  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO && b.status !== 'Cancelled');
+  const todayBks  = bookings.filter(b => b._raw && b._raw.date === todayISO && !isCancelledBooking(b));
   // Active maids: staff who are active and scheduled to work today (not day off)
   const activeMaids = (store.staff || []).filter(s => s.active !== false && isWorkingDay(s, todayISO)).length;
-  // Today financials — all non-cancelled bookings for today
+  // Today financials — all non-cancelled bookings whose service date is today.
+  // (todayBks already filters out cancelled, so their money never counts.)
+  // Today Revenue  = total value of today's bookings.
+  // Today Received = amount marked received on today's bookings.
+  // Outstanding    = unpaid balance on today's bookings (per-booking clamp so an
+  //                  overpaid booking can't create negative outstanding).
   const todayRevenue     = todayBks.reduce((s, b) => s + (Number(b.total) || 0), 0);
   const todayReceived    = todayBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
-  const todayOutstanding = Math.max(0, todayRevenue - todayReceived);
+  const todayOutstanding = todayBks.reduce((s, b) => s + Math.max(0, (Number(b.total) || 0) - (Number(b._raw?.paid_amount) || 0)), 0);
   const dynamicKpis = [
     { label: "Bookings Today",  value: String(todayBks.length),          unit: "jobs",    icon: "calendar", tone: "mint" },
     { label: "Active Maids",    value: String(activeMaids),              unit: "working", icon: "users",    tone: "ink"  },
