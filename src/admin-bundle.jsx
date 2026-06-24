@@ -2628,10 +2628,13 @@ const RegularsView = () => {
       setGenerating(null); return;
     }
 
-    // Skip dates that already have a confirmed booking for this customer
+    // Skip dates that already have a booking for this customer — INCLUDING
+    // cancelled ones. A cancelled slot must NOT be regenerated, otherwise
+    // cancelling a recurring booking would silently recreate it as a fresh
+    // active booking (which then reappears in revenue/outstanding totals).
     const { data: existing } = await db('bookings')
       .select('date').eq('phone', schedule.customer_phone)
-      .in('date', allSlots).neq('status', 'Cancelled');
+      .in('date', allSlots);
     const existingDates = new Set((existing || []).map(b => b.date));
     const newSlots = allSlots.filter(d => !existingDates.has(d));
 
