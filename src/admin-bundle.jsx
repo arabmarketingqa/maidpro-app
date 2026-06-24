@@ -1331,6 +1331,9 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
   const [query, setQuery] = React.useState("");
   const [detailBooking, setDetailBooking] = React.useState(null);
   const [showNew, setShowNew] = React.useState(false);
+  // Pagination — reveal rows in pages so the list scales as bookings grow.
+  const PAGE_SIZE = 25;
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   // ── Date filter state ─────────────────────────────────────────────────────
   const todayISO  = React.useMemo(() => new Date().toISOString().split('T')[0], []);
   const [dateFrom, setDateFrom] = React.useState('');
@@ -1403,6 +1406,9 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
     if (dateTo   && raw > dateTo)   return false;
     return true;
   });
+  // Reset pagination whenever the filter criteria change (not on every poll refetch).
+  React.useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filter, effectivePayFilter, effectiveQuery, dateFrom, dateTo]);
+  const shown = filtered.slice(0, visibleCount);
   const dateLabel = dateFrom
     ? (dateFrom === dateTo ? dateFrom : `${dateFrom} – ${dateTo}`)
     : '';
@@ -1620,7 +1626,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
             </tr>
           </thead>
           <tbody>
-            {filtered.map(b => (
+            {shown.map(b => (
               <tr key={b.ref} className="row-hover border-t border-ink-200/70">
                 <td className="px-6 py-3.5">
                   <span className="font-mono tabular-nums text-[12.5px] text-ink-700">{b.ref}</span>
@@ -1666,7 +1672,7 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
 
       {/* mobile cards */}
       <ul className="md:hidden divide-y divide-ink-100">
-        {filtered.map(b => {
+        {shown.map(b => {
           const assignedIds   = (store?.assignments?.[b.ref]) || [];
           const assignedStaff = assignedIds.map(id => (store?.staff || []).find(s => s.id === id)).filter(Boolean);
           const due           = Math.max(0, b.total - (b.paid_amount || 0));
@@ -1736,6 +1742,20 @@ const BookingsSection = ({ bookings, store, set, externalQuery, externalPayFilte
         })}
       </ul>
 
+      {filtered.length > shown.length && (
+        <div className="px-6 py-4 flex items-center justify-center gap-3 border-t border-ink-100">
+          <button onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="h-9 px-4 rounded-lg bg-ink-100 hover:bg-ink-200 text-[13px] font-semibold text-ink-700 transition-colors">
+            Show more
+          </button>
+          <button onClick={() => setVisibleCount(filtered.length)}
+            className="h-9 px-3 rounded-lg text-[13px] font-semibold text-mint-700 hover:bg-mint-50 transition-colors">
+            Show all
+          </button>
+          <span className="text-[12px] text-ink-500">Showing {shown.length} of {filtered.length}</span>
+        </div>
+      )}
+
       {filtered.length === 0 && (
         <div className="px-6 py-16 text-center">
           <div className="text-[14px] font-semibold text-ink-700">No bookings match.</div>
@@ -1778,8 +1798,8 @@ const OverviewSection = ({ store, set, kpis, bookings }) => (
       ))}
     </div>
 
-    {/* Booking table */}
-    <BookingsSection bookings={bookings.slice(0, 8)} store={store} set={set}/>
+    {/* Booking table — full list (paginated inside BookingsSection), not a recent-8 cap */}
+    <BookingsSection bookings={bookings} store={store} set={set}/>
 
   </div>
 );
