@@ -5039,7 +5039,7 @@ const NewBookingModal = ({ store, onClose }) => {
               onChange={e => { const n = Number(e.target.value); upd({ cleaners: n, manualStaff: f.manualStaff.slice(0, n) }) }}
               className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none"
             >
-              {Array.from({ length: Math.min(store.limits?.maxMaids || 8, Math.max(1, (store.staff||[]).length || 8)) }, (_, i) => i + 1).map(n => (
+              {Array.from({ length: Math.max(1, (store.staff||[]).filter(s => s.active !== false).length || 1) }, (_, i) => i + 1).map(n => (
                 <option key={n} value={n}>{n} maid{n > 1 ? 's' : ''}</option>
               ))}
             </select>
@@ -5051,29 +5051,44 @@ const NewBookingModal = ({ store, onClose }) => {
                 <span className="text-ink-400 font-normal normal-case tracking-normal ml-1.5">(optional · select up to {f.cleaners})</span>
               </Label>
               <div className="grid grid-cols-2 gap-2">
-                {(store.staff||[]).filter(s => s.active !== false).map(s => {
-                  const isSelected = f.manualStaff.includes(s.id)
-                  const isDisabled = !isSelected && f.manualStaff.length >= Number(f.cleaners)
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => {
-                        if (isSelected) upd({ manualStaff: f.manualStaff.filter(id => id !== s.id) })
-                        else if (f.manualStaff.length < Number(f.cleaners)) upd({ manualStaff: [...f.manualStaff, s.id] })
-                      }}
-                      className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-colors
-                        ${isSelected ? 'border-mint-400 bg-mint-50' : isDisabled ? 'border-ink-100 bg-ink-50 cursor-not-allowed opacity-50' : 'border-ink-200 bg-white hover:border-mint-300 hover:bg-mint-50'}`}
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold
-                        ${isSelected ? 'bg-mint-500 text-white' : 'bg-ink-100 text-ink-600'}`}>
-                        {isSelected ? <AdminIcon name="check" className="w-3.5 h-3.5"/> : (s.name||'?')[0].toUpperCase()}
-                      </div>
-                      <span className={`text-[12.5px] font-medium truncate ${isSelected ? 'text-ink-900' : isDisabled ? 'text-ink-400' : 'text-ink-700'}`}>{s.name}</span>
-                    </button>
-                  )
-                })}
+                {(() => {
+                  // Availability per maid for the chosen time + duration on this date.
+                  // A maid with an overlapping job is shown as Busy and is unclickable.
+                  const ns = parseTimeToHours(f.time)
+                  const ne = ns + (Number(f.hours) || 0)
+                  return (store.staff||[]).filter(s => s.active !== false).map(s => {
+                    const isSelected = f.manualStaff.includes(s.id)
+                    const conflict   = isSelected ? null : findConflictInRows(slotData.bookings, s.id, ns, ne)
+                    const busy       = !!conflict
+                    const isDisabled = busy || (!isSelected && f.manualStaff.length >= Number(f.cleaners))
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={isDisabled}
+                        title={busy ? `Busy ${conflict.range}${conflict.ref && conflict.ref !== '—' ? ` (Ref ${conflict.ref})` : ''}` : undefined}
+                        onClick={() => {
+                          if (isSelected) upd({ manualStaff: f.manualStaff.filter(id => id !== s.id) })
+                          else if (!busy && f.manualStaff.length < Number(f.cleaners)) upd({ manualStaff: [...f.manualStaff, s.id] })
+                        }}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-colors
+                          ${isSelected ? 'border-mint-400 bg-mint-50'
+                            : busy ? 'border-amber-200 bg-amber-50/60 cursor-not-allowed'
+                            : isDisabled ? 'border-ink-100 bg-ink-50 cursor-not-allowed opacity-50'
+                            : 'border-ink-200 bg-white hover:border-mint-300 hover:bg-mint-50'}`}
+                      >
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold
+                          ${isSelected ? 'bg-mint-500 text-white' : busy ? 'bg-amber-100 text-amber-700' : 'bg-ink-100 text-ink-600'}`}>
+                          {isSelected ? <AdminIcon name="check" className="w-3.5 h-3.5"/> : (s.name||'?')[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className={`text-[12.5px] font-medium truncate ${isSelected ? 'text-ink-900' : busy ? 'text-amber-800' : isDisabled ? 'text-ink-400' : 'text-ink-700'}`}>{s.name}</div>
+                          {busy && <div className="text-[10.5px] font-semibold text-amber-600 leading-tight truncate">Busy {conflict.range}</div>}
+                        </div>
+                      </button>
+                    )
+                  })
+                })()}
               </div>
               {f.manualStaff.length > 0 && (
                 <div className="mt-2 flex items-center justify-between text-[12px]">
