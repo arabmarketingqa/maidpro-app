@@ -6,6 +6,7 @@ import { StepService, StepDate, StepTime, StepLocation, StepConfirm, StepSuccess
 import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle } from './tweaks-panel'
 import { supabase, SETTINGS_SYNC_CHANNEL, SETTINGS_SYNC_KEY } from './supabase'
 import { readBookingCache, writeBookingCache, invalidateBookingCache } from './bookingCache'
+import { fetchDayBookings, filterFreeMaids } from './conflict'
 
 /* ── Multi-tenant scoping for the public booking page ──
    The company is resolved from the URL slug BEFORE the booking UI renders
@@ -660,7 +661,11 @@ function BookingApp() {
             const jobCounts = {};
             (existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
             const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0));
-            assigned_staff = sorted.slice(0, needed).map(s => s.id);
+            // Never double-book: only auto-assign maids who are genuinely free
+            // during this booking's time window on the chosen date.
+            const dayBookings = await fetchDayBookings(supabase, PUBLIC_COMPANY_ID, bookingDate);
+            const freeIds = filterFreeMaids(sorted.map(s => s.id), dayBookings, state.time, breakdown.hours);
+            assigned_staff = freeIds.slice(0, needed);
           }
         }
       } catch (_) { /* staff table not ready — skip assignment */ }

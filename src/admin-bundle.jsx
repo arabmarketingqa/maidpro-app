@@ -1,5 +1,6 @@
 ﻿import React from 'react'
 import { supabase, fmtBooking, broadcastSettingsUpdate } from './supabase'
+import { hasTimeConflict, fetchDayBookings, findConflictInRows, filterFreeMaids, parseTimeToHours } from './conflict'
 import { SVC_ICONS, SVC_ICON_NAMES, SvcIcon } from './serviceIcons'
 import { COUNTRIES as BRAND_COUNTRIES, dialCodeFor, timezoneFor } from './countries'
 import { useAdminI18n } from './admin-i18n'
@@ -1224,6 +1225,7 @@ const MaterialsSection = ({ store, set }) => {
 const AssignStaff = ({ booking, store, set }) => {
   const [open, setOpen] = React.useState(false);
   const [dropPos, setDropPos] = React.useState({ top: 0, left: 0 });
+  const [conflictErr, setConflictErr] = React.useState('');
   const ref = React.useRef(null);
 
   React.useEffect(() => {
@@ -1243,15 +1245,35 @@ const AssignStaff = ({ booking, store, set }) => {
       const left = Math.min(r.right - dropW, window.innerWidth - dropW - 8);
       setDropPos({ top, left: Math.max(8, left) });
     }
+    setConflictErr('');
     setOpen(o => !o);
   };
   const assigned = (store?.assignments?.[booking.ref]) || [];
   const toggle = async (id) => {
     if (!set || !store) return;
     const has = assigned.includes(id);
-    const next = has ? assigned.filter(x => x !== id) : [...assigned, id];
     // All maids work the full booking duration simultaneously — no splitting
     const totalHours = Number(booking._raw?.hours ?? booking.hours ?? 4);
+    // Bulletproof double-booking guard: when ADDING a maid, never let them be
+    // assigned to a booking that overlaps another job they already have on the
+    // same date. (Removing is always allowed.)
+    if (!has) {
+      const conflict = await hasTimeConflict(supabase, {
+        maidId: id,
+        date: booking._raw?.date,
+        startTime: booking._raw?.time || booking.time,
+        durationHours: totalHours,
+        companyId: getScopedCompany(),
+        excludeBookingId: booking._raw?.id ?? null,
+      });
+      if (conflict) {
+        const staffName = (store?.staff || []).find(s => s.id === id)?.name || 'This maid';
+        setConflictErr(`${staffName} is already booked ${conflict.range} (Ref ${conflict.ref}). Choose another maid or time.`);
+        return;
+      }
+    }
+    setConflictErr('');
+    const next = has ? assigned.filter(x => x !== id) : [...assigned, id];
     const newStaffHours = Object.fromEntries(next.map(sid => [sid, totalHours]));
     set({
       assignments: { ...(store.assignments || {}), [booking.ref]: next },
@@ -1286,6 +1308,11 @@ const AssignStaff = ({ booking, store, set }) => {
           style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, zIndex: 9999, width: 256 }}
           className="rounded-xl bg-white shadow-xl ring-1 ring-ink-200 p-1.5 max-h-72 overflow-y-auto">
           <div className="px-2 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-500">Assign maids</div>
+          {conflictErr && (
+            <div className="mx-1.5 mb-1.5 px-2.5 py-2 rounded-lg bg-red-50 ring-1 ring-red-200 text-[11.5px] font-medium text-red-700 leading-snug">
+              {conflictErr}
+            </div>
+          )}
           {(store?.staff || []).map(s => {
             const on = assigned.includes(s.id);
             const bookingDate = booking._raw?.date || '';
@@ -2696,6 +2723,17 @@ const RegularsView = () => {
       ? (schedule.days_of_week || []).map(d => DAY_NAMES[d]).join(', ')
       : (schedule.monthly_dates || []).map(d => `${d}${ordSfx(d)}`).join(', ');
 
+    // Double-booking guard for recurring slots: pull every booking that already
+    // exists on the dates we're about to generate, grouped by date, so each new
+    // slot only keeps the preferred maids who are actually free that day.
+    const startTime = schedule.start_time || '9:00 AM';
+    const slotHours = Number(schedule.hours) || 4;
+    const { data: slotBks } = await db('bookings')
+      .select('id, ref, time, hours, assigned_staff, status, date')
+      .in('date', newSlots);
+    const bksByDate = {};
+    (slotBks || []).forEach(b => { (bksByDate[b.date] = bksByDate[b.date] || []).push(b); });
+
     const rows = newSlots.map((dateStr, i) => ({
       ref:            `MP-${String(refBase + i + 1).padStart(3, '0')}`,
       name:           schedule.customer_name,
@@ -2703,13 +2741,15 @@ const RegularsView = () => {
       service:        schedule.service || 'Regular Cleaning',
       mode:           'hourly',
       date:           dateStr,
-      time:           schedule.start_time || '9:00 AM',
-      hours:          Number(schedule.hours) || 4,
+      time:           startTime,
+      hours:          slotHours,
       cleaners:       Number(schedule.maids) || 1,
       rate:           0,
       total:          0,
       status:         'Pending',
-      assigned_staff: staffToUse,
+      // Keep only preferred maids who are free on this specific date — never
+      // double-book an overlapping slot.
+      assigned_staff: filterFreeMaids(staffToUse, bksByDate[dateStr] || [], startTime, slotHours),
       // Embed schedule ID so syncFutureBookings can find these bookings precisely
       notes:          `[sch:${schedule.id}] Recurring: ${label}`,
     }));
@@ -3945,8 +3985,8 @@ const StaffSchedule = ({ store, bookings, dateKey }) => {
 };
 
 /* ─── Settings (lightweight) ─── */
-const HOUR_OPTIONS = Array.from({ length: 18 }, (_, i) => {
-  const h = i + 5; // 5 AM to 10 PM
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const h = i; // 12 AM (midnight) to 11 PM — full 24-hour range, no limit
   const ap = h < 12 ? 'AM' : 'PM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return { value: h, label: `${h12}:00 ${ap}` };
@@ -4415,6 +4455,22 @@ const BookingDetailModal = ({ booking, store, set, onClose }) => {
     if (!booking._raw?.id) { setSaveError('Booking has no database ID — cannot save.'); return }
     setSaving(true)
     setSaveError('')
+    // Reschedule guard: if the date/time moved, ensure none of this booking's
+    // assigned maids now overlap another job. Exclude this booking itself.
+    if (status !== 'Cancelled' && assignedIds.length > 0) {
+      const dayBookings = await fetchDayBookings(supabase, getScopedCompany(), editDate)
+      const ns = parseTimeToHours(editTime)
+      const ne = ns + (totalBookingHours || 0)
+      for (const sid of assignedIds) {
+        const conflict = findConflictInRows(dayBookings, sid, ns, ne, booking._raw.id)
+        if (conflict) {
+          const nm = (store.staff || []).find(s => s.id === sid)?.name || 'An assigned maid'
+          setSaving(false)
+          setSaveError(`${nm} is already booked ${conflict.range} (Ref ${conflict.ref}) on ${editDate}. Reassign that maid or pick another time.`)
+          return
+        }
+      }
+    }
     const { error } = await db('bookings').update({
       status,
       notes,
@@ -4792,6 +4848,25 @@ const NewBookingModal = ({ store, onClose }) => {
     const free = freeMaidsAt(f.time)
     if (slotData.availableCount === 0) { setErr('No staff have this date as a working day. Update working days in Staff Management.'); return }
     if (free < Number(f.cleaners)) { setErr(`Not enough free maids for this slot — only ${free} available (${Number(f.cleaners)} needed). Choose a different time or reduce maid count.`); return }
+
+    // Bulletproof double-booking guard. Pull this date's bookings once; reuse
+    // for both the manual-selection check and the auto-assign free-maid filter.
+    const dayBookings = await fetchDayBookings(supabase, getScopedCompany(), f.date)
+
+    // Manual selection: block the save if ANY chosen maid already has an
+    // overlapping job on this date.
+    if (f.manualStaff.length > 0) {
+      const newStart = parseTimeToHours(f.time)
+      const newEnd   = newStart + (Number(f.hours) || 0)
+      for (const sid of f.manualStaff) {
+        const conflict = findConflictInRows(dayBookings, sid, newStart, newEnd)
+        if (conflict) {
+          const nm = (store.staff || []).find(s => s.id === sid)?.name || 'A selected maid'
+          setErr(`${nm} is already booked ${conflict.range} (Ref ${conflict.ref}). Choose another maid or time.`)
+          return
+        }
+      }
+    }
     setSaving(true); setErr('')
 
     // Use manually selected maids if provided, otherwise auto-assign
@@ -4821,7 +4896,9 @@ const NewBookingModal = ({ store, onClose }) => {
             const jobCounts = {}
             ;(existingBks || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1 }))
             const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0))
-            assigned_staff = sorted.slice(0, needed).map(s => s.id)
+            // Only ever pick maids who are genuinely free during this slot.
+            const freeIds = filterFreeMaids(sorted.map(s => s.id), dayBookings, f.time, Number(f.hours))
+            assigned_staff = freeIds.slice(0, needed)
           }
         }
       } catch (_) {}
@@ -5145,7 +5222,9 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
           return ids.map(id => (staffList.find(s => s.id === id)?.name || '—')).join(', ');
         };
 
-        const completedJobs    = inRange.filter(b => b.status === 'Completed');
+        // Jobs report covers confirmed AND completed jobs (a confirmed job is a
+        // real scheduled job that should appear before it's marked complete).
+        const completedJobs    = inRange.filter(b => b.status === 'Confirmed' || b.status === 'Completed');
         const totalHours       = completedJobs.reduce((s, b) => s + (b.hours || 0), 0);
         const totalRevenue     = completedJobs.reduce((s, b) => s + (Number(b.total) || 0), 0);
         const totalReceived    = completedJobs.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
@@ -5250,7 +5329,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
   <!-- Summary pills -->
   <div class="summary">
     <div class="pill">
-      <div class="pill-label">Completed Jobs</div>
+      <div class="pill-label">Jobs</div>
       <div class="pill-value">${completedJobs.length}<span class="pill-unit">jobs</span></div>
     </div>
     <div class="pill">
@@ -5315,8 +5394,8 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
 
         return (
           <Card
-            title="Jobs Report — Completed"
-            subtitle={`${completedJobs.length} completed job${completedJobs.length !== 1 ? 's' : ''} · ${from} → ${to}`}
+            title="Jobs Report — Confirmed & Completed"
+            subtitle={`${completedJobs.length} job${completedJobs.length !== 1 ? 's' : ''} · ${from} → ${to}`}
             padded={false}
             action={
               <button onClick={handlePrint}
@@ -5341,7 +5420,7 @@ const ReportsSection = ({ bookings, store, reportType = 'daily' }) => {
                 </thead>
                 <tbody>
                   {completedJobs.length === 0 ? (
-                    <tr><td colSpan={8} className="px-5 py-12 text-center text-[13px] text-ink-400">No completed jobs in selected range.</td></tr>
+                    <tr><td colSpan={8} className="px-5 py-12 text-center text-[13px] text-ink-400">No confirmed or completed jobs in selected range.</td></tr>
                   ) : completedJobs.map((b, i) => (
                     <tr key={b.ref} className="border-t border-ink-100 hover:bg-ink-50/50 transition-colors">
                       <td className="px-5 py-3 font-mono text-[12px] text-ink-400 tabular-nums">{i + 1}</td>
@@ -6058,10 +6137,15 @@ const AdminPanel = ({ companyId, companySlug }) => {
     const jobCounts = {};
     (allBookings || []).forEach(b => (b.assigned_staff || []).forEach(sid => { jobCounts[sid] = (jobCounts[sid] || 0) + 1; }));
 
-    // Pick the N least-busy maids
+    // Pick the N least-busy maids — but only from those genuinely FREE during
+    // this booking's time window (never double-book an overlapping slot).
     const needed = Math.max(1, Number(newRow.cleaners) || 1);
     const sorted = [...pool].sort((a, b) => (jobCounts[a.id] || 0) - (jobCounts[b.id] || 0));
-    const assigned = sorted.slice(0, needed).map(s => s.id);
+    const dayBookings = await fetchDayBookings(supabase, getScopedCompany(), newRow.date);
+    const freeIds = filterFreeMaids(
+      sorted.map(s => s.id), dayBookings, newRow.time, Number(newRow.hours), newRow.id
+    );
+    const assigned = freeIds.slice(0, needed);
     const ref = newRow.ref || String(newRow.id);
 
     await db('bookings').update({ assigned_staff: assigned }).eq('id', newRow.id);
@@ -6150,13 +6234,18 @@ const AdminPanel = ({ companyId, companySlug }) => {
   //                  overpaid booking can't create negative outstanding).
   const todayRevenue     = todayBks.reduce((s, b) => s + (Number(b.total) || 0), 0);
   const todayReceived    = todayBks.reduce((s, b) => s + (Number(b._raw?.paid_amount) || 0), 0);
-  const todayOutstanding = todayBks.reduce((s, b) => s + Math.max(0, (Number(b.total) || 0) - (Number(b._raw?.paid_amount) || 0)), 0);
+  // Outstanding spans ALL non-cancelled bookings (not just today) so the Overview
+  // reflects the company's total unpaid balance. Per-booking clamp keeps an
+  // overpaid booking from creating negative outstanding.
+  const totalOutstanding = bookings
+    .filter(b => !isCancelledBooking(b))
+    .reduce((s, b) => s + Math.max(0, (Number(b.total) || 0) - (Number(b._raw?.paid_amount) || 0)), 0);
   const dynamicKpis = [
     { label: "Bookings Today",  value: String(todayBks.length),          unit: "jobs",    icon: "calendar", tone: "mint" },
     { label: "Active Maids",    value: String(activeMaids),              unit: "working", icon: "users",    tone: "ink"  },
     { label: "Today Revenue",   value: todayRevenue.toLocaleString(),    unit: "QAR",     icon: "money",    tone: "mint" },
     { label: "Today Received",  value: todayReceived.toLocaleString(),   unit: "QAR",     icon: "check",    tone: "mint" },
-    { label: "Outstanding",     value: todayOutstanding.toLocaleString(), unit: "QAR",    icon: "money",    tone: todayOutstanding > 0 ? "warn" : "ink" },
+    { label: "Outstanding",     value: totalOutstanding.toLocaleString(), unit: "QAR",    icon: "money",    tone: totalOutstanding > 0 ? "warn" : "ink" },
   ];
   const sections = {
     overview:      <OverviewSection store={store} set={set} kpis={dynamicKpis} bookings={bookings}/>,
