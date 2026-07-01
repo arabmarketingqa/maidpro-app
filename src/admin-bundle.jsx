@@ -4798,9 +4798,11 @@ const NewBookingModal = ({ store, onClose }) => {
     setSlotData(p => ({ ...p, loading: true }))
     Promise.all([
       db('bookings').select('time, hours, cleaners, assigned_staff').eq('date', f.date).neq('status', 'Cancelled'),
-      db('staff').select('id, working_days'),
+      db('staff').select('id, working_days, active'),
     ]).then(([{ data: bks }, { data: staff }]) => {
-      const workingStaff = (staff || []).filter(s => isWorkingDay(s, f.date));
+      // Availability for the CHOSEN date (past or future): only staff who work
+      // that weekday AND are not on-hold (active === false) count as available.
+      const workingStaff = (staff || []).filter(s => s.active !== false && isWorkingDay(s, f.date));
       setSlotData({ bookings: bks || [], availableCount: workingStaff.length, workingStaffIds: workingStaff.map(s => s.id), loading: false })
     })
   }, [f.date])
@@ -4839,12 +4841,9 @@ const NewBookingModal = ({ store, onClose }) => {
     return Math.max(0, slotData.availableCount - busyMaids.size - unassigned)
   }
 
-  const todayStr = (() => { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}` })()
-  const isPastSlot = (timeStr) => f.date === todayStr && Math.floor(parseH(timeStr)) <= new Date().getHours()
-
   const submit = async () => {
     if (!f.name.trim()||!f.phone.trim()) { setErr('Name and phone are required'); return }
-    if (isPastSlot(f.time)) { setErr('This time slot is in the past. Please choose a future time.'); return }
+    // Admin manual booking may log past jobs — no past date/time restriction here.
     const free = freeMaidsAt(f.time)
     if (slotData.availableCount === 0) { setErr('No staff have this date as a working day. Update working days in Staff Management.'); return }
     if (free < Number(f.cleaners)) { setErr(`Not enough free maids for this slot — only ${free} available (${Number(f.cleaners)} needed). Choose a different time or reduce maid count.`); return }
@@ -4875,9 +4874,9 @@ const NewBookingModal = ({ store, onClose }) => {
       try {
         const needed = Number(f.cleaners) || 1
         const mode   = 'hourly'
-        const { data: availStaff } = await db('staff').select('id, skills, working_days')
+        const { data: availStaff } = await db('staff').select('id, skills, working_days, active')
         if (availStaff && availStaff.length > 0) {
-          let pool = availStaff.filter(s => {
+          let pool = availStaff.filter(s => s.active !== false).filter(s => {
             const sk = Array.isArray(s.skills) ? s.skills : []
             const modes = sk.filter(x => x.startsWith('@')).map(x => x.slice(1))
             return modes.length === 0 || modes.includes(mode)
@@ -5013,11 +5012,11 @@ const NewBookingModal = ({ store, onClose }) => {
             <Label className="mb-1.5">Time {slotData.loading && <span className="text-ink-400 font-normal normal-case tracking-normal ml-1">checking…</span>}</Label>
             <select value={f.time} onChange={e=>upd({time:e.target.value})} className="w-full h-10 px-3 rounded-lg bg-white hairline text-[13.5px] text-ink-900 outline-none">
               {TIMES.map(t => {
-                const past = isPastSlot(t)
+                // Admin may log past jobs — past slots are never disabled here.
                 const free = freeMaidsAt(t)
-                const full = !past && free < Number(f.cleaners)
-                const label = past ? `${t} — Past` : full ? `${t} — Full (${free} free)` : free < slotData.availableCount ? `${t} — ${free} free` : t
-                return <option key={t} value={t} disabled={past || full}>{label}</option>
+                const full = free < Number(f.cleaners)
+                const label = full ? `${t} — Full (${free} free)` : free < slotData.availableCount ? `${t} — ${free} free` : t
+                return <option key={t} value={t} disabled={full}>{label}</option>
               })}
             </select>
           </div>
